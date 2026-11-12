@@ -15,7 +15,7 @@ public static class SiteFinder
     /// lane around buildings and not building over existing roads.
     /// </summary>
     public static (int X, int Y)? Find(GameWorld world, Settlement settlement, BuildingDef def, (int X, int Y)? near = null,
-        int maxRadius = Placement.SettlementRadius, Func<int, int, bool>? accept = null)
+        int? maxRadius = null, Func<int, int, bool>? accept = null)
     {
         var (ox, oy) = near ?? (settlement.CenterX, settlement.CenterY);
         bool preferFertile = def.FertileBonus > 0;
@@ -23,7 +23,8 @@ public static class SiteFinder
         double bestScore = double.MinValue;
         int validFound = 0;
 
-        for (int r = 0; r <= maxRadius; r++)
+        int searchRadius = maxRadius ?? settlement.TerritoryRadius;
+        for (int r = 0; r <= searchRadius; r++)
         {
             foreach (var (x, y) in Ring(ox, oy, r))
             {
@@ -99,17 +100,32 @@ public static class RoadPlanner
 {
     public const int MaxSearch = 6000;
 
+    /// <summary>Longest bridge the planner will build in one go.</summary>
+    public const int MaxBridgeTiles = 8;
+
     /// <summary>
     /// Builds a road from the building's door to the nearest existing road or stockpile entrance.
     /// Returns false when there's no buildable route.
     /// </summary>
     public static bool Connect(GameWorld world, Settlement settlement, Building building)
     {
+        var tiles = PlanRoute(world, settlement, building);
+        if (tiles == null) return false;
+        return tiles.Count == 0 || world.Execute(new PlaceRoadCommand(settlement.Id, tiles)).Ok;
+    }
+
+    /// <summary>
+    /// The new road tiles needed to connect a building (possibly a planned one that isn't placed yet),
+    /// an empty list if it's already connected or there's nothing to connect to, or null if it can't be done
+    /// (no route, or a bridge longer than <see cref="MaxBridgeTiles"/>).
+    /// </summary>
+    public static List<(int X, int Y)>? PlanRoute(GameWorld world, Settlement settlement, Building building)
+    {
         var start = building.AccessTiles()
             .Prepend(building.DoorTile)
             .FirstOrDefault(t => Pathfinder.StepCost(world.Map.GetTile(t.X, t.Y), Pathfinder.Mode.BuildRoad) != null,
                 (X: int.MinValue, Y: int.MinValue));
-        if (start.X == int.MinValue) return false;
+        if (start.X == int.MinValue) return null;
 
         var stockpileEntrances = settlement.Buildings
             .Where(b => b.Def.IsStockpile && b.Id != building.Id)
@@ -117,18 +133,20 @@ public static class RoadPlanner
             .ToHashSet();
 
         // The first building (usually the stockpile) has nothing to connect to yet.
-        if (settlement.Roads.Count == 0 && stockpileEntrances.Count == 0) return false;
+        if (settlement.Roads.Count == 0 && stockpileEntrances.Count == 0) return new();
 
         bool IsGoal(int x, int y) =>
-            (x, y) != start && (world.Map.GetTile(x, y).IsRoad || stockpileEntrances.Contains((x, y)));
+            (x, y) != start && !building.Covers(x, y) &&
+            (world.Map.GetTile(x, y).IsRoad || stockpileEntrances.Contains((x, y)));
 
-        if (IsGoal(start.X, start.Y) || world.Map.GetTile(start.X, start.Y).IsRoad) return true;
+        if (IsGoal(start.X, start.Y) || world.Map.GetTile(start.X, start.Y).IsRoad) return new();
 
-        var path = Pathfinder.FindPathToAny(world.Map, start, IsGoal, Pathfinder.Mode.BuildRoad, MaxSearch);
-        if (path == null) return false;
+        var path = Pathfinder.FindPathToAny(world.Map, start, IsGoal, Pathfinder.Mode.BuildRoad, MaxSearch, building.Covers);
+        if (path == null) return null;
 
         var tiles = path.Where(t => !world.Map.GetTile(t.X, t.Y).IsRoad).ToList();
-        return tiles.Count == 0 || world.Execute(new PlaceRoadCommand(settlement.Id, tiles)).Ok;
+        if (tiles.Count(t => world.Map.GetTile(t.X, t.Y).Terrain == Terrain.Water) > MaxBridgeTiles) return null;
+        return tiles;
     }
 }
 
@@ -145,10 +163,14 @@ public static class SettlementGovernor
 
     public const int MaxAttemptsPerDay = 3;
 
+    /// <summary>Candidate sites per search that get a full road-route check.</summary>
+    public const int MaxRouteChecksPerSearch = 10;
+
     public static void Daily(GameWorld world, Settlement settlement)
     {
         if (!settlement.Rules.AutoBuild) return;
-        if (settlement.Buildings.Count(b => b.IsConstructionSite) >= MaxActiveConstructionSites) return;
+        int maxSites = MaxActiveConstructionSites + settlement.Citizens.Count / 100;
+        if (settlement.Buildings.Count(b => b.IsConstructionSite) >= maxSites) return;
 
         // Try wishes in priority order; the first affordable one with a usable site gets built.
         long today = world.Time.Day;
@@ -165,7 +187,8 @@ public static class SettlementGovernor
                 continue;
             if (!fieldReady)
             {
-                field = Logistics.StockpileField(world, settlement);
+                // Where a road (or bridge) from a stockpile could reach: the same rules the road planner uses.
+                field = Logistics.StockpileField(world, settlement, Pathfinder.Mode.BuildRoad);
                 fieldReady = true;
             }
             if (TryBuild(world, settlement, def, near, field)) return;
@@ -178,8 +201,8 @@ public static class SettlementGovernor
     private static bool TryBuild(GameWorld world, Settlement settlement, BuildingDef def, (int X, int Y)? near, CostGrid? field)
     {
         // A service building must actually reach the homes it was meant for, so only look nearby.
-        int maxRadius = def.Service is { } service && near != null ? service.Radius / 2 : Placement.SettlementRadius;
-        // Only sites people can walk to from a stockpile (no farms across a river without a bridge).
+        int? maxRadius = def.Service is { } service && near != null ? service.Radius / 2 : null;
+        // Only sites people can reach from a stockpile, possibly over a bridge the road planner will build.
         bool Reachable(int left, int top)
         {
             if (field == null) return true;
@@ -190,7 +213,18 @@ public static class SettlementGovernor
             return false;
         }
 
-        var site = SiteFinder.Find(world, settlement, def, near, maxRadius, Reachable);
+        // Plan the connecting road (and any bridge) before committing, so nothing gets built and torn
+        // down. Route planning is expensive, so only a limited number of candidate sites get one.
+        int routeChecks = 0;
+        bool Connectable(int left, int top)
+        {
+            if (!Reachable(left, top) || routeChecks++ >= MaxRouteChecksPerSearch) return false;
+            var route = RoadPlanner.PlanRoute(world, settlement, new Building(0, def, left, top));
+            return route != null &&
+                   settlement.Stock.Get("wood") >= Roads.BridgeCost(world, route) + def.Cost.GetValueOrDefault("wood");
+        }
+
+        var site = SiteFinder.Find(world, settlement, def, near, maxRadius, Connectable);
         if (site is not var (x, y)) return false;
 
         var result = world.Execute(new PlaceBuildingCommand(settlement.Id, def.Id, x, y));
@@ -256,7 +290,8 @@ public static class SettlementGovernor
         var wishes = new List<(string, (int, int)?)>();
         void Wish(string id, (int, int)? near = null) => wishes.Add((id, near));
 
-        if (plannedHousing < 3) Wish("hovel");
+        int homeless = s.Citizens.Count(c => c.HomeBuildingId == null);
+        if (plannedHousing < 3 + homeless) Wish("hovel");
         foreach (var spot in ServiceGaps("water")) Wish("well", spot);
 
         // Each farm (two farmers) reliably covers about 6 nutrition a day.
@@ -284,7 +319,7 @@ public static class SettlementGovernor
         {
             int taverns = s.CountIncludingPlanned("tavern");
             int breweries = s.CountIncludingPlanned("brewery");
-            if ((breweries == 0 || (s.Stock.Get("ale") < 10 && breweries < taverns)) && !Understaffed("brewery"))
+            if ((breweries == 0 || (s.Stock.Get("ale") < 20 && breweries <= taverns)) && !Understaffed("brewery"))
                 Wish("brewery");
             if (s.Stock.Get("ale") >= 10)
                 foreach (var spot in ServiceGaps("drink")) Wish("tavern", spot);

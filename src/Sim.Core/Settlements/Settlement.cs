@@ -104,6 +104,10 @@ public sealed class Settlement
         CenterY = centerY;
     }
 
+    /// <summary>How far from the centre this settlement may build; grows with its population.</summary>
+    public int TerritoryRadius => Math.Min(Commands.Placement.MaxSettlementRadius,
+        Commands.Placement.SettlementRadius + Citizens.Count / Commands.Placement.CitizensPerExtraTile);
+
     public int StorageCapacity => Buildings.Where(b => b.IsOperational).Sum(b => b.Def.Storage);
     public int FreeStorage => Math.Max(0, StorageCapacity - Stock.Total);
 

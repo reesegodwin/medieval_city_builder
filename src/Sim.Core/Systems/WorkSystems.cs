@@ -21,13 +21,13 @@ public static class Logistics
     public const string NoRouteProblem = "No route to a stockpile";
 
     /// <summary>Walking cost from the nearest operational stockpile to every tile around the settlement, or null if there are no stockpiles.</summary>
-    public static CostGrid? StockpileField(GameWorld world, Settlement settlement)
+    public static CostGrid? StockpileField(GameWorld world, Settlement settlement, Pathfinder.Mode mode = Pathfinder.Mode.Walk)
     {
         var stockpiles = settlement.Buildings.Where(b => b.IsOperational && b.Def.IsStockpile).ToList();
         if (stockpiles.Count == 0) return null;
-        int r = Commands.Placement.SettlementRadius + 6;
+        int r = settlement.TerritoryRadius + 6;
         return Pathfinder.CostField(world.Map, stockpiles.SelectMany(s => s.AccessTiles()),
-            settlement.CenterX - r, settlement.CenterY - r, settlement.CenterX + r, settlement.CenterY + r);
+            settlement.CenterX - r, settlement.CenterY - r, settlement.CenterX + r, settlement.CenterY + r, mode);
     }
 
     /// <summary>Recomputes every building's hauling efficiency. Call after buildings or roads change.</summary>

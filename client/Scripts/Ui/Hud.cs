@@ -89,7 +89,7 @@ public partial class Hud : CanvasLayer
             buildRow.AddChild(b);
             return b;
         }
-        ToolButton("Roads\nfree", "Lay roads (R). Roads make hauling faster; people walk along them.", () => RoadRequested?.Invoke());
+        ToolButton("Roads\nbridges: wood", "Lay roads (R). Free on land; over water they become bridges (4 wood per tile). Roads make hauling faster; people walk along them.", () => RoadRequested?.Invoke());
         ToolButton("Demolish\nrefund", "Tear down buildings or roads (X). Refunds part of the cost.", () => DemolishRequested?.Invoke());
 
         foreach (var def in data.Buildings.Values)

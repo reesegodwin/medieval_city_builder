@@ -75,15 +75,21 @@ public sealed record SetAutoBuildCommand(int SettlementId, bool Enabled) : IComm
 
 public static class Placement
 {
-    /// <summary>How far from the settlement centre buildings may be placed.</summary>
-    public const int SettlementRadius = 48;
+    /// <summary>Starting territory radius: how far from the centre a new settlement may build.</summary>
+    public const int SettlementRadius = 44;
+
+    /// <summary>Territory never grows beyond this.</summary>
+    public const int MaxSettlementRadius = 100;
+
+    /// <summary>Territory grows by one tile for this many citizens.</summary>
+    public const int CitizensPerExtraTile = 8;
 
     /// <summary>Returns null if the building can go here, otherwise the reason it can't.</summary>
     public static string? Check(GameWorld world, Settlement settlement, Data.BuildingDef def, int x, int y)
     {
         int cx = x + def.Width / 2, cy = y + def.Height / 2;
-        if (Math.Abs(cx - settlement.CenterX) + Math.Abs(cy - settlement.CenterY) > SettlementRadius)
-            return "Too far from the settlement";
+        if (Math.Abs(cx - settlement.CenterX) + Math.Abs(cy - settlement.CenterY) > settlement.TerritoryRadius)
+            return "Outside the settlement's territory";
 
         for (int dy = 0; dy < def.Height; dy++)
         for (int dx = 0; dx < def.Width; dx++)
@@ -126,16 +132,23 @@ public static class Placement
 /// <summary>Low-level road tile changes. Callers go through the road commands.</summary>
 public static class Roads
 {
+    /// <summary>Wood per tile for a road over water (a bridge).</summary>
+    public const int BridgeWoodPerTile = 4;
+
     /// <summary>Returns null if a road can go on this tile, otherwise why not.</summary>
     public static string? Check(GameWorld world, Settlement settlement, int x, int y)
     {
-        if (Math.Abs(x - settlement.CenterX) + Math.Abs(y - settlement.CenterY) > Placement.SettlementRadius)
-            return "Too far from the settlement";
+        if (Math.Abs(x - settlement.CenterX) + Math.Abs(y - settlement.CenterY) > settlement.TerritoryRadius)
+            return "Outside the settlement's territory";
         var tile = world.Map.GetTile(x, y);
         if (tile.BuildingId != 0) return "Blocked by a building";
-        if (!tile.IsBuildable) return $"Cannot build a road on {tile.Terrain}";
+        if (!tile.IsBuildable && tile.Terrain != Terrain.Water) return $"Cannot build a road on {tile.Terrain}";
         return null;
     }
+
+    /// <summary>Wood needed to build these tiles (only new bridge tiles cost anything).</summary>
+    public static int BridgeCost(GameWorld world, IEnumerable<(int X, int Y)> tiles) =>
+        tiles.Distinct().Count(t => world.Map.GetTile(t.X, t.Y) is { IsRoad: false, Terrain: Terrain.Water }) * BridgeWoodPerTile;
 
     internal static void Add(GameWorld world, Settlement settlement, int x, int y)
     {
@@ -170,6 +183,10 @@ public sealed record PlaceRoadCommand(int SettlementId, IReadOnlyList<(int X, in
             if (world.Map.GetTile(x, y).IsRoad) continue;
             if (Roads.Check(world, settlement, x, y) is { } error) return CommandResult.Fail($"({x},{y}): {error}");
         }
+
+        int wood = Roads.BridgeCost(world, Tiles);
+        if (wood > 0 && !settlement.Stock.TryTake("wood", wood))
+            return CommandResult.Fail($"Bridge needs {wood} wood");
 
         int before = settlement.Roads.Count;
         foreach (var (x, y) in Tiles) Roads.Add(world, settlement, x, y);

@@ -7,6 +7,9 @@ namespace Sim.Core.World;
 public static class Pathfinder
 {
     public const double RoadCost = 0.4;
+
+    /// <summary>Road-building cost of crossing open water, where a bridge would have to be built.</summary>
+    public const double BridgePlanCost = 5.0;
     public const int DefaultMaxExpanded = 20_000;
 
     public enum Mode
@@ -14,7 +17,7 @@ public static class Pathfinder
         /// <summary>People walking: avoids water and buildings, prefers roads.</summary>
         Walk,
 
-        /// <summary>Laying roads: only buildable ground, and existing roads are slightly preferred.</summary>
+        /// <summary>Laying roads: buildable ground, existing roads preferred, water crossed by (expensive) bridges.</summary>
         BuildRoad,
     }
 
@@ -25,9 +28,9 @@ public static class Pathfinder
     {
         if (tile.BuildingId != 0) return null;
         if (mode == Mode.BuildRoad)
-            return tile.IsRoad ? 0.5 : tile.IsBuildable ? 1.0 : null;
+            return tile.IsRoad ? 0.5 : tile.IsBuildable ? 1.0 : tile.Terrain == Terrain.Water ? BridgePlanCost : null;
 
-        if (tile.IsRoad) return RoadCost;
+        if (tile.IsRoad) return RoadCost; // includes bridges over water
         return tile.Terrain switch
         {
             Terrain.Water => null,
@@ -48,11 +51,12 @@ public static class Pathfinder
 
     /// <summary>Dijkstra from a tile to the nearest tile matching <paramref name="isGoal"/>.</summary>
     public static List<(int X, int Y)>? FindPathToAny(WorldMap map, (int X, int Y) from, Func<int, int, bool> isGoal,
-        Mode mode = Mode.Walk, int maxExpanded = DefaultMaxExpanded) =>
-        Search(map, from, isGoal, mode, maxExpanded, (_, _) => 0, allowBlockedGoal: false);
+        Mode mode = Mode.Walk, int maxExpanded = DefaultMaxExpanded, Func<int, int, bool>? blocked = null) =>
+        Search(map, from, isGoal, mode, maxExpanded, (_, _) => 0, allowBlockedGoal: false, blocked);
 
     private static List<(int X, int Y)>? Search(WorldMap map, (int X, int Y) from, Func<int, int, bool> isGoal,
-        Mode mode, int maxExpanded, Func<int, int, double> heuristic, bool allowBlockedGoal)
+        Mode mode, int maxExpanded, Func<int, int, double> heuristic, bool allowBlockedGoal,
+        Func<int, int, bool>? blocked = null)
     {
         var open = new PriorityQueue<(int X, int Y), (double F, long Order)>();
         var cost = new Dictionary<(int, int), double> { [from] = 0 };
@@ -73,7 +77,9 @@ public static class Pathfinder
                 var next = (current.X + dx, current.Y + dy);
                 if (closed.Contains(next)) continue;
 
-                double? step = StepCost(map.GetTile(next.Item1, next.Item2), mode);
+                double? step = blocked != null && blocked(next.Item1, next.Item2)
+                    ? null
+                    : StepCost(map.GetTile(next.Item1, next.Item2), mode);
                 if (step == null)
                 {
                     if (!allowBlockedGoal || !isGoal(next.Item1, next.Item2)) continue;
@@ -106,7 +112,8 @@ public static class Pathfinder
     /// Multi-source Dijkstra over a rectangle: the walking cost from the nearest source to every tile.
     /// Used for logistics (distance from stockpiles to each workplace).
     /// </summary>
-    public static CostGrid CostField(WorldMap map, IEnumerable<(int X, int Y)> sources, int minX, int minY, int maxX, int maxY)
+    public static CostGrid CostField(WorldMap map, IEnumerable<(int X, int Y)> sources, int minX, int minY, int maxX, int maxY,
+        Mode mode = Mode.Walk)
     {
         var grid = new CostGrid(minX, minY, maxX, maxY);
         var open = new PriorityQueue<(int X, int Y), (double Cost, long Order)>();
@@ -114,7 +121,7 @@ public static class Pathfinder
 
         foreach (var s in sources)
         {
-            if (!grid.Contains(s.X, s.Y) || StepCost(map.GetTile(s.X, s.Y), Mode.Walk) == null) continue;
+            if (!grid.Contains(s.X, s.Y) || StepCost(map.GetTile(s.X, s.Y), mode) == null) continue;
             if (grid[s.X, s.Y] <= 0) continue;
             grid[s.X, s.Y] = 0;
             open.Enqueue(s, (0, order++));
@@ -127,7 +134,7 @@ public static class Pathfinder
             {
                 int nx = current.X + dx, ny = current.Y + dy;
                 if (!grid.Contains(nx, ny)) continue;
-                double? step = StepCost(map.GetTile(nx, ny), Mode.Walk);
+                double? step = StepCost(map.GetTile(nx, ny), mode);
                 if (step == null) continue;
                 double nc = priority.Cost + step.Value;
                 if (nc >= grid[nx, ny]) continue;

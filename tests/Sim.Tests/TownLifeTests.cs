@@ -55,8 +55,8 @@ public class RoadTests
     {
         var (world, town, _) = Scenario.NewTown();
 
-        var water = Scenario.FindTile(world, town, Terrain.Water);
-        Assert.False(world.Execute(new PlaceRoadCommand(town.Id, new[] { water })).Ok);
+        var rock = Scenario.FindTile(world, town, Terrain.Rock);
+        Assert.False(world.Execute(new PlaceRoadCommand(town.Id, new[] { rock })).Ok);
 
         var stockpile = town.Buildings.First(b => b.Def.Id == "stockpile");
         Assert.False(world.Execute(new PlaceRoadCommand(town.Id, new[] { (stockpile.X, stockpile.Y) })).Ok);
@@ -71,6 +71,39 @@ public class RoadTests
         Assert.True(world.Execute(new RemoveRoadCommand(town.Id, new[] { grass })).Ok);
         Assert.False(world.Map.GetTile(grass.X, grass.Y).IsRoad);
         Assert.DoesNotContain(grass, town.Roads);
+    }
+
+    [Fact]
+    public void BridgesCostWoodAndCanBeWalkedOver()
+    {
+        var (world, town, _) = Scenario.NewTown();
+        var water = Scenario.FindTile(world, town, Terrain.Water);
+        Assert.Null(Pathfinder.StepCost(world.Map.GetTile(water.X, water.Y), Pathfinder.Mode.Walk));
+
+        town.Stock.TryTake("wood", town.Stock.Get("wood"));
+        var noWood = world.Execute(new PlaceRoadCommand(town.Id, new[] { water }));
+        Assert.False(noWood.Ok);
+        Assert.Contains("wood", noWood.Error);
+
+        town.Stock.Add("wood", Roads.BridgeWoodPerTile);
+        Assert.True(world.Execute(new PlaceRoadCommand(town.Id, new[] { water })).Ok);
+        Assert.Equal(0, town.Stock.Get("wood"));
+        Assert.Equal(Pathfinder.RoadCost, Pathfinder.StepCost(world.Map.GetTile(water.X, water.Y), Pathfinder.Mode.Walk));
+    }
+
+    [Fact]
+    public void TerritoryGrowsWithPopulation()
+    {
+        var (world, town, _) = Scenario.NewTown();
+        int start = town.TerritoryRadius;
+        Assert.Equal(Placement.SettlementRadius + town.Citizens.Count / Placement.CitizensPerExtraTile, start);
+
+        foreach (var c in CitizenFactory.CreateHousehold(world, 4).Concat(CitizenFactory.CreateHousehold(world, 4))
+                     .Concat(Enumerable.Range(0, 40).SelectMany(_ => CitizenFactory.CreateHousehold(world, 1))))
+            town.AddCitizen(c);
+
+        Assert.True(town.TerritoryRadius > start);
+        Assert.True(town.TerritoryRadius <= Placement.MaxSettlementRadius);
     }
 
     [Fact]

@@ -62,7 +62,7 @@ public partial class Main : Node3D
 
         var roads = new RoadRenderer { Name = "Roads" };
         AddChild(roads);
-        roads.Initialize(town);
+        roads.Initialize(_session.World.Map, town);
 
         _placement = new PlacementTool { Name = "Placement" };
         AddChild(_placement);

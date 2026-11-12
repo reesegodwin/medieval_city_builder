@@ -48,9 +48,17 @@ public partial class RoadTool : Node3D
         _preview.VisibleInstanceCount = 0;
     }
 
-    public string Status => Problem != null ? $"Road: {Problem}"
-        : _start == null ? "Road: click where the road starts (right-click to stop)"
-        : $"Road: click where it ends ({_tiles.Count} tiles)";
+    public string Status
+    {
+        get
+        {
+            if (Problem != null) return $"Road: {Problem}";
+            if (_start == null) return "Road: click where the road starts (right-click to stop). Roads over water become bridges.";
+            int wood = Roads.BridgeCost(_session.World, _tiles);
+            string bridge = wood > 0 ? $", bridge costs {wood} wood (you have {_session.PlayerTown.Stock.Get("wood")})" : "";
+            return $"Road: click where it ends ({_tiles.Count} tiles{bridge})";
+        }
+    }
 
     public override void _Process(double delta)
     {
