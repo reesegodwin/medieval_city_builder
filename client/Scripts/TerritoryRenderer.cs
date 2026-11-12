@@ -5,7 +5,8 @@ using Sim.Core.World;
 namespace MedievalClient;
 
 /// <summary>
-/// Draws the settlement's territory border as a coloured line along the inside edge of claimed land. It widens
+/// Draws the settlement's territory border as a smoothed coloured line (marching squares, so steps become
+/// diagonals) draped over the ground. It widens
 /// as the camera zooms out so it stays readable, and is rebuilt only when the territory or the (stepped) width
 /// changes. While the territory tool is open the claimed land is also tinted.
 /// </summary>
@@ -18,7 +19,6 @@ public partial class TerritoryRenderer : Node3D
     private const float WidthPerDistance = 0.0075f;
     private const float WidthStep = 0.04f;
     private const float Y = 0.03f;
-    private static readonly (int Dx, int Dz)[] Diagonals = { (-1, -1), (1, -1), (1, 1), (-1, 1) };
 
     /// <summary>Unshaded and unaffected by fog, so the border stays readable from far away.</summary>
     private static readonly StandardMaterial3D BorderMaterial = new()
@@ -76,46 +76,107 @@ public partial class TerritoryRenderer : Node3D
         if (ShowFill && !_fillBuilt)
         {
             _fillBuilt = true;
-            var mb = new MeshBuilder();
-            foreach (var (x, z) in _settlement.Territory)
-                mb.Quad(new Vector3(x, Y - 0.01f, z), new Vector3(x + 1, Y - 0.01f, z),
-                    new Vector3(x + 1, Y - 0.01f, z + 1), new Vector3(x, Y - 0.01f, z + 1), Fill, Vector3.Up);
-            _fill.Mesh = mb.Commit(Materials.Overlay);
+            BuildFill();
         }
         _fill.Visible = ShowFill;
     }
 
+    // ---- Marching squares over tile centres ----
+    // A "cell" sits between four tile centres; its top-left tile is (cx, cy). Walking the cell's outline
+    // (corner, edge midpoint, corner, ...) and keeping owned corners plus midpoints where ownership changes
+    // gives the owned part of the cell. Two midpoints next to each other on that outline are a piece of the
+    // border. Staircases become 45-degree lines and straight edges stay on the tile boundaries.
+
+    private static readonly (int Dx, int Dz)[] CellCorners = { (0, 0), (1, 0), (1, 1), (0, 1) };
+
+    /// <summary>Cells touching at least one owned tile.</summary>
+    private HashSet<(int, int)> TouchedCells()
+    {
+        var cells = new HashSet<(int, int)>();
+        foreach (var (x, z) in _settlement.Territory)
+            for (int dz = -1; dz <= 0; dz++)
+            for (int dx = -1; dx <= 0; dx++)
+                cells.Add((x + dx, z + dz));
+        return cells;
+    }
+
+    /// <summary>The owned polygon of a cell, as 2D points with a flag marking edge midpoints.</summary>
+    private List<(Vector2 P, bool Mid)> CellPolygon(int cx, int cz)
+    {
+        var owned = new bool[4];
+        for (int k = 0; k < 4; k++) owned[k] = Owns(cx + CellCorners[k].Dx, cz + CellCorners[k].Dz);
+        var poly = new List<(Vector2, bool)>(8);
+        for (int k = 0; k < 4; k++)
+        {
+            var (ax, az) = CellCorners[k];
+            var (bx, bz) = CellCorners[(k + 1) % 4];
+            var a = new Vector2(cx + ax + 0.5f, cz + az + 0.5f);
+            var b = new Vector2(cx + bx + 0.5f, cz + bz + 0.5f);
+            if (owned[k]) poly.Add((a, false));
+            if (owned[k] != owned[(k + 1) % 4]) poly.Add(((a + b) / 2, true));
+        }
+        return poly;
+    }
+
+    /// <summary>Ground height with a per-build cache (corner heights are reused many times).</summary>
+    private Func<Vector2, float, Vector3> Drape()
+    {
+        var cache = new Dictionary<(int, int), float>();
+        float Corner(int x, int z)
+        {
+            if (!cache.TryGetValue((x, z), out float h)) cache[(x, z)] = h = TerrainShape.CornerHeight(_map, x, z);
+            return h;
+        }
+        return (p, lift) =>
+        {
+            int ix = Mathf.FloorToInt(p.X), iz = Mathf.FloorToInt(p.Y);
+            float fx = p.X - ix, fz = p.Y - iz;
+            float h = Mathf.Lerp(Mathf.Lerp(Corner(ix, iz), Corner(ix + 1, iz), fx),
+                Mathf.Lerp(Corner(ix, iz + 1), Corner(ix + 1, iz + 1), fx), fz);
+            return new Vector3(p.X, Mathf.Max(h, TerrainShape.WaterLevel) + lift, p.Y); // ride on water, not the riverbed
+        };
+    }
+
     private void BuildBorder(float width)
     {
-        // Strips extend inward, so a wide border never covers land outside the territory.
-        float y = Y + width * 0.02f;
+        float lift = Y + width * 0.08f;
+        var at = Drape();
         var mb = new MeshBuilder();
-        foreach (var (x, z) in _settlement.Territory)
+        foreach (var (cx, cz) in TouchedCells())
         {
-            if (!Owns(x, z - 1)) Strip(mb, x, z, x + 1, z, 0, 1, width, y);
-            if (!Owns(x, z + 1)) Strip(mb, x, z + 1, x + 1, z + 1, 0, -1, width, y);
-            if (!Owns(x - 1, z)) Strip(mb, x, z, x, z + 1, 1, 0, width, y);
-            if (!Owns(x + 1, z)) Strip(mb, x + 1, z, x + 1, z + 1, -1, 0, width, y);
-
-            // Inside corners of the staircase: both side neighbours are ours but the diagonal isn't. Without a
-            // corner square, wide strips leave a notch at every step and diagonal borders look dotted.
-            foreach (var (dx, dz) in Diagonals)
+            var poly = CellPolygon(cx, cz);
+            for (int i = 0; i < poly.Count; i++)
             {
-                if (Owns(x + dx, z + dz) || !Owns(x + dx, z) || !Owns(x, z + dz)) continue;
-                float cx = dx > 0 ? x + 1 - width : x, cz = dz > 0 ? z + 1 - width : z;
-                mb.Quad(new Vector3(cx, y, cz), new Vector3(cx + width, y, cz),
-                    new Vector3(cx + width, y, cz + width), new Vector3(cx, y, cz + width), Border, Vector3.Up);
+                var (a, aMid) = poly[i];
+                var (b, bMid) = poly[(i + 1) % poly.Count];
+                if (aMid && bMid) Segment(mb, a, b, width, lift, at);
             }
         }
         _border.Mesh = mb.Commit(BorderMaterial);
     }
 
-    /// <summary>A flat strip along a tile edge, extending inward by <paramref name="width"/>.</summary>
-    private static void Strip(MeshBuilder mb, float x0, float z0, float x1, float z1, int inX, int inZ, float width, float y)
+    /// <summary>A flat band centred on a border segment, extended by half its width so joints overlap cleanly.</summary>
+    private static void Segment(MeshBuilder mb, Vector2 a, Vector2 b, float width, float lift, Func<Vector2, float, Vector3> at)
     {
-        var a = new Vector3(x0, y, z0);
-        var b = new Vector3(x1, y, z1);
-        var offset = new Vector3(inX * width, 0, inZ * width);
-        mb.Quad(a, b, b + offset, a + offset, Border, Vector3.Up);
+        var dir = (b - a).Normalized();
+        var side = new Vector2(-dir.Y, dir.X) * (width / 2);
+        a -= dir * (width / 2);
+        b += dir * (width / 2);
+        mb.Quad(at(a + side, lift), at(b + side, lift), at(b - side, lift), at(a - side, lift), Border, Vector3.Up);
+    }
+
+    private void BuildFill()
+    {
+        var at = Drape();
+        var mb = new MeshBuilder();
+        foreach (var (cx, cz) in TouchedCells())
+        {
+            var poly = CellPolygon(cx, cz);
+            if (poly.Count < 3) continue;
+            var first = at(poly[0].P, Y);
+            for (int i = 1; i + 1 < poly.Count; i++)
+                mb.Tri(first, at(poly[i].P, Y), at(poly[i + 1].P, Y), Fill, Vector3.Up);
+        }
+        _fill.Mesh = mb.Commit(Materials.Overlay);
     }
 }

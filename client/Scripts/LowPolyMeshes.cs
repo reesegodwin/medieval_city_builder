@@ -248,6 +248,19 @@ public static class LowPolyMeshes
         mb.GableRoof(new Vector3(min.X - 0.1f, max.Y, min.Z - 0.1f), new Vector3(max.X + 0.1f, max.Y, max.Z + 0.1f), roofHeight, roof);
     }
 
+    private static readonly Dictionary<(int, int), ArrayMesh> FoundationCache = new();
+
+    /// <summary>Packed-earth footing from just below ground level down into the terrain.</summary>
+    public static ArrayMesh Foundation(int width, int height)
+    {
+        if (FoundationCache.TryGetValue((width, height), out var cached)) return cached;
+        var mb = new MeshBuilder { Center = new Vector3(width / 2f, -0.2f, height / 2f) };
+        mb.Box(new Vector3(0.02f, -0.45f, 0.02f), new Vector3(width - 0.02f, -0.005f, height - 0.02f), Soil.Lightened(0.08f));
+        var mesh = mb.Commit();
+        FoundationCache[(width, height)] = mesh;
+        return mesh;
+    }
+
     public static ArrayMesh Scaffold(int width, int height)
     {
         if (ScaffoldCache.TryGetValue((width, height), out var cached)) return cached;

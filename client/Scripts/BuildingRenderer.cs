@@ -67,6 +67,8 @@ public partial class BuildingRenderer : Node3D
             Scaffold = new MeshInstance3D { Mesh = LowPolyMeshes.Scaffold(b.Def.Width, b.Def.Height) },
             Plot = new MeshInstance3D { Mesh = LowPolyMeshes.Plot(b.Def.Width, b.Def.Height) },
         };
+        // An earthen footing under every building, so it never floats where the ground slopes towards water.
+        root.AddChild(new MeshInstance3D { Mesh = LowPolyMeshes.Foundation(b.Def.Width, b.Def.Height) });
         root.AddChild(view.Model);
         root.AddChild(view.Scaffold);
         root.AddChild(view.Plot);

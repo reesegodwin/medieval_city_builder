@@ -29,7 +29,9 @@ public partial class RoadRenderer : Node3D
         _builtVersion = _settlement.RoadVersion;
 
         var mb = new MeshBuilder();
-        const float y = 0.015f, inset = 0.04f;
+        const float lift = 0.02f, inset = 0.04f;
+        // Roads drape over the (gently uneven) ground instead of floating at a fixed height.
+        Vector3 V(float px, float pz) => new(px, TerrainShape.HeightAt(_map, px, pz) + lift, pz);
         foreach (var (x, z) in _settlement.Roads)
         {
             if (_map.GetTile(x, z).Terrain == Terrain.Water)
@@ -39,16 +41,16 @@ public partial class RoadRenderer : Node3D
             }
             float jitter = (float)(Hashing.Hash01(0x40AD, x, z) - 0.5) * 0.08f;
             var color = Dirt.Lightened(jitter);
-            mb.Quad(new Vector3(x + inset, y, z + inset), new Vector3(x + 1 - inset, y, z + inset),
-                new Vector3(x + 1 - inset, y, z + 1 - inset), new Vector3(x + inset, y, z + 1 - inset), color, Vector3.Up);
+            mb.Quad(V(x + inset, z + inset), V(x + 1 - inset, z + inset), V(x + 1 - inset, z + 1 - inset), V(x + inset, z + 1 - inset),
+                color, Vector3.Up);
 
             // Fill the gaps towards road neighbours so roads read as continuous strips.
             if (_settlement.Roads.Contains((x + 1, z)))
-                mb.Quad(new Vector3(x + 1 - inset, y, z + inset), new Vector3(x + 1 + inset, y, z + inset),
-                    new Vector3(x + 1 + inset, y, z + 1 - inset), new Vector3(x + 1 - inset, y, z + 1 - inset), color, Vector3.Up);
+                mb.Quad(V(x + 1 - inset, z + inset), V(x + 1 + inset, z + inset), V(x + 1 + inset, z + 1 - inset), V(x + 1 - inset, z + 1 - inset),
+                    color, Vector3.Up);
             if (_settlement.Roads.Contains((x, z + 1)))
-                mb.Quad(new Vector3(x + inset, y, z + 1 - inset), new Vector3(x + 1 - inset, y, z + 1 - inset),
-                    new Vector3(x + 1 - inset, y, z + 1 + inset), new Vector3(x + inset, y, z + 1 + inset), color, Vector3.Up);
+                mb.Quad(V(x + inset, z + 1 - inset), V(x + 1 - inset, z + 1 - inset), V(x + 1 - inset, z + 1 + inset), V(x + inset, z + 1 + inset),
+                    color, Vector3.Up);
         }
         _mesh.Mesh = mb.Commit();
     }
