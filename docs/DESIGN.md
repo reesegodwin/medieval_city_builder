@@ -157,7 +157,9 @@ Rough guess for one experienced developer: a playable Phase 3 in 6–12 months, 
 - **Service coverage model:** each need (water, faith, drink, market) is met by the nearest staffed service building within its radius (Manhattan distance from the home) that has spare capacity. It's recalculated daily. Taverns use ale per person served. A need's "missing" penalty only applies from a minimum population, so small villages aren't punished.
 - **Food variety:** +3 mood per distinct food eaten in the last 3 days beyond the first (max +6). Without a market people always eat the tastiest food; with a market they shop around.
 - **Walking stays cosmetic:** the client draws townsfolk following roads using the same pathfinder, but the simulation never depends on their drawn position.
-- **Sound is deferred:** it has no simulation impact and needs audio assets.
+- **Sound:** all audio is synthesized in code (no third-party files), so there are no licences to track. Any future internet asset must have its licence verified at the source and be recorded in `CREDITS.md`.
+- **Bridges and territory (Phase 1c):** roads over water become bridges (4 wood per tile, up to 8 tiles per governor-built crossing). Territory radius = 44 + population / 8, capped at 100. The governor plans each building's connecting road before placing it, so it never builds somewhere it can't reach.
+- **Saves:** versioned JSON. Only changes are stored (terrain comes from the seed). Save and load are exact: a loaded world continues with the same state hash as the original.
 
 ## Battles: individual units + destructible structures (hybrid LOD simulation)
 

@@ -14,3 +14,8 @@
 - Rendering and UI stay in `client/`; game rules stay in `Sim.Core`. The client talks to the simulation only through `client/Scripts/SimSession.cs`, so Phase 2 can swap in a network connection.
 - Art is procedural placeholder meshes (`client/Scripts/LowPolyMeshes.cs`). Citizens' walking is cosmetic; never feed client positions back into the simulation.
 - Verify client changes with `dotnet build client/MedievalClient.csproj`. When a Godot binary is available, also render a screenshot with `xvfb-run` (see README) and look at it.
+
+## Assets and licences
+- All art and audio are currently generated in code (`LowPolyMeshes.cs`, `Audio/SoundSynth.cs`). Keep it that way unless a third-party asset is clearly worth it.
+- Never add an asset from the internet without reading its licence from the original source (the licence file in the download or the creator's page). Prefer CC0. Record it in `CREDITS.md` (creator, URL, licence, required attribution) and keep the licence file next to the asset. If the licence can't be verified, don't use the asset.
+- Exported builds must ship Godot's and .NET's licence notices (see `CREDITS.md`).

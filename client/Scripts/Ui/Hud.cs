@@ -28,6 +28,10 @@ public partial class Hud : CanvasLayer
     public event Action? RulesRequested;
     public event Action? SaveRequested;
     public event Action? LoadRequested;
+    public event Action? SoundToggled;
+
+    /// <summary>Raised whenever any HUD button is pressed (for the click sound).</summary>
+    public event Action? ButtonClicked;
 
     public void Build(GameData data, bool autoBuild)
     {
@@ -73,6 +77,7 @@ public partial class Hud : CanvasLayer
                      ("Rules", "Job priorities, stock limits and reserves (P)", () => RulesRequested?.Invoke()),
                      ("Save", "Quick-save (F5)", () => SaveRequested?.Invoke()),
                      ("Load", "Load the quick-save (F9)", () => LoadRequested?.Invoke()),
+                     ("Sound", "Sound on/off (M)", () => SoundToggled?.Invoke()),
                  })
         {
             var b = new Button { Text = text, TooltipText = tip, FocusMode = Control.FocusModeEnum.None };
@@ -167,6 +172,16 @@ public partial class Hud : CanvasLayer
         help.OffsetLeft = -560;
         help.OffsetRight = -12;
         AddChild(help);
+    }
+
+    /// <summary>Hooks every button and checkbox under <paramref name="root"/> to <see cref="ButtonClicked"/>.</summary>
+    public void ConnectClickSounds(Node root)
+    {
+        foreach (var child in root.GetChildren())
+        {
+            if (child is BaseButton button) button.Pressed += () => ButtonClicked?.Invoke();
+            ConnectClickSounds(child);
+        }
     }
 
     private static string Describe(BuildingDef def)

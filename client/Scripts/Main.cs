@@ -1,4 +1,5 @@
 using Godot;
+using MedievalClient.Audio;
 using MedievalClient.Ui;
 using Sim.Core.Commands;
 
@@ -13,6 +14,7 @@ namespace MedievalClient;
 ///   --inspect             select a citizen on start (shows the inspector panel)
 ///   --rules               open the rules panel on start
 ///   --save-load-test      save, reload the scene from the save, then continue (automated check)
+///   --export-sounds DIR   write every generated sound to DIR as .wav files
 /// </summary>
 public partial class Main : Node3D
 {
@@ -28,6 +30,7 @@ public partial class Main : Node3D
     private Hud _hud = null!;
     private InspectorPanel _inspector = null!;
     private RulesPanel _rules = null!;
+    private SoundManager _sound = null!;
     private MeshInstance3D _marker = null!;
 
     private int? _selectedBuilding;
@@ -85,6 +88,10 @@ public partial class Main : Node3D
         AddChild(_demolishTool);
         _demolishTool.Initialize(_session, _camera);
 
+        _sound = new SoundManager { Name = "Sound" };
+        AddChild(_sound);
+        _sound.Initialize(town, () => _camera.Focus);
+
         _marker = new MeshInstance3D { Mesh = LowPolyMeshes.SelectionMarker, Visible = false };
         AddChild(_marker);
 
@@ -117,6 +124,10 @@ public partial class Main : Node3D
         _hud.RulesRequested += _rules.Toggle;
         _hud.SaveRequested += SaveGame;
         _hud.LoadRequested += LoadGame;
+        _hud.SoundToggled += _sound.ToggleMute;
+        _hud.ButtonClicked += _sound.Click;
+        _hud.ConnectClickSounds(_hud);
+        if (SimSession.UserArg("--export-sounds") is { Length: > 0 } soundDir) _sound.ExportAll(soundDir);
         if (wasLoaded)
         {
             Flash($"Loaded {town.Name}, {_session.World.Time}");
@@ -182,7 +193,9 @@ public partial class Main : Node3D
         {
             _uiTimer = 0;
             _hud.Refresh(_session);
-            _hud.AddEvents(_session.TakeNewEvents());
+            var events = _session.TakeNewEvents();
+            _hud.AddEvents(events);
+            _sound.OnEvents(events);
             RefreshInspector();
             if (_rules.Visible) _rules.Refresh();
             _hud.FeedVisible = !_rules.Visible;
@@ -200,6 +213,7 @@ public partial class Main : Node3D
             : null));
 
         UpdateMarker((float)delta);
+        _sound.Tick(delta, !_session.Paused);
 
         _frames++;
         if (_frames == 20 && !_saveLoadTestDone && SimSession.UserArg("--save-load-test") != null)
@@ -226,8 +240,19 @@ public partial class Main : Node3D
         {
             case InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true }:
                 if (_placement.Active != null) PlaceBuilding();
-                else if (_roadTool.Active) Report(_roadTool.Click(), "Can't build road");
-                else if (_demolishTool.Active) Report(_demolishTool.Click(), "Can't demolish");
+                else if (_roadTool.Active)
+                {
+                    var road = _roadTool.Click();
+                    Report(road, "Can't build road");
+                    if (road is { Ok: true }) _sound.Placed();
+                    else if (road == null) _sound.Click();
+                }
+                else if (_demolishTool.Active)
+                {
+                    var torn = _demolishTool.Click();
+                    Report(torn, "Can't demolish");
+                    if (torn is { Ok: true }) _sound.Demolished();
+                }
                 else Select();
                 break;
 
@@ -247,6 +272,11 @@ public partial class Main : Node3D
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.P }:
                 _rules.Toggle();
+                break;
+
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.M }:
+                _sound.ToggleMute();
+                Flash(_sound.Muted ? "Sound off (M)" : "Sound on");
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.F5 }:
@@ -332,6 +362,7 @@ public partial class Main : Node3D
     private void PlaceBuilding()
     {
         var result = _placement.TryPlace();
+        if (result is { Ok: true }) _sound.Placed();
         if (result is { Ok: false, Error: { } error }) Flash($"Can't build here: {error}");
         else if (result is { Ok: true } && _placement.Active is { } def &&
                  !_session.PlayerTown.Stock.Has(def.Cost))
