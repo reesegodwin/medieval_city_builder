@@ -26,6 +26,9 @@ public partial class CameraRig : Node3D
     /// <summary>The ground point the camera looks at.</summary>
     public Vector3 Focus => Position;
 
+    /// <summary>Current distance from the focus point (eases towards the zoom target).</summary>
+    public float Distance => _distance;
+
     public override void _Ready()
     {
         _camera = new Camera3D { Fov = 40f, Far = 400f };
@@ -34,6 +37,9 @@ public partial class CameraRig : Node3D
     }
 
     public void LookAtTile(int x, int y) => Position = new Vector3(x + 0.5f, 0, y + 0.5f);
+
+    /// <summary>Jumps to a zoom distance (clamped to the allowed range).</summary>
+    public void SetDistance(float distance) => _distance = _targetDistance = Mathf.Clamp(distance, MinDistance, MaxDistance);
 
     public override void _UnhandledInput(InputEvent @event)
     {

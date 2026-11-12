@@ -1,5 +1,62 @@
 [
   {
+    "id": "keep",
+    "name": "Keep",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0,
+    "cost": {},
+    "builderSlots": 2,
+    "townCentre": {
+      "territoryCap": 7321,
+      "upgradeTo": "town_hall",
+      "minPopulation": 0
+    },
+    "jobs": 4,
+    "jobKind": "roadworker"
+  },
+  {
+    "id": "town_hall",
+    "name": "Town Hall",
+    "width": 3,
+    "height": 3,
+    "buildDays": 3,
+    "cost": {
+      "wood": 100,
+      "stone": 60,
+      "coin": 150
+    },
+    "builderSlots": 4,
+    "townCentre": {
+      "territoryCap": 12961,
+      "upgradeTo": "castle",
+      "minPopulation": 90
+    },
+    "jobs": 6,
+    "jobKind": "roadworker",
+    "upkeep": 2
+  },
+  {
+    "id": "castle",
+    "name": "Castle",
+    "width": 3,
+    "height": 3,
+    "buildDays": 6,
+    "cost": {
+      "wood": 200,
+      "stone": 180,
+      "coin": 600
+    },
+    "builderSlots": 6,
+    "townCentre": {
+      "territoryCap": 20201,
+      "minPopulation": 240
+    },
+    "jobs": 8,
+    "jobKind": "roadworker",
+    "upkeep": 4
+  },
+  {
     "id": "stockpile",
     "name": "Stockpile",
     "width": 3,
@@ -8,7 +65,9 @@
     "cost": {
       "wood": 5
     },
-    "storage": 500
+    "storage": 500,
+    "jobs": 10,
+    "jobKind": "hauler"
   },
   {
     "id": "hovel",
@@ -158,7 +217,8 @@
       "need": "faith",
       "radius": 22,
       "capacity": 80
-    }
+    },
+    "upkeep": 0.3
   },
   {
     "id": "brewery",
@@ -180,7 +240,8 @@
         "ale": 4
       },
       "workDays": 1
-    }
+    },
+    "upkeep": 0.3
   },
   {
     "id": "tavern",
@@ -200,7 +261,8 @@
       "consumesPerPersonDay": {
         "ale": 0.2
       }
-    }
+    },
+    "upkeep": 0.3
   },
   {
     "id": "market",
@@ -218,6 +280,160 @@
       "need": "market",
       "radius": 24,
       "capacity": 120
+    },
+    "upkeep": 0.4
+  },
+  {
+    "id": "mine",
+    "name": "Iron Mine",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.5,
+    "cost": {
+      "wood": 25
+    },
+    "jobs": 2,
+    "jobKind": "miner",
+    "recipe": {
+      "outputs": {
+        "iron_ore": 3
+      },
+      "workDays": 1
+    },
+    "nearTerrain": {
+      "terrain": "IronDeposit",
+      "radius": 6,
+      "min": 3
+    },
+    "governor": {
+      "minPopulation": 60,
+      "populationPerBuilding": 200,
+      "lowStock": 20
+    },
+    "upkeep": 0.5
+  },
+  {
+    "id": "smithy",
+    "name": "Smithy",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.6,
+    "cost": {
+      "wood": 20,
+      "stone": 15,
+      "coin": 15
+    },
+    "jobs": 1,
+    "jobKind": "smith",
+    "recipe": {
+      "inputs": {
+        "iron_ore": 2,
+        "wood": 1
+      },
+      "outputs": {
+        "tools": 2
+      },
+      "workDays": 1
+    },
+    "governor": {
+      "minPopulation": 60,
+      "populationPerBuilding": 150,
+      "lowStock": 15
+    },
+    "upkeep": 0.5
+  },
+  {
+    "id": "pasture",
+    "name": "Sheep Pasture",
+    "width": 4,
+    "height": 4,
+    "buildDays": 0.3,
+    "cost": {
+      "wood": 12
+    },
+    "jobs": 1,
+    "jobKind": "shepherd",
+    "recipe": {
+      "outputs": {
+        "wool": 3
+      },
+      "workDays": 1
+    },
+    "governor": {
+      "minPopulation": 80,
+      "populationPerBuilding": 150,
+      "lowStock": 20
     }
+  },
+  {
+    "id": "weaver",
+    "name": "Weaver",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.5,
+    "cost": {
+      "wood": 20
+    },
+    "jobs": 1,
+    "jobKind": "weaver",
+    "recipe": {
+      "inputs": {
+        "wool": 3
+      },
+      "outputs": {
+        "cloth": 2
+      },
+      "workDays": 1
+    },
+    "governor": {
+      "minPopulation": 80,
+      "populationPerBuilding": 150,
+      "lowStock": 15
+    },
+    "upkeep": 0.3
+  },
+  {
+    "id": "carpenter",
+    "name": "Carpenter",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.5,
+    "cost": {
+      "wood": 20,
+      "stone": 5,
+      "coin": 15
+    },
+    "jobs": 1,
+    "jobKind": "carpenter",
+    "recipe": {
+      "inputs": {
+        "wood": 3
+      },
+      "outputs": {
+        "furniture": 1
+      },
+      "workDays": 1
+    },
+    "governor": {
+      "minPopulation": 150,
+      "populationPerBuilding": 250,
+      "lowStock": 10
+    },
+    "upkeep": 0.3
+  },
+  {
+    "id": "trading_post",
+    "name": "Trading Post",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.5,
+    "cost": {
+      "wood": 30,
+      "stone": 10
+    },
+    "jobs": 1,
+    "jobKind": "merchant",
+    "trade": true,
+    "upkeep": 1
   }
 ]

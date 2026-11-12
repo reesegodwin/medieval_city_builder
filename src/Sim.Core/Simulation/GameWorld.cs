@@ -28,6 +28,15 @@ public sealed class GameWorld
     public int TotalDeaths { get; set; }
     public int TotalBirths { get; set; }
 
+    /// <summary>Offers, trade routes and caravans between towns.</summary>
+    public Trade.TradeBook Trade { get; set; } = new();
+
+    /// <summary>Speed and offline rules, chosen when the world is created.</summary>
+    public WorldSettings Settings { get; set; } = new();
+
+    /// <summary>Real UTC time the world was last played (or saved); used to catch up on time away.</summary>
+    public DateTimeOffset? LastActiveUtc { get; set; }
+
     public GameWorld(ulong seed, GameData? data = null)
     {
         Seed = seed;
@@ -64,7 +73,11 @@ public sealed class GameWorld
         h.Add(Time.Tick).Add(TotalBirths).Add(TotalDeaths).Add(Events.Count).Add(Rng.StateFingerprint);
         foreach (var s in Settlements)
         {
-            h.Add(s.Id);
+            h.Add(s.Id).Add(s.Territory.Count).Add(s.TerritoryCap).Add(s.HaulCoverage).Add(s.Roads.Count)
+                .Add(s.TaxAccrued).Add(s.UpkeepOwed).Add(s.UpkeepUnpaid);
+            foreach (var plan in s.RoadPlans) h.Add(plan.X).Add(plan.Y).Add(plan.Progress);
+            foreach (var (tool, wear) in s.ToolWear) h.Add(tool).Add(wear);
+            foreach (var (good, use) in s.GoodsUse) h.Add(good).Add(use);
             foreach (var (resource, amount) in s.Stock.Items) h.Add(resource).Add(amount);
             foreach (var b in s.Buildings)
             {
@@ -79,6 +92,21 @@ public sealed class GameWorld
                 foreach (var (kind, skill) in c.Skills) h.Add(kind).Add(skill);
             }
         }
+        var trade = Trade;
+        h.Add(trade.CompletedTrades).Add(trade.MerchantVisits);
+        foreach (var o in trade.Offers)
+        {
+            h.Add(o.Id).Add(o.SettlementId).Add(o.ExpiresTick);
+            foreach (var (r, n) in o.Give) h.Add(r).Add(n);
+            foreach (var (r, n) in o.Want) h.Add(r).Add(-n);
+        }
+        foreach (var r in trade.Routes) h.Add(r.Id).Add(r.FromId).Add(r.ToId).Add(r.Accepted).Add(r.NextTick).Add(r.Rounds).Add(r.Skipped);
+        foreach (var c in trade.Caravans)
+        {
+            h.Add(c.Id).Add((int)c.Kind).Add(c.FromId).Add(c.ToId).Add(c.ArriveTick).Add(c.Path.Count);
+            foreach (var (r, n) in c.Cargo) h.Add(r).Add(n);
+        }
+        foreach (var (id, tick) in trade.NextMerchant) h.Add(id).Add(tick);
         return h.Value;
     }
 }

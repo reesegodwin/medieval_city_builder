@@ -53,7 +53,9 @@ public partial class RoadTool : Node3D
         get
         {
             if (Problem != null) return $"Road: {Problem}";
-            if (_start == null) return "Road: click where the road starts (right-click to stop). Roads over water become bridges.";
+            if (_start == null)
+                return "Road: click where the road starts (right-click to stop). Dirt roads are free; roadworkers from the town centre " +
+                       "build them over time. They may leave your territory, but not enter another town's. Over water they become bridges.";
             int wood = Roads.BridgeCost(_session.World, _tiles);
             string bridge = wood > 0 ? $", bridge costs {wood} wood (you have {_session.PlayerTown.Stock.Get("wood")})" : "";
             return $"Road: click where it ends ({_tiles.Count} tiles{bridge})";
@@ -78,10 +80,10 @@ public partial class RoadTool : Node3D
         for (int i = 0; i < n; i++)
         {
             var (x, y) = _tiles[i];
-            bool isRoad = world.Map.GetTile(x, y).IsRoad;
+            bool isRoad = world.Map.GetTile(x, y) is { IsRoad: true } or { RoadPlanned: true };
             string? error = isRoad ? null : Roads.Check(world, _session.PlayerTown, x, y);
             Problem ??= error;
-            _preview.SetInstanceTransform(i, new Transform3D(Basis.Identity, Coords.TileCenter(x, y) + new Vector3(0, 0.05f, 0)));
+            _preview.SetInstanceTransform(i, new Transform3D(Basis.Identity, Coords.TileCenter(x, y) + new Vector3(0, GroundY(x, y) + 0.05f, 0)));
             _preview.SetInstanceColor(i, isRoad ? Existing : error == null ? Valid : Invalid);
         }
         _preview.VisibleInstanceCount = n;
@@ -120,4 +122,8 @@ public partial class RoadTool : Node3D
         }
         return tiles;
     }
+
+    /// <summary>Ground (or water surface) height at a tile's centre, so previews sit on the land.</summary>
+    private float GroundY(int x, int y) =>
+        Mathf.Max(TerrainShape.HeightAt(_session.World.Map, x + 0.5f, y + 0.5f), TerrainShape.WaterLevel);
 }

@@ -2,17 +2,29 @@ using Godot;
 using MedievalClient.Audio;
 using MedievalClient.Ui;
 using Sim.Core.Commands;
+using Sim.Core.Simulation;
 
 namespace MedievalClient;
 
 /// <summary>
-/// Entry point. Creates the simulation session and all renderers/UI in code, and routes input.
-/// User arguments (after "--" on Godot's command line):
-///   --seed N              world seed (default 42)
+/// Entry point. Shows the start menu (or starts straight from the command line), then creates all renderers and
+/// UI in code and routes input. User arguments (after "--" on Godot's command line):
+///   --join HOST[:PORT]    join a shared world as --name
+///   --host [PORT]         host a world for friends as --name (continues the hosted world if there is one)
+///   --name NAME           player name for shared worlds
+///   --world-speed PRESET  persistent | weekend | evening | sprint (new worlds)
+///   --menu                show the start menu even with other options (for screenshots)
+///   --seed N              world seed (default 42); starts single-player directly
 ///   --warmup-days N       fast-forward the simulation before showing it
 ///   --screenshot file.png save a screenshot after a few frames and quit (automated checks)
 ///   --inspect             select a citizen on start (shows the inspector panel)
 ///   --rules               open the rules panel on start
+///   --trade [TAB]         open the trade panel on start (tab 0-4)
+///   --follow-caravan      keep the camera on a caravan on the road (automated checks)
+///   --territory           open the territory paint tool on start
+///   --zoom N              start with the camera N units away (6-90)
+///   --place ID            start placing building ID with the cursor mid-screen (automated checks)
+///   --cursor X,Y          with --place, put the cursor at this pixel instead
 ///   --save-load-test      save, reload the scene from the save, then continue (automated check)
 ///   --export-sounds DIR   write every generated sound to DIR as .wav files
 /// </summary>
@@ -27,9 +39,12 @@ public partial class Main : Node3D
     private PlacementTool _placement = null!;
     private RoadTool _roadTool = null!;
     private DemolishTool _demolishTool = null!;
+    private TerritoryTool _territoryTool = null!;
+    private TerritoryRenderer _territory = null!;
     private Hud _hud = null!;
     private InspectorPanel _inspector = null!;
     private RulesPanel _rules = null!;
+    private TradePanel _trade = null!;
     private SoundManager _sound = null!;
     private MeshInstance3D _marker = null!;
 
@@ -42,15 +57,93 @@ public partial class Main : Node3D
     private string? _screenshotPath;
     private int _frames;
     private static bool _saveLoadTestDone;
+    private static bool _justLoaded;
+    private bool _followCaravan;
+    private readonly HashSet<int> _renderedSettlements = new();
+    private Node3D _world3D = null!;
+
+    public override void _Notification(int what)
+    {
+        if (what == NotificationWMCloseRequest) SimSession.Current?.Dispose(); // a host saves and stops serving
+    }
+
+    public override void _ExitTree()
+    {
+        if (_session == null) return;
+        _session.Notice -= Flash;
+        _session.WorldReplaced -= Rebuild;
+    }
+
+    /// <summary>A session from command-line arguments, or null to show the start menu.</summary>
+    private static SimSession? SessionFromCommandLine()
+    {
+        string name = SimSession.UserArg("--name") is { Length: > 0 } n ? n : "Player";
+        double secondsPerDay = WorldSpeeds.SecondsPerDay(SimSession.UserArg("--world-speed") ?? "evening") ?? 60;
+        if (SimSession.UserArg("--join") is { Length: > 0 } address)
+        {
+            int port = Sim.Net.Protocol.DefaultPort;
+            int colon = address.LastIndexOf(':');
+            if (colon > 0 && int.TryParse(address[(colon + 1)..], out int p))
+            {
+                port = p;
+                address = address[..colon];
+            }
+            return SimSession.JoinGame(name, address, port);
+        }
+        if (SimSession.UserArg("--host") is { } hostArg)
+        {
+            int port = int.TryParse(hostArg, out int p) ? p : Sim.Net.Protocol.DefaultPort;
+            return SimSession.HostGame(name, port, SimSession.SeedFromCommandLine(42),
+                new WorldSettings { SecondsPerGameDay = secondsPerDay, WhenEmpty = EmptyWorldPolicy.CatchUp });
+        }
+        if (SimSession.UserArg("--menu") != null) return null;
+        string[] directStart = { "--seed", "--warmup-days", "--screenshot", "--place", "--inspect", "--rules",
+            "--territory", "--zoom", "--save-load-test", "--export-sounds" };
+        return directStart.Any(a => SimSession.UserArg(a) != null)
+            ? SimSession.NewLocal(SimSession.SeedFromCommandLine(42), secondsPerDay)
+            : null;
+    }
+
+    private void ShowStartMenu()
+    {
+        var menu = new StartMenu { Name = "StartMenu" };
+        menu.Started += session =>
+        {
+            SimSession.Current = session;
+            GetTree().ReloadCurrentScene();
+        };
+        AddChild(menu);
+    }
+
+    /// <summary>The world object was replaced (resync with the server): rebuild the scene around it.</summary>
+    private void Rebuild() => CallDeferred(MethodName.ReloadScene);
+
+    private void ReloadScene() => GetTree().ReloadCurrentScene();
 
     public override void _Ready()
     {
-        // A world loaded from a save is handed over through SimSession.PendingWorld (the scene reloads).
-        _session = SimSession.PendingWorld is { } loaded
-            ? new SimSession(loaded)
-            : new SimSession(SimSession.SeedFromCommandLine(42));
-        bool wasLoaded = SimSession.PendingWorld != null;
-        SimSession.PendingWorld = null;
+        // The session survives scene reloads (loading a save, resyncing with a server).
+        if (SimSession.Current == null)
+        {
+            try
+            {
+                SimSession.Current = SessionFromCommandLine();
+            }
+            catch (Exception e)
+            {
+                GD.PrintErr($"Couldn't start: {e.Message}");
+            }
+            if (SimSession.Current == null)
+            {
+                ShowStartMenu();
+                return;
+            }
+        }
+        _session = SimSession.Current;
+        _session.Notice += Flash;
+        _session.WorldReplaced += Rebuild;
+        bool wasLoaded = _justLoaded;
+        _justLoaded = false;
         var town = _session.PlayerTown;
 
         SetupLighting();
@@ -64,17 +157,13 @@ public partial class Main : Node3D
         terrain.FocusProvider = () => _camera.Focus;
         AddChild(terrain);
 
-        var buildings = new BuildingRenderer { Name = "Buildings" };
-        buildings.Initialize(town);
-        AddChild(buildings);
+        _world3D = new Node3D { Name = "Settlements" };
+        AddChild(_world3D);
+        AddNewSettlements();
 
-        _citizens = new CitizenRenderer { Name = "Citizens" };
-        AddChild(_citizens);
-        _citizens.Initialize(_session.World, town);
-
-        var roads = new RoadRenderer { Name = "Roads" };
-        AddChild(roads);
-        roads.Initialize(_session.World.Map, town);
+        var caravans = new CaravanRenderer { Name = "Caravans" };
+        AddChild(caravans);
+        caravans.Initialize(_session.World);
 
         _placement = new PlacementTool { Name = "Placement" };
         AddChild(_placement);
@@ -88,6 +177,10 @@ public partial class Main : Node3D
         AddChild(_demolishTool);
         _demolishTool.Initialize(_session, _camera);
 
+        _territoryTool = new TerritoryTool { Name = "TerritoryTool" };
+        AddChild(_territoryTool);
+        _territoryTool.Initialize(_session, _camera);
+
         _sound = new SoundManager { Name = "Sound" };
         AddChild(_sound);
         _sound.Initialize(town, () => _camera.Focus);
@@ -97,7 +190,8 @@ public partial class Main : Node3D
 
         _hud = new Hud { Name = "Hud" };
         AddChild(_hud);
-        _hud.Build(_session.World.Data, town.Rules.AutoBuild);
+        _hud.Build(_session.World.Data, town.Rules.AutoBuild, town.Rules.AutoExpandTerritory,
+            SimSession.Speeds.Where(x => x <= _session.MaxSpeed).ToList(), _session.CanChangeSpeed, _session.CanPause);
         _hud.BuildRequested += id =>
         {
             CancelTools();
@@ -111,23 +205,53 @@ public partial class Main : Node3D
             _session.Speed = speed;
             _session.Paused = false;
         };
-        _hud.PauseToggled += () => _session.Paused = !_session.Paused;
+        _hud.PauseToggled += () =>
+        {
+            if (_session.CanPause) _session.Paused = !_session.Paused;
+        };
         _hud.AutoBuildToggled += on => _session.Execute(new SetAutoBuildCommand(town.Id, on));
+        _hud.AutoTerritoryToggled += on => _session.Execute(new SetAutoExpandTerritoryCommand(town.Id, on));
+        _hud.TerritoryRequested += StartTerritoryTool;
+        _hud.ExpandTerritoryRequested += () =>
+        {
+            var result = _session.Execute(new ExpandTerritoryCommand(town.Id));
+            Report(result, "Can't expand");
+            if (result.Ok) Flash($"Territory: {town.Territory.Count}/{town.TerritoryAllowance} tiles");
+        };
 
         _inspector = new InspectorPanel { Name = "Inspector" };
         _hud.AddChild(_inspector);
         _inspector.Closed += ClearSelection;
+        _inspector.UpgradeRequested += () =>
+        {
+            var result = _session.Execute(new UpgradeTownCentreCommand(town.Id));
+            Report(result, "Can't upgrade");
+            if (result is { Ok: true, CreatedId: int id })
+            {
+                _sound.Placed();
+                _selectedBuilding = id;
+                Flash($"{town.FindBuilding(id)?.Def.Name} planned. Builders start once the materials are in.");
+            }
+            RefreshInspector();
+        };
 
         _rules = new RulesPanel { Name = "Rules" };
         _rules.Initialize(_session);
         _hud.AddChild(_rules);
         _hud.RulesRequested += _rules.Toggle;
+
+        _trade = new TradePanel { Name = "Trade" };
+        _trade.Initialize(_session);
+        _hud.AddChild(_trade);
+        _hud.TradeRequested += ToggleTrade;
         _hud.SaveRequested += SaveGame;
         _hud.LoadRequested += LoadGame;
         _hud.SoundToggled += _sound.ToggleMute;
         _hud.ButtonClicked += _sound.Click;
         _hud.ConnectClickSounds(_hud);
         if (SimSession.UserArg("--export-sounds") is { Length: > 0 } soundDir) _sound.ExportAll(soundDir);
+        if (_session.Mode == SessionMode.Host)
+            Flash($"Hosting on port {_session.HostPort}. Friends join with your address and that port.");
         if (wasLoaded)
         {
             Flash($"Loaded {town.Name}, {_session.World.Time}");
@@ -138,6 +262,16 @@ public partial class Main : Node3D
             _session.RunDays(warmup);
         _screenshotPath = SimSession.UserArg("--screenshot");
         if (SimSession.UserArg("--rules") != null) _rules.Toggle();
+        if (SimSession.UserArg("--trade") is { } tradeTab)
+        {
+            _trade.Toggle();
+            if (int.TryParse(tradeTab, out int tab)) _trade.ShowTab(tab);
+        }
+        if (SimSession.UserArg("--territory") != null) StartTerritoryTool();
+        if (float.TryParse(SimSession.UserArg("--zoom"), out float zoom)) _camera.SetDistance(zoom);
+        _followCaravan = SimSession.UserArg("--follow-caravan") != null;
+        if (SimSession.UserArg("--place") is { Length: > 0 } placeId && _session.World.Data.Buildings.TryGetValue(placeId, out var placeDef))
+            _placement.Begin(placeDef);
         if (SimSession.UserArg("--inspect") != null)
             _selectedCitizen = town.Citizens.FirstOrDefault(c => c.IsAdult && c.JobBuildingId != null)?.Id;
 
@@ -183,9 +317,58 @@ public partial class Main : Node3D
         AddChild(sun);
     }
 
+    /// <summary>Draws every settlement in the world: the player's own, and other players' as they appear.</summary>
+    private void AddNewSettlements()
+    {
+        var map = _session.World.Map;
+        foreach (var settlement in _session.World.Settlements)
+        {
+            if (!_renderedSettlements.Add(settlement.Id)) continue;
+            bool mine = settlement == _session.PlayerTown;
+            var root = new Node3D { Name = $"Settlement_{settlement.Id}" };
+            _world3D.AddChild(root);
+
+            var buildings = new BuildingRenderer { Name = "Buildings" };
+            buildings.Initialize(settlement);
+            root.AddChild(buildings);
+
+            var citizens = new CitizenRenderer { Name = "Citizens" };
+            root.AddChild(citizens);
+            citizens.Initialize(_session.World, settlement);
+            if (mine) _citizens = citizens;
+
+            var roads = new RoadRenderer { Name = "Roads" };
+            root.AddChild(roads);
+            roads.Initialize(map, settlement);
+
+            var territory = new TerritoryRenderer { Name = "Territory" };
+            if (!mine) territory.BorderColor = TerritoryRenderer.OtherPlayerColor(settlement.Id);
+            root.AddChild(territory);
+            territory.Initialize(map, settlement, () => _camera.Distance);
+            if (mine) _territory = territory;
+        }
+    }
+
     public override void _Process(double delta)
     {
+        if (_session == null)
+        {
+            // Start menu: still honour --screenshot for automated checks.
+            if (++_frames == 30 && SimSession.UserArg("--screenshot") is { Length: > 0 } menuShot)
+            {
+                GetViewport().GetTexture().GetImage().SavePng(menuShot);
+                GD.Print($"Saved screenshot to {menuShot}");
+                GetTree().Quit();
+            }
+            return;
+        }
         _session.Advance(delta);
+        if (_session.World.Settlements.Count != _renderedSettlements.Count) AddNewSettlements();
+        if (_followCaravan && _session.World.Trade.Caravans.FirstOrDefault() is { } caravan)
+        {
+            var (at, _) = CaravanRenderer.PositionAlongPath(caravan, (float)caravan.Progress(_session.World.Time.Tick));
+            _camera.Position = new Vector3(at.X, 0, at.Y);
+        }
         _citizens.Animate = !_session.Paused;
 
         _uiTimer += delta;
@@ -198,7 +381,8 @@ public partial class Main : Node3D
             _sound.OnEvents(events);
             RefreshInspector();
             if (_rules.Visible) _rules.Refresh();
-            _hud.FeedVisible = !_rules.Visible;
+            _trade.Refresh();
+            _hud.FeedVisible = !_rules.Visible && !_trade.Visible;
         }
 
         if (_flashTimer > 0)
@@ -210,12 +394,23 @@ public partial class Main : Node3D
             ? _placement.Problem is { } p ? $"{def.Name}: {p}" : $"Place {def.Name} (right-click to stop)"
             : _roadTool.Active ? _roadTool.Status
             : _demolishTool.Active ? _demolishTool.Status
+            : _territoryTool.Active ? _territoryTool.Status
             : null));
+        _territory.ShowFill = _territoryTool.Active;
 
         UpdateMarker((float)delta);
         _sound.Tick(delta, !_session.Paused);
 
         _frames++;
+        // Automated checks: put the cursor mid-screen so a tool's preview shows in the screenshot.
+        if (_frames == 5 && SimSession.UserArg("--place") != null)
+        {
+            var cursor = GetViewport().GetVisibleRect().Size / 2;
+            if (SimSession.UserArg("--cursor")?.Split(',') is [var cx, var cy] &&
+                float.TryParse(cx, out float px) && float.TryParse(cy, out float py))
+                cursor = new Vector2(px, py);
+            GetViewport().WarpMouse(cursor);
+        }
         if (_frames == 20 && !_saveLoadTestDone && SimSession.UserArg("--save-load-test") != null)
         {
             _saveLoadTestDone = true;
@@ -230,12 +425,14 @@ public partial class Main : Node3D
             var image = GetViewport().GetTexture().GetImage();
             var error = image.SavePng(_screenshotPath);
             GD.Print(error == Error.Ok ? $"Saved screenshot to {_screenshotPath}" : $"Screenshot failed: {error}");
+            SimSession.Current?.Dispose();
             GetTree().Quit();
         }
     }
 
     public override void _UnhandledInput(InputEvent @event)
     {
+        if (_session == null) return; // start menu
         switch (@event)
         {
             case InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true }:
@@ -247,6 +444,7 @@ public partial class Main : Node3D
                     if (road is { Ok: true }) _sound.Placed();
                     else if (road == null) _sound.Click();
                 }
+                else if (_territoryTool.Active) _territoryTool.BeginStroke(Input.IsKeyPressed(Key.Shift));
                 else if (_demolishTool.Active)
                 {
                     var torn = _demolishTool.Click();
@@ -254,6 +452,10 @@ public partial class Main : Node3D
                     if (torn is { Ok: true }) _sound.Demolished();
                 }
                 else Select();
+                break;
+
+            case InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: false }:
+                _territoryTool.EndStroke();
                 break;
 
             case InputEventMouseButton { ButtonIndex: MouseButton.Right, Pressed: true }:
@@ -270,8 +472,25 @@ public partial class Main : Node3D
                 StartDemolishTool();
                 break;
 
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.T }:
+                StartTerritoryTool();
+                break;
+
+            case InputEventKey { Pressed: true, Keycode: Key.Bracketleft } when _territoryTool.Active:
+                _territoryTool.ResizeBrush(-1);
+                break;
+
+            case InputEventKey { Pressed: true, Keycode: Key.Bracketright } when _territoryTool.Active:
+                _territoryTool.ResizeBrush(+1);
+                break;
+
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.P }:
+                if (_trade.Visible) _trade.Toggle();
                 _rules.Toggle();
+                break;
+
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.J }:
+                ToggleTrade();
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.M }:
@@ -288,24 +507,40 @@ public partial class Main : Node3D
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.Space }:
-                _session.Paused = !_session.Paused;
+                if (_session.CanPause) _session.Paused = !_session.Paused;
                 break;
 
             case InputEventKey { Pressed: true, Echo: false } key
                 when key.Keycode >= Key.Key1 && key.Keycode < Key.Key1 + SimSession.Speeds.Length:
-                _session.Speed = SimSession.Speeds[key.Keycode - Key.Key1];
+                double requested = SimSession.Speeds[key.Keycode - Key.Key1];
+                if (!_session.CanChangeSpeed || requested > _session.MaxSpeed) break;
+                _session.Speed = requested;
                 _session.Paused = false;
                 break;
         }
     }
 
-    private bool AnyToolActive => _placement.Active != null || _roadTool.Active || _demolishTool.Active;
+    private void ToggleTrade()
+    {
+        if (_rules.Visible) _rules.Toggle(); // they share the left side of the screen
+        _trade.Toggle();
+    }
+
+    private bool AnyToolActive => _placement.Active != null || _roadTool.Active || _demolishTool.Active || _territoryTool.Active;
 
     private void CancelTools()
     {
         _placement.Cancel();
         _roadTool.Cancel();
         _demolishTool.Cancel();
+        _territoryTool.Cancel();
+    }
+
+    private void StartTerritoryTool()
+    {
+        CancelTools();
+        ClearSelection();
+        _territoryTool.Begin();
     }
 
     private void StartRoadTool()
@@ -324,6 +559,11 @@ public partial class Main : Node3D
 
     private void SaveGame()
     {
+        if (!_session.CanSave)
+        {
+            Flash("Only the host saves a shared world.");
+            return;
+        }
         try
         {
             string path = _session.Save();
@@ -337,6 +577,11 @@ public partial class Main : Node3D
 
     private void LoadGame()
     {
+        if (_session.Mode != SessionMode.Local)
+        {
+            Flash("Loading is for single-player worlds. Leave this shared world first.");
+            return;
+        }
         if (!SimSession.HasSave)
         {
             Flash("No save yet (press F5 to save)");
@@ -344,12 +589,14 @@ public partial class Main : Node3D
         }
         try
         {
-            SimSession.PendingWorld = SimSession.LoadSaved();
+            var loaded = new SimSession(SimSession.LoadSaved());
+            _session.Dispose();
+            SimSession.Current = loaded;
+            _justLoaded = true;
             GetTree().ReloadCurrentScene();
         }
         catch (Exception e)
         {
-            SimSession.PendingWorld = null;
             Flash($"Load failed: {e.Message}");
         }
     }
@@ -419,7 +666,7 @@ public partial class Main : Node3D
         }
         else if (_selectedBuilding is int bid && town.FindBuilding(bid) is { } b)
         {
-            _inspector.ShowBuilding(town, b);
+            _inspector.ShowBuilding(_session.World, town, b);
         }
     }
 

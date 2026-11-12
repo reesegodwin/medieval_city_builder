@@ -21,13 +21,20 @@ public interface ICommand
     CommandResult Execute(GameWorld world);
 }
 
-public sealed record PlaceBuildingCommand(int SettlementId, string BuildingDefId, int X, int Y) : ICommand
+/// <summary>A command acting on one settlement; servers only accept it from that settlement's owner.</summary>
+public interface ISettlementCommand : ICommand
+{
+    int SettlementId { get; }
+}
+
+public sealed record PlaceBuildingCommand(int SettlementId, string BuildingDefId, int X, int Y) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
         var settlement = world.FindSettlement(SettlementId);
         if (settlement == null) return CommandResult.Fail("Unknown settlement");
         if (!world.Data.Buildings.TryGetValue(BuildingDefId, out var def)) return CommandResult.Fail("Unknown building type");
+        if (def.IsTownCentre) return CommandResult.Fail("Each settlement has one town centre; upgrade it instead");
 
         string? error = Placement.Check(world, settlement, def, X, Y);
         if (error != null) return CommandResult.Fail(error);
@@ -38,7 +45,7 @@ public sealed record PlaceBuildingCommand(int SettlementId, string BuildingDefId
     }
 }
 
-public sealed record SetJobPriorityCommand(int SettlementId, string JobKind, int Priority) : ICommand
+public sealed record SetJobPriorityCommand(int SettlementId, string JobKind, int Priority) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -49,7 +56,7 @@ public sealed record SetJobPriorityCommand(int SettlementId, string JobKind, int
     }
 }
 
-public sealed record SetReserveCommand(int SettlementId, string Resource, int Amount) : ICommand
+public sealed record SetReserveCommand(int SettlementId, string Resource, int Amount) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -63,7 +70,7 @@ public sealed record SetReserveCommand(int SettlementId, string Resource, int Am
 }
 
 /// <summary>Sets the flat stock limit for a resource; producers stop once stock reaches it.</summary>
-public sealed record SetProductionLimitCommand(int SettlementId, string Resource, int Amount) : ICommand
+public sealed record SetProductionLimitCommand(int SettlementId, string Resource, int Amount) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -76,7 +83,7 @@ public sealed record SetProductionLimitCommand(int SettlementId, string Resource
     }
 }
 
-public sealed record SetAutoBuildCommand(int SettlementId, bool Enabled) : ICommand
+public sealed record SetAutoBuildCommand(int SettlementId, bool Enabled) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -89,26 +96,15 @@ public sealed record SetAutoBuildCommand(int SettlementId, bool Enabled) : IComm
 
 public static class Placement
 {
-    /// <summary>Starting territory radius: how far from the centre a new settlement may build.</summary>
-    public const int SettlementRadius = 44;
-
-    /// <summary>Territory never grows beyond this.</summary>
-    public const int MaxSettlementRadius = 100;
-
-    /// <summary>Territory grows by one tile for this many citizens.</summary>
-    public const int CitizensPerExtraTile = 8;
-
     /// <summary>Returns null if the building can go here, otherwise the reason it can't.</summary>
     public static string? Check(GameWorld world, Settlement settlement, Data.BuildingDef def, int x, int y)
     {
         int cx = x + def.Width / 2, cy = y + def.Height / 2;
-        if (Math.Abs(cx - settlement.CenterX) + Math.Abs(cy - settlement.CenterY) > settlement.TerritoryRadius)
-            return "Outside the settlement's territory";
-
         for (int dy = 0; dy < def.Height; dy++)
         for (int dx = 0; dx < def.Width; dx++)
         {
             var tile = world.Map.GetTile(x + dx, y + dy);
+            if (tile.TerritoryId != settlement.Id) return "Outside the settlement's territory";
             if (tile.BuildingId != 0) return "Blocked by another building";
             if (!tile.IsBuildable) return $"Cannot build on {tile.Terrain}";
         }
@@ -134,6 +130,7 @@ public static class Placement
             tile.BuildingId = building.Id;
             if (tile.Terrain == Terrain.Fertile) fertile++;
             if (tile.IsRoad) Roads.Remove(world, settlement, x + dx, y + dy);
+            if (tile.RoadPlanned) Roads.Unplan(world, settlement, x + dx, y + dy);
         }
 
         building.TerrainMultiplier = 1.0 + def.FertileBonus * fertile / (def.Width * def.Height);
@@ -149,12 +146,27 @@ public static class Roads
     /// <summary>Wood per tile for a road over water (a bridge).</summary>
     public const int BridgeWoodPerTile = 4;
 
-    /// <summary>Returns null if a road can go on this tile, otherwise why not.</summary>
+    /// <summary>Roadworker-days to lay one tile of dirt road next to the town centre.</summary>
+    public const double RoadWorkDays = 0.05;
+
+    /// <summary>Roadworker-days to build one tile of bridge.</summary>
+    public const double BridgeWorkDays = 0.5;
+
+    /// <summary>Distance from the town centre at which roadworkers lose half their time walking to the site.</summary>
+    public const double WalkHalfDistance = 60;
+
+    /// <summary>Roads can reach this far from the town centre (in either axis), well past the territory.</summary>
+    public const int MaxRoadDistance = 600;
+
+    /// <summary>
+    /// Returns null if a road can go on this tile, otherwise why not. Dirt roads are free and may go on unclaimed
+    /// land outside the territory, but not into another settlement's territory.
+    /// </summary>
     public static string? Check(GameWorld world, Settlement settlement, int x, int y)
     {
-        if (Math.Abs(x - settlement.CenterX) + Math.Abs(y - settlement.CenterY) > settlement.TerritoryRadius)
-            return "Outside the settlement's territory";
         var tile = world.Map.GetTile(x, y);
+        if (tile.TerritoryId != settlement.Id && tile.TerritoryId != 0) return "Inside another settlement's territory";
+        if (Math.Max(Math.Abs(x - settlement.CenterX), Math.Abs(y - settlement.CenterY)) > MaxRoadDistance) return "Too far from the town";
         if (tile.BuildingId != 0) return "Blocked by a building";
         if (!tile.IsBuildable && tile.Terrain != Terrain.Water) return $"Cannot build a road on {tile.Terrain}";
         return null;
@@ -162,7 +174,47 @@ public static class Roads
 
     /// <summary>Wood needed to build these tiles (only new bridge tiles cost anything).</summary>
     public static int BridgeCost(GameWorld world, IEnumerable<(int X, int Y)> tiles) =>
-        tiles.Distinct().Count(t => world.Map.GetTile(t.X, t.Y) is { IsRoad: false, Terrain: Terrain.Water }) * BridgeWoodPerTile;
+        tiles.Distinct().Count(t => world.Map.GetTile(t.X, t.Y) is { IsRoad: false, RoadPlanned: false, Terrain: Terrain.Water }) * BridgeWoodPerTile;
+
+    public static double WorkDays(in Tile tile) => tile.Terrain == Terrain.Water ? BridgeWorkDays : RoadWorkDays;
+
+    /// <summary>Marks a tile for roadworkers to build.</summary>
+    internal static void Plan(GameWorld world, Settlement settlement, int x, int y)
+    {
+        ref var tile = ref world.Map.GetTile(x, y);
+        if (tile.IsRoad || tile.RoadPlanned) return;
+        tile.RoadPlanned = true;
+        settlement.RoadPlans.Add(new RoadPlan { X = x, Y = y });
+        settlement.RoadVersion++;
+    }
+
+    /// <summary>Drops a planned tile (a building was placed on it, or the plan was cancelled).</summary>
+    internal static bool Unplan(GameWorld world, Settlement settlement, int x, int y)
+    {
+        ref var tile = ref world.Map.GetTile(x, y);
+        int index = settlement.RoadPlans.FindIndex(p => p.X == x && p.Y == y);
+        if (index < 0) return false;
+        tile.RoadPlanned = false;
+        settlement.RoadPlans.RemoveAt(index);
+        settlement.RoadVersion++;
+        return true;
+    }
+
+    /// <summary>Turns a plan into a finished road.</summary>
+    internal static void Finish(GameWorld world, Settlement settlement, RoadPlan plan)
+    {
+        world.Map.GetTile(plan.X, plan.Y).RoadPlanned = false;
+        settlement.RoadPlans.Remove(plan);
+        Add(world, settlement, plan.X, plan.Y);
+    }
+
+    /// <summary>Builds every planned tile at once (founding a town, or a town with nobody to build roads).</summary>
+    public static void FinishAllPlans(GameWorld world, Settlement settlement)
+    {
+        if (settlement.RoadPlans.Count == 0) return;
+        foreach (var plan in settlement.RoadPlans.ToList()) Finish(world, settlement, plan);
+        Logistics.UpdateHaulFactors(world, settlement);
+    }
 
     internal static void Add(GameWorld world, Settlement settlement, int x, int y)
     {
@@ -184,7 +236,7 @@ public static class Roads
 }
 
 /// <summary>Lays road on every listed tile. All tiles must be valid, or nothing is built.</summary>
-public sealed record PlaceRoadCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles) : ICommand
+public sealed record PlaceRoadCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -194,35 +246,36 @@ public sealed record PlaceRoadCommand(int SettlementId, IReadOnlyList<(int X, in
 
         foreach (var (x, y) in Tiles)
         {
-            if (world.Map.GetTile(x, y).IsRoad) continue;
+            var tile = world.Map.GetTile(x, y);
+            if (tile.IsRoad || tile.RoadPlanned) continue;
             if (Roads.Check(world, settlement, x, y) is { } error) return CommandResult.Fail($"({x},{y}): {error}");
         }
 
+        // Dirt roads are free: roadworkers build them over time. Bridges need their wood up front.
         int wood = Roads.BridgeCost(world, Tiles);
         if (wood > 0 && !settlement.Stock.TryTake("wood", wood))
             return CommandResult.Fail($"Bridge needs {wood} wood");
 
-        int before = settlement.Roads.Count;
-        foreach (var (x, y) in Tiles) Roads.Add(world, settlement, x, y);
-        if (settlement.Roads.Count != before) Logistics.UpdateHaulFactors(world, settlement);
+        foreach (var (x, y) in Tiles) Roads.Plan(world, settlement, x, y);
         return CommandResult.Success();
     }
 }
 
-public sealed record RemoveRoadCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles) : ICommand
+public sealed record RemoveRoadCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
         var settlement = world.FindSettlement(SettlementId);
         if (settlement == null) return CommandResult.Fail("Unknown settlement");
 
-        int before = settlement.Roads.Count;
+        int before = settlement.Roads.Count, plansBefore = settlement.RoadPlans.Count;
         foreach (var (x, y) in Tiles)
         {
             if (settlement.Roads.Contains((x, y))) Roads.Remove(world, settlement, x, y);
+            else Roads.Unplan(world, settlement, x, y);
         }
-        if (settlement.Roads.Count == before) return CommandResult.Fail("No road there");
-        Logistics.UpdateHaulFactors(world, settlement);
+        if (settlement.Roads.Count == before && settlement.RoadPlans.Count == plansBefore) return CommandResult.Fail("No road there");
+        if (settlement.Roads.Count != before) Logistics.UpdateHaulFactors(world, settlement);
         return CommandResult.Success();
     }
 }
@@ -231,7 +284,7 @@ public sealed record RemoveRoadCommand(int SettlementId, IReadOnlyList<(int X, i
 /// Tears a building down. Workers and residents are released, and part of the cost comes back:
 /// nothing was spent yet while awaiting materials, half while under construction, a quarter once finished.
 /// </summary>
-public sealed record DemolishBuildingCommand(int SettlementId, int BuildingId) : ICommand
+public sealed record DemolishBuildingCommand(int SettlementId, int BuildingId) : ISettlementCommand
 {
     public const double ConstructionRefund = 0.5;
     public const double OperationalRefund = 0.25;
@@ -242,6 +295,7 @@ public sealed record DemolishBuildingCommand(int SettlementId, int BuildingId) :
         if (settlement == null) return CommandResult.Fail("Unknown settlement");
         var b = settlement.FindBuilding(BuildingId);
         if (b == null) return CommandResult.Fail("Unknown building");
+        if (b.Def.IsTownCentre) return CommandResult.Fail("The town centre can't be demolished");
 
         Work.ReleaseWorkers(settlement, b);
         foreach (int id in b.ResidentIds)
@@ -276,5 +330,41 @@ public sealed record DemolishBuildingCommand(int SettlementId, int BuildingId) :
         world.Log(EventKind.BuildingDemolished, settlement,
             $"{b.Def.Name} demolished" + (returned.Count > 0 ? $" ({string.Join(", ", returned)} recovered)" : ""));
         return CommandResult.Success();
+    }
+}
+
+/// <summary>
+/// Founds a settlement for a player joining a shared world, well away from existing ones. Applied in the same
+/// order on the server and every client, so they all get the same town.
+/// </summary>
+public sealed record FoundSettlementCommand(string OwnerId) : ICommand
+{
+    /// <summary>Distance between neighbouring founding spots, comfortably more than two maximum territories.</summary>
+    public const int Spacing = 260;
+
+    public CommandResult Execute(GameWorld world)
+    {
+        if (string.IsNullOrWhiteSpace(OwnerId)) return CommandResult.Fail("A player name is needed");
+        if (world.Settlements.Any(s => s.OwnerId == OwnerId)) return CommandResult.Fail($"{OwnerId} already has a settlement");
+
+        // The n-th new settlement goes to the n-th spot on square rings around the first one.
+        var origin = world.Settlements.FirstOrDefault() is { } first ? (first.CenterX, first.CenterY) : (0, 0);
+        var (dx, dy) = SpotOffset(world.Settlements.Count);
+        var town = Simulation.SettlementFounder.Found(world, nearX: origin.Item1 + dx * Spacing, nearY: origin.Item2 + dy * Spacing);
+        town.OwnerId = OwnerId;
+        return CommandResult.Success(town.Id);
+    }
+
+    /// <summary>Offsets (in spacings) in ring order: (0,0), then the 8 around it, then the 16 around those...</summary>
+    public static (int Dx, int Dy) SpotOffset(int n)
+    {
+        int index = 0;
+        for (int r = 0; ; r++)
+        for (int dy = -r; dy <= r; dy++)
+        for (int dx = -r; dx <= r; dx++)
+        {
+            if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != r) continue;
+            if (index++ == n) return (dx, dy);
+        }
     }
 }

@@ -1,7 +1,9 @@
 using Godot;
 using Sim.Core.Data;
 using Sim.Core.Events;
+using Sim.Core.Settlements;
 using Sim.Core.Systems;
+using Sim.Core.Time;
 
 namespace MedievalClient.Ui;
 
@@ -18,6 +20,7 @@ public partial class Hud : CanvasLayer
     private Label _status = null!;
     private Button _pause = null!;
     private CheckBox _autoBuild = null!;
+    private CheckBox _autoTerritory = null!;
 
     public event Action<string>? BuildRequested;
     public event Action? RoadRequested;
@@ -25,7 +28,11 @@ public partial class Hud : CanvasLayer
     public event Action<double>? SpeedRequested;
     public event Action? PauseToggled;
     public event Action<bool>? AutoBuildToggled;
+    public event Action<bool>? AutoTerritoryToggled;
+    public event Action? TerritoryRequested;
+    public event Action? ExpandTerritoryRequested;
     public event Action? RulesRequested;
+    public event Action? TradeRequested;
     public event Action? SaveRequested;
     public event Action? LoadRequested;
     public event Action? SoundToggled;
@@ -33,7 +40,9 @@ public partial class Hud : CanvasLayer
     /// <summary>Raised whenever any HUD button is pressed (for the click sound).</summary>
     public event Action? ButtonClicked;
 
-    public void Build(GameData data, bool autoBuild)
+    /// <param name="speeds">Speed multipliers to offer (relative to the world's normal speed).</param>
+    /// <param name="canChangeSpeed">False when the world's speed is fixed or someone else controls it.</param>
+    public void Build(GameData data, bool autoBuild, bool autoTerritory, IReadOnlyList<double> speeds, bool canChangeSpeed, bool canPause)
     {
         // --- Top bar ---
         var top = new PanelContainer();
@@ -49,13 +58,23 @@ public partial class Hud : CanvasLayer
         topRow.AddChild(_date);
         topRow.AddChild(_stock);
 
-        _pause = new Button { Text = "Pause", ToggleMode = true, TooltipText = "Space", FocusMode = Control.FocusModeEnum.None };
+        _pause = new Button
+        {
+            Text = "Pause", ToggleMode = true, FocusMode = Control.FocusModeEnum.None, Disabled = !canPause,
+            TooltipText = canPause ? "Space" : "Shared worlds can't be paused",
+        };
         _pause.Pressed += () => PauseToggled?.Invoke();
         topRow.AddChild(_pause);
         int key = 1;
-        foreach (double speed in SimSession.Speeds)
+        foreach (double speed in speeds)
         {
-            var b = new Button { Text = speed >= 1000 ? $"{speed / 1000}kx" : $"{speed}x", ToggleMode = true, TooltipText = $"Key {key++}", FocusMode = Control.FocusModeEnum.None };
+            var b = new Button
+            {
+                Text = $"{speed}x", ToggleMode = true, FocusMode = Control.FocusModeEnum.None, Disabled = !canChangeSpeed,
+                TooltipText = canChangeSpeed
+                    ? $"Key {key++}: {speed}x the world's normal speed"
+                    : "This world's speed is fixed or set by the host",
+            };
             double s = speed;
             b.Pressed += () => SpeedRequested?.Invoke(s);
             _speedButtons[speed] = b;
@@ -72,9 +91,20 @@ public partial class Hud : CanvasLayer
         _autoBuild.Toggled += on => AutoBuildToggled?.Invoke(on);
         topRow.AddChild(_autoBuild);
 
+        _autoTerritory = new CheckBox
+        {
+            Text = "Auto land",
+            ButtonPressed = autoTerritory,
+            TooltipText = "Spend spare territory allowance evenly around the town centre each day.\nTurn off to paint territory yourself (T).",
+            FocusMode = Control.FocusModeEnum.None,
+        };
+        _autoTerritory.Toggled += on => AutoTerritoryToggled?.Invoke(on);
+        topRow.AddChild(_autoTerritory);
+
         foreach (var (text, tip, action) in new (string, string, Action)[]
                  {
                      ("Rules", "Job priorities, stock limits and reserves (P)", () => RulesRequested?.Invoke()),
+                     ("Trade", "Offers, trade routes and caravans (J). Needs a Trading Post.", () => TradeRequested?.Invoke()),
                      ("Save", "Quick-save (F5)", () => SaveRequested?.Invoke()),
                      ("Load", "Load the quick-save (F9)", () => LoadRequested?.Invoke()),
                      ("Sound", "Sound on/off (M)", () => SoundToggled?.Invoke()),
@@ -111,9 +141,15 @@ public partial class Hud : CanvasLayer
         }
         ToolButton("Roads\nbridges: wood", "Lay roads (R). Free on land; over water they become bridges (4 wood per tile). Roads make hauling faster; people walk along them.", () => RoadRequested?.Invoke());
         ToolButton("Demolish\nrefund", "Tear down buildings or roads (X). Refunds part of the cost.", () => DemolishRequested?.Invoke());
+        ToolButton("Territory\npaint", "Paint where your territory goes (T): drag to claim, Shift+drag to give land back, [ ] brush size.\n" +
+            "Your allowance grows with population, up to the cap of your town centre (upgrade it to raise the cap).",
+            () => TerritoryRequested?.Invoke());
+        ToolButton("Territory\nexpand evenly", "Claim all spare territory allowance evenly around the town centre.",
+            () => ExpandTerritoryRequested?.Invoke());
 
         foreach (var def in data.Buildings.Values)
         {
+            if (def.IsTownCentre) continue; // upgraded from the inspector, never placed
             string cost = def.Cost.Count == 0 ? "free" : string.Join(", ", def.Cost.Select(kv => $"{kv.Value} {kv.Key}"));
             var b = new Button
             {
@@ -159,7 +195,7 @@ public partial class Hud : CanvasLayer
         // --- Controls help (top-right, under the bar) ---
         var help = new Label
         {
-            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   X: demolish   P: rules\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
+            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   X: demolish   T: territory   P: rules   J: trade\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
             HorizontalAlignment = HorizontalAlignment.Right,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
@@ -197,6 +233,8 @@ public partial class Hud : CanvasLayer
         }
         if (def.FertileBonus > 0) lines.Add($"+{def.FertileBonus:P0} output on fertile soil");
         if (def.NearTerrain is { } near) lines.Add($"Needs {near.Terrain} within {near.Radius} tiles");
+        if (def.TownCentre is { } centre) lines.Add($"Town centre: territory up to {centre.TerritoryCap} tiles; its roadworkers build roads");
+        if (def.Upkeep > 0) lines.Add($"Upkeep {def.Upkeep:0.#} coin a day (half output while the treasury can't pay)");
         if (def.Service is { } service)
         {
             lines.Add($"Serves {service.Need} to up to {service.Capacity} people within {service.Radius} tiles of their home");
@@ -211,23 +249,35 @@ public partial class Hud : CanvasLayer
         var world = session.World;
         var town = session.PlayerTown;
         double moodNow = town.Citizens.Count > 0 ? town.Citizens.Average(c => c.Mood) : 0;
-        _date.Text = $"{town.Name}  ·  {world.Time}\nMood {moodNow:0}/100";
+        string where = session.Mode switch
+        {
+            SessionMode.Host => $"  ·  hosting :{session.HostPort}",
+            SessionMode.Join => "  ·  online",
+            _ => "",
+        };
+        string behind = session.TicksBehind > TimeScale.TicksPerDay ? $"  (catching up {session.TicksBehind / TimeScale.TicksPerDay} days)" : "";
+        _date.Text = $"{town.Name}  ·  {world.Time}{where}\nMood {moodNow:0}/100  ·  {session.Speed:0.#}x{behind}";
 
         int adults = town.Citizens.Count(c => c.IsAdult);
         int idle = town.Citizens.Count(c => c.IsAdult && c.JobBuildingId == null);
         int homeless = town.Citizens.Count(c => c.HomeBuildingId == null);
+        int haulers = town.Buildings.Where(b => b.CurrentJobKind == JobKinds.Hauler).Sum(b => b.WorkerIds.Count);
         _stock.Text =
-            $"Pop {town.Citizens.Count} ({adults} adults, {idle} idle{(homeless > 0 ? $", {homeless} homeless" : "")})   " +
+            $"Pop {town.Citizens.Count} ({adults} adults, {haulers} hauling, {idle} idle{(homeless > 0 ? $", {homeless} homeless" : "")})   " +
             $"Food {Needs.FoodDays(world, town):0.0} days (grain {town.Stock.Get("grain")}, bread {town.Stock.Get("bread")}, " +
             $"veg {town.Stock.Get("vegetables")})   Ale {town.Stock.Get("ale")}   " +
-            $"Wood {town.Stock.Get("wood")}   Stone {town.Stock.Get("stone")}\n" +
-            $"Storage {town.Stock.Total}/{town.StorageCapacity}   Needs met: " +
+            $"Coin {town.Stock.Get("coin")} ({EconomySystem.DailyTax(world, town) - EconomySystem.DailyUpkeep(town):+0.#;-0.#}/day" +
+            (town.UpkeepUnpaid ? ", UPKEEP UNPAID" : "") + $")   Wood {town.Stock.Get("wood")}   Stone {town.Stock.Get("stone")}   Tools {town.Stock.Get("tools")}   " +
+            $"Cloth {town.Stock.Get("cloth")}   Furniture {town.Stock.Get("furniture")}\n" +
+            $"Storage {town.Stock.Total}/{town.StorageCapacity}   Land {town.Territory.Count}/{town.TerritoryAllowance} " +
+            $"(cap {town.TerritoryCap})   Needs met: " +
             string.Join("   ", world.Data.Needs.Select(n => $"{n.Name} {ServiceSystem.Coverage(town, n.Id):P0}"));
 
         _pause.SetPressedNoSignal(session.Paused);
         foreach (var (speed, button) in _speedButtons)
             button.SetPressedNoSignal(!session.Paused && Math.Abs(session.Speed - speed) < 0.001);
         _autoBuild.SetPressedNoSignal(town.Rules.AutoBuild);
+        _autoTerritory.SetPressedNoSignal(town.Rules.AutoExpandTerritory);
     }
 
     public void AddEvents(IEnumerable<GameEvent> events)

@@ -17,8 +17,15 @@ public sealed class SettlementRules
         ["woodcutter"] = 3,
         ["barkeep"] = 3,
         ["trader"] = 3,
+        ["smith"] = 3,
         ["quarrier"] = 2,
         ["brewer"] = 2,
+        ["miner"] = 2,
+        ["shepherd"] = 2,
+        ["weaver"] = 2,
+        ["carpenter"] = 2,
+        [JobKinds.Roadworker] = 4,
+        [JobKinds.Hauler] = 1, // only people nobody else needs; the first to be pulled into other work
     };
 
     /// <summary>Production may not consume a resource below this stock (e.g. keep grain for eating).</summary>
@@ -39,6 +46,11 @@ public sealed class SettlementRules
         ["ale"] = 150,
         ["wood"] = 250,
         ["stone"] = 200,
+        ["iron_ore"] = 80,
+        ["tools"] = 60,
+        ["wool"] = 60,
+        ["cloth"] = 60,
+        ["furniture"] = 40,
     };
 
     /// <summary>Per-citizen stock targets; the effective limit is the larger of this and the flat limit.</summary>
@@ -56,6 +68,12 @@ public sealed class SettlementRules
     /// <summary>Whether the settlement's governor AI may place new buildings on its own.</summary>
     public bool AutoBuild { get; set; } = true;
 
+    /// <summary>
+    /// Whether spare territory allowance is claimed automatically, evenly around the centre. Turn it off to
+    /// paint territory by hand (e.g. only along one bank of a river).
+    /// </summary>
+    public bool AutoExpandTerritory { get; set; } = true;
+
     public int PriorityOf(string jobKind) => JobPriority.TryGetValue(jobKind, out int p) ? p : 0;
     public int ReserveOf(string resource) => Reserves.TryGetValue(resource, out int r) ? r : 0;
     public int LimitOf(string resource, int population)
@@ -70,6 +88,9 @@ public sealed class Settlement
 {
     public int Id { get; }
     public string Name { get; }
+
+    /// <summary>The player who controls this settlement (their account name), or null for single-player / NPC towns.</summary>
+    public string? OwnerId { get; set; }
     public int CenterX { get; }
     public int CenterY { get; }
 
@@ -93,6 +114,9 @@ public sealed class Settlement
     /// <summary>Governor memory: day a site search last failed, per "building@spot", so it isn't retried daily.</summary>
     public Dictionary<string, long> FailedSiteSearches { get; } = new();
 
+    /// <summary>Road tiles planned but not yet built, in the order they'll be built.</summary>
+    public List<RoadPlan> RoadPlans { get; } = new();
+
     /// <summary>Bumped whenever roads change, so renderers know to rebuild.</summary>
     public int RoadVersion { get; set; }
 
@@ -104,9 +128,28 @@ public sealed class Settlement
         CenterY = centerY;
     }
 
-    /// <summary>How far from the centre this settlement may build; grows with its population.</summary>
-    public int TerritoryRadius => Math.Min(Commands.Placement.MaxSettlementRadius,
-        Commands.Placement.SettlementRadius + Citizens.Count / Commands.Placement.CitizensPerExtraTile);
+    /// <summary>Tiles this settlement has claimed, in sorted order. Buildings and roads may only go on them.</summary>
+    public SortedSet<(int X, int Y)> Territory { get; } = new();
+
+    /// <summary>Bumped whenever territory changes, so renderers know to rebuild.</summary>
+    public int TerritoryVersion { get; set; }
+
+    /// <summary>
+    /// Most territory the settlement may hold, set by its best town-centre tier so far (it doesn't drop while
+    /// the centre is being upgraded).
+    /// </summary>
+    public int TerritoryCap { get; set; }
+
+    /// <summary>Territory the settlement may hold right now: grows with population, up to <see cref="TerritoryCap"/>.</summary>
+    public int TerritoryAllowance => Math.Min(TerritoryCap, Commands.TerritoryRules.PopulationAllowance(Citizens.Count));
+
+    /// <summary>Farthest claimed tile from the centre (Chebyshev distance), for bounding searches.</summary>
+    public int TerritoryExtent { get; internal set; }
+
+    public bool OwnsTile(World.WorldMap map, int x, int y) => map.GetTile(x, y).TerritoryId == Id;
+
+    /// <summary>The settlement's town centre (keep, town hall...), or null if it has none.</summary>
+    public Building? TownCentre => Buildings.FirstOrDefault(b => b.Def.IsTownCentre);
 
     public int StorageCapacity => Buildings.Where(b => b.IsOperational).Sum(b => b.Def.Storage);
     public int FreeStorage => Math.Max(0, StorageCapacity - Stock.Total);
@@ -161,8 +204,52 @@ public sealed class Settlement
 
     public int LimitOf(string resource) => Rules.LimitOf(resource, Citizens.Count);
 
-    /// <summary>Job slots the settlement actually wants filled right now.</summary>
-    public int WantedWorkers(Building b) => IsAtProductionLimit(b) ? 0 : b.JobSlots;
+    /// <summary>Haulers each stockpile should have, sized to the carrying there is to do (rebuilt hourly).</summary>
+    public Dictionary<int, int> HaulerQuota { get; } = new();
+
+    /// <summary>
+    /// Share (0..1) of the carrying that workplaces would otherwise do themselves that haulers currently cover.
+    /// Set hourly by the job system.
+    /// </summary>
+    public double HaulCoverage { get; set; }
+
+    /// <summary>Wear on tools not yet amounting to a whole tool, per tool resource.</summary>
+    public SortedDictionary<string, double> ToolWear { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Taxes collected but not yet a whole coin.</summary>
+    public double TaxAccrued { get; set; }
+
+    /// <summary>Upkeep owed but not yet paid (fractions, or what the treasury couldn't cover).</summary>
+    public double UpkeepOwed { get; set; }
+
+    /// <summary>The treasury couldn't pay upkeep at the last daily reckoning; buildings with upkeep run at reduced output.</summary>
+    public bool UpkeepUnpaid { get; set; }
+
+    /// <summary>Household goods used but not yet amounting to a whole unit, per resource.</summary>
+    public SortedDictionary<string, double> GoodsUse { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Job slots the settlement wants filled. Workplaces that reached their stock limit keep their workers on
+    /// standby (they keep the job, and any other job may take them at once); haulers follow the hauling quota.
+    /// </summary>
+    public int WantedWorkers(Building b) => b.CurrentJobKind switch
+    {
+        JobKinds.Hauler => Math.Min(b.JobSlots, HaulerQuota.GetValueOrDefault(b.Id)),
+        // About one roadworker per ten planned tiles, none when there's nothing to build.
+        JobKinds.Roadworker => RoadPlans.Count == 0 ? 0 : Math.Min(b.JobSlots, 1 + RoadPlans.Count / 10),
+        _ => b.JobSlots,
+    };
+
+    /// <summary>Workers here have nothing to do right now and can be moved to other work freely.</summary>
+    public bool IsOnStandby(Building b) => IsAtProductionLimit(b) && !b.InputsLoaded;
 
     public override string ToString() => Name;
+}
+
+/// <summary>A road tile waiting to be built, and the roadworker-days spent on it so far.</summary>
+public sealed class RoadPlan
+{
+    public int X { get; set; }
+    public int Y { get; set; }
+    public double Progress { get; set; }
 }

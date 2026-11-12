@@ -82,8 +82,10 @@ dotnet test
 | Mouse wheel | Zoom |
 | Q / E | Rotate the view 90° |
 | Left-click | Select a building or citizen, or place a building |
-| R | Road tool: click the start, then click the end (lays an L-shaped road; over water it builds a bridge) |
+| R | Road tool: click the start, then click the end. Dirt roads are free; roadworkers build them over time. They can run outside your territory (not into another town's), and over water they become bridges that cost wood |
 | X | Demolish tool: click a building or road tile |
+| T | Territory tool: drag to claim land, Shift+drag to give it back, `[` / `]` change the brush size |
+| J | Trade panel: market, your offers, new offer (with a fair-price button), routes and caravans. Needs a Trading Post |
 | Right-click / Esc | Cancel the current tool or close the inspector |
 | P | Rules panel: job priorities, stock limits, reserves |
 | F5 / F9 | Quick-save / load (saved in Godot's user data folder) |
@@ -92,6 +94,8 @@ dotnet test
 | 1–4 | Speed: 1× (real time, 1 game day per hour), 60×, 600×, 3600× |
 
 The bottom bar places buildings and starts the Roads and Demolish tools: a green ghost means the spot is valid, and red shows the reason it isn't. Service buildings show their reach as a yellow diamond. Placed buildings wait for materials, go up inside a scaffold, then start working. **Auto-build** lets the town's governor keep building on its own.
+
+Territory is the land you may build on. You choose where it goes by painting it (T), so you can grow along one bank of a river or up to a mountain and no further. How much you may hold grows with population, up to the cap of your town centre. Select the Keep and upgrade it to a Town Hall, then a Castle, to raise the cap. **Auto land** claims spare allowance evenly around the centre each day; turn it off to paint by hand. **Expand evenly** does the same once.
 
 ### Command-line options
 
@@ -103,7 +107,18 @@ These go after `--` on Godot's command line:
 | `--warmup-days N` | Fast-forward the simulation N days before showing it |
 | `--inspect` | Open the inspector on a citizen at start |
 | `--screenshot out.png` | Save a screenshot after a few frames, then quit |
+| `--host [PORT]` | Host a world for friends as `--name` |
+| `--join HOST[:PORT]` | Join a shared world as `--name` |
+| `--name NAME` | Your player name in shared worlds |
+| `--world-speed PRESET` | `persistent`, `weekend`, `evening` (default) or `sprint`, for new worlds |
+| `--menu` | Show the start menu even with other options (for screenshots) |
 | `--rules` | Open the rules panel at start |
+| `--trade [TAB]` | Open the trade panel at start (tab 0–4) |
+| `--follow-caravan` | Keep the camera on a caravan on the road |
+| `--territory` | Open the territory tool at start |
+| `--zoom N` | Start with the camera N units away (6–90) |
+| `--place ID` | Start placing building `ID` (e.g. `chapel`) with the cursor in the middle of the screen |
+| `--cursor X,Y` | With `--place`, put the cursor at this pixel instead |
 | `--save-load-test` | Save, reload the game from that save, and print both state hashes (they should match) |
 | `--export-sounds DIR` | Write every generated sound to `DIR` as `.wav` files |
 
@@ -118,6 +133,26 @@ To compile-check the client without the editor:
 ```bash
 dotnet build client/MedievalClient.csproj
 ```
+
+### Trading
+
+Build a **Trading Post** and connect it to a road, then open the trade panel (J). Caravans only travel on roads, so to trade with another town, build a road towards it (it may leave your territory). Buildings cost upkeep in coin each day and your people pay taxes; if the treasury runs dry, buildings with upkeep work at half speed. Sell goods for coin, buy with coin, or barter goods for goods; **Fair price** fills in what merchants pay or charge, and you can raise it for anything you'd rather keep. Deals happen instantly, but the goods and coin travel by ox cart and arrive days later. Merchants visit every 10 days and buy anything listed at a fair price; in shared worlds you can also take other players' offers and set up standing trade routes.
+
+### Playing with friends
+
+From the start menu (or the command line):
+
+- **Host:** runs the world on your computer while you play. Friends join with your address and port (default 7777; forward it on your router for friends outside your home network). The world is saved in your user folder, and **Host (continue)** picks it up next time.
+- **Join:** enter a friend's address (`host` or `host:port`) or a dedicated server's.
+- **World speed**, **Speed control** and **When nobody plays** are chosen when a world is created and stay with it. See `docs/DESIGN.md`.
+
+### Dedicated server
+
+```bash
+dotnet run -c Release --project src/Sim.Server -- --world myworld.json --speed persistent --when-empty run
+```
+
+It creates `myworld.json` if it doesn't exist, listens on port 7777, autosaves every 5 minutes, and saves when stopped (Ctrl+C, `docker stop` or systemd). Options: `--port`, `--seed`, `--speed persistent|weekend|evening|sprint|<seconds per day>`, `--speed-policy fixed|host|unanimous`, `--when-empty pause|catchup|run`, `--catch-up-days N`, `--max-speed X`, `--admin NAME`, `--autosave-minutes N`. Players are identified by name only for now, so use it with friends rather than as a public server.
 
 ### Sound and art
 
@@ -137,15 +172,18 @@ Every sound (wind and birdsong, hammering from nearby construction, clicks, thud
 | `src/Sim.Core/Commands/` | The commands players and AI use to change the world. |
 | `src/Sim.Core/Simulation/` | The world state root, the simulator loop, and settlement founding. |
 | `src/Sim.Core/Persistence/` | Save/load (versioned JSON). |
+| `src/Sim.Net/` | Networking with no engine code: protocol, `WorldHost` (server logic), `NetClient` (keeps a world copy in step) and TCP transport. |
+| `src/Sim.Server/` | The dedicated server program (`medieval-server`). |
 | `src/Sim.Console/` | Headless runner with text reports and an ASCII map. |
 | `tests/Sim.Tests/` | xUnit tests. |
 | `client/` | Godot 4 (C#) game client: procedural low-poly terrain, water, roads, buildings and townsfolk who walk along roads, camera, HUD, building/road/demolish tools and inspector. |
-| `client/Scripts/SimSession.cs` | The client's only door into the simulation (in-process now, network in Phase 2), plus save/load. |
+| `client/Scripts/SimSession.cs` | The client's only door into the simulation: single-player, hosting or joined, plus save/load. |
+| `client/Scripts/Ui/StartMenu.cs` | New world, continue, host or join. |
 | `client/Scripts/Audio/` | Procedural sound synthesis and playback. |
 | `client/Scripts/Ui/RulesPanel.cs` | The settlement rules panel. |
 
 ## Next steps
 
-1. **Phase 1, wrapping up:** a pass on idle workers (once stores are full, many adults have nothing to do; more industries will give them work) and a minimap.
-2. **Phase 2:** a dedicated server with PostgreSQL persistence (reusing the save format) and multiplayer. `SimSession` becomes a network client.
+1. **Phase 1 depth:** housing upgrades and social classes, seasons, a town ledger screen.
+2. **Phase 2, continuing:** player accounts and authentication, Steam relay for hosting without port forwarding, a Docker image for the server, and interaction between towns (trade first).
 3. **Phase 3:** armies raised from townsfolk, squad battles, and generals.

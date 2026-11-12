@@ -16,6 +16,57 @@ public sealed class ResourceDef
     public double MealMood { get; set; }
 
     public bool IsFood => Nutrition > 0;
+
+    /// <summary>
+    /// Tools: while the settlement has any in stock, workers at workplaces and building sites get this much
+    /// extra output (0.25 = +25%).
+    /// </summary>
+    public double WorkBonus { get; set; }
+
+    /// <summary>Tools used up per worker-day of work done with them.</summary>
+    public double WearPerWorkerDay { get; set; }
+
+    public bool IsTool => WorkBonus > 0;
+
+    /// <summary>Fair value in coin of one unit, used for fair prices and by merchants.</summary>
+    public double Value { get; set; }
+}
+
+/// <summary>Trade tuning (trade.json).</summary>
+public sealed class TradeRules
+{
+    /// <summary>Open offers expire after this many game days; set-aside goods go back to stock.</summary>
+    public double OfferDays { get; set; } = 10;
+
+    /// <summary>How far a caravan travels per game day.</summary>
+    public double CaravanTilesPerDay { get; set; } = 40;
+
+    /// <summary>Buyers pay this times the fair value (what merchants charge); sellers get the fair value.</summary>
+    public double MerchantMarkup { get; set; } = 1.25;
+
+    public double MerchantVisitDays { get; set; } = 10;
+
+    /// <summary>Coin a visiting merchant can spend per visit.</summary>
+    public int MerchantPurse { get; set; } = 300;
+
+    /// <summary>Units of goods a visiting merchant can bring per visit.</summary>
+    public int MerchantCargo { get; set; } = 200;
+
+    /// <summary>How far away merchants come from.</summary>
+    public int MerchantDistance { get; set; } = 120;
+
+    /// <summary>Goods merchants sell to towns.</summary>
+    public List<string> MerchantGoods { get; set; } = new();
+
+    public int StartingCoin { get; set; } = 50;
+
+    /// <summary>Coin each adult pays in taxes per game day.</summary>
+    public double TaxPerAdultDay { get; set; } = 0.08;
+
+    /// <summary>Output of buildings with upkeep while the treasury can't pay it.</summary>
+    public double UnpaidOutput { get; set; } = 0.5;
+    public int MaxOpenOffers { get; set; } = 8;
+    public int MaxRoutes { get; set; } = 6;
 }
 
 public sealed class RecipeDef
@@ -40,6 +91,17 @@ public sealed class NeedDef
     public double MissingMood { get; set; }
 
     public int MinPopulation { get; set; }
+
+    /// <summary>
+    /// For household goods (clothing, furniture...): the service need people must have covered to get them,
+    /// e.g. "market". Null for needs met directly by service buildings.
+    /// </summary>
+    public string? Via { get; set; }
+
+    /// <summary>Goods each person supplied uses up per day.</summary>
+    public Dictionary<string, double> Goods { get; set; } = new();
+
+    public bool IsGoodsNeed => Via != null;
 }
 
 /// <summary>Makes a building serve a need to homes within a radius.</summary>
@@ -58,6 +120,35 @@ public sealed class NearTerrainRequirement
     public Terrain Terrain { get; set; }
     public int Radius { get; set; }
     public int Min { get; set; }
+}
+
+/// <summary>
+/// Marks a town-centre tier (keep, town hall, castle...). Each settlement has exactly one centre; it can't be
+/// placed or demolished, only upgraded in place. Its tier caps how much territory the settlement may hold.
+/// </summary>
+public sealed class TownCentreDef
+{
+    /// <summary>Most territory tiles a settlement with this centre may claim (population grows it up to this).</summary>
+    public int TerritoryCap { get; set; }
+
+    /// <summary>The next tier, or null at the top.</summary>
+    public string? UpgradeTo { get; set; }
+
+    /// <summary>Population needed before the settlement may upgrade into this tier.</summary>
+    public int MinPopulation { get; set; }
+}
+
+/// <summary>When the governor AI builds a production-chain building (data-driven, so new chains need no code).</summary>
+public sealed class GovernorHint
+{
+    /// <summary>Not before the settlement has this many people.</summary>
+    public int MinPopulation { get; set; }
+
+    /// <summary>At most one more of these per this many people.</summary>
+    public int PopulationPerBuilding { get; set; } = 100;
+
+    /// <summary>Only add more while every output is below this stock.</summary>
+    public int LowStock { get; set; } = 20;
 }
 
 public sealed class BuildingDef
@@ -85,6 +176,17 @@ public sealed class BuildingDef
 
     public ServiceDef? Service { get; set; }
 
+    public TownCentreDef? TownCentre { get; set; }
+
+    public GovernorHint? Governor { get; set; }
+
+    /// <summary>Coin per game day the treasury pays to keep this building running once finished.</summary>
+    public double Upkeep { get; set; }
+
+    /// <summary>A Trading Post: needed to post or accept offers and routes; caravans leave from it.</summary>
+    public bool Trade { get; set; }
+
+    public bool IsTownCentre => TownCentre != null;
     public bool IsStockpile => Storage > 0;
     public bool IsWorkplace => Jobs > 0 && JobKind != null;
 }
@@ -98,14 +200,26 @@ public sealed class GameData
     /// <summary>Needs in id order (deterministic iteration).</summary>
     public IReadOnlyList<NeedDef> Needs { get; }
 
+    /// <summary>Buildings in data-file order (deterministic iteration).</summary>
+    public IReadOnlyList<BuildingDef> BuildingList { get; }
+
+    /// <summary>Tool resources (see <see cref="ResourceDef.WorkBonus"/>) in id order.</summary>
+    public IReadOnlyList<ResourceDef> Tools { get; }
+
     /// <summary>Food resources ordered best meal first.</summary>
     public IReadOnlyList<ResourceDef> FoodsByPreference { get; }
 
-    public GameData(IEnumerable<ResourceDef> resources, IEnumerable<BuildingDef> buildings, IEnumerable<NeedDef>? needs = null)
+    public TradeRules Trade { get; }
+
+    public GameData(IEnumerable<ResourceDef> resources, IEnumerable<BuildingDef> buildings, IEnumerable<NeedDef>? needs = null,
+        TradeRules? trade = null)
     {
+        Trade = trade ?? new TradeRules();
         Resources = resources.ToDictionary(r => r.Id);
-        Buildings = buildings.ToDictionary(b => b.Id);
+        BuildingList = buildings.ToList();
+        Buildings = BuildingList.ToDictionary(b => b.Id);
         Needs = (needs ?? Enumerable.Empty<NeedDef>()).OrderBy(n => n.Id, StringComparer.Ordinal).ToList();
+        Tools = Resources.Values.Where(r => r.IsTool).OrderBy(r => r.Id, StringComparer.Ordinal).ToList();
         FoodsByPreference = Resources.Values.Where(r => r.IsFood)
             .OrderByDescending(r => r.MealMood).ThenBy(r => r.Id, StringComparer.Ordinal).ToList();
         Validate();
@@ -125,7 +239,8 @@ public sealed class GameData
         var resources = LoadEmbedded<List<ResourceDef>>("resources.json");
         var buildings = LoadEmbedded<List<BuildingDef>>("buildings.json");
         var needs = LoadEmbedded<List<NeedDef>>("needs.json");
-        return new GameData(resources, buildings, needs);
+        var trade = LoadEmbedded<TradeRules>("trade.json");
+        return new GameData(resources, buildings, needs, trade);
     }
 
     private static T LoadEmbedded<T>(string fileName)
@@ -137,8 +252,36 @@ public sealed class GameData
                ?? throw new InvalidDataException($"Could not parse {fileName}");
     }
 
+    /// <summary>The first town-centre tier (the one a new settlement starts with), or null if the data has none.</summary>
+    public BuildingDef? StartingTownCentre { get; private set; }
+
     private void Validate()
     {
+        foreach (var r in Trade.MerchantGoods)
+            if (!Resources.ContainsKey(r)) throw new InvalidDataException($"Merchants sell unknown resource '{r}'");
+
+        foreach (var n in Needs)
+        {
+            if (n.Via != null && !Needs.Any(other => other.Id == n.Via && !other.IsGoodsNeed))
+                throw new InvalidDataException($"Need '{n.Id}' is supplied via unknown service need '{n.Via}'");
+            foreach (var r in n.Goods.Keys)
+                if (!Resources.ContainsKey(r)) throw new InvalidDataException($"Need '{n.Id}' uses unknown resource '{r}'");
+        }
+
+        var centres = Buildings.Values.Where(b => b.IsTownCentre).OrderBy(b => b.Id, StringComparer.Ordinal).ToList();
+        foreach (var c in centres)
+        {
+            if (c.TownCentre!.UpgradeTo is not { } next) continue;
+            if (!Buildings.TryGetValue(next, out var up) || !up.IsTownCentre)
+                throw new InvalidDataException($"Town centre '{c.Id}' upgrades to '{next}', which isn't a town centre");
+            if (up.Width != c.Width || up.Height != c.Height)
+                throw new InvalidDataException($"Town centre '{c.Id}' and its upgrade '{next}' must have the same size");
+        }
+        var upgraded = centres.Select(c => c.TownCentre!.UpgradeTo).Where(u => u != null).ToHashSet();
+        var roots = centres.Where(c => !upgraded.Contains(c.Id)).ToList();
+        if (roots.Count > 1) throw new InvalidDataException("There must be only one starting town-centre tier");
+        StartingTownCentre = roots.FirstOrDefault();
+
         foreach (var b in Buildings.Values)
         {
             var referenced = b.Cost.Keys

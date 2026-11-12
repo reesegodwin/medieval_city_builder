@@ -118,11 +118,12 @@ internal static class Report
         int adults = s.Citizens.Count(c => c.IsAdult);
         int idle = s.Citizens.Count(c => c.IsAdult && c.JobBuildingId == null);
         int homeless = s.Citizens.Count(c => c.HomeBuildingId == null);
+        int haulers = s.Buildings.Where(b => b.CurrentJobKind == JobKinds.Hauler).Sum(b => b.WorkerIds.Count);
         double mood = s.Citizens.Count > 0 ? s.Citizens.Average(c => c.Mood) : 0;
         Console.WriteLine(
             $"{world.Time,-20} Pop {s.Citizens.Count,3} ({adults} adults) | " +
             $"grain {s.Stock.Get("grain"),4} bread {s.Stock.Get("bread"),4} ({Needs.FoodDays(world, s),5:0.0}d) | " +
-            $"wood {s.Stock.Get("wood"),4} stone {s.Stock.Get("stone"),4} | mood {mood,3:0} | idle {idle} homeless {homeless} | " +
+            $"wood {s.Stock.Get("wood"),4} stone {s.Stock.Get("stone"),4} | mood {mood,3:0} | idle {idle} haulers {haulers} ({s.HaulCoverage:P0}) homeless {homeless} | " +
             string.Join(" ", world.Data.Needs.Select(n => $"{n.Id} {ServiceSystem.Coverage(s, n.Id):P0}")));
     }
 
@@ -131,6 +132,12 @@ internal static class Report
         PrintDay(world, s);
         Console.WriteLine($"Births {world.TotalBirths}, deaths {world.TotalDeaths}. Storage {s.Stock.Total}/{s.StorageCapacity}, " +
                           $"housing {s.HousingCapacity - s.FreeHousing}/{s.HousingCapacity}, road tiles {s.Roads.Count}.");
+        var trade = world.Trade;
+        Console.WriteLine($"Treasury: taxes {EconomySystem.DailyTax(world, s):0.#}/day, upkeep {EconomySystem.DailyUpkeep(s):0.#}/day" +
+                          (s.UpkeepUnpaid ? " (UNPAID)" : "") + ".");
+        Console.WriteLine($"Trade: {trade.CompletedTrades} trades, {trade.MerchantVisits} merchant visits, coin {s.Stock.Get("coin")}, " +
+                          $"{trade.Offers.Count(o => o.SettlementId == s.Id)} open offers, {trade.Caravans.Count} caravans on the road.");
+        Console.WriteLine($"Territory {s.Territory.Count}/{s.TerritoryAllowance} tiles (cap {s.TerritoryCap}, {s.TownCentre?.Def.Name ?? "no town centre"}).");
         Console.WriteLine("Stock: " + string.Join(", ", s.Stock.Items.Select(kv => $"{kv.Key} {kv.Value}")));
         Console.WriteLine("Buildings:");
         foreach (var group in s.Buildings.GroupBy(b => b.Def.Name))

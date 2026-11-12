@@ -43,6 +43,7 @@ public class PathfinderTests
         double before = farm.HaulFactor;
 
         Assert.True(RoadPlanner.Connect(world, town, farm));
+        Roads.FinishAllPlans(world, town); // roadworkers would take a little while
 
         Assert.True(farm.HaulFactor > before, $"haul factor {farm.HaulFactor} should beat {before}");
     }
@@ -50,6 +51,40 @@ public class PathfinderTests
 
 public class RoadTests
 {
+    [Fact]
+    public void RoadworkersBuildPlannedRoadsOverTime()
+    {
+        var (world, town, sim) = Scenario.NewTown();
+        var grass = FindFreeBuildable(world, town);
+        Assert.True(world.Execute(new PlaceRoadCommand(town.Id, new[] { grass })).Ok);
+        Assert.Single(town.RoadPlans);
+
+        sim.RunDays(1);
+
+        Assert.Empty(town.RoadPlans);
+        Assert.True(world.Map.GetTile(grass.X, grass.Y).IsRoad);
+        Assert.Contains(town.TownCentre!.Def.JobKind, new[] { "roadworker" });
+    }
+
+    [Fact]
+    public void RoadsCanLeaveTheTerritoryButNotEnterAnotherTown()
+    {
+        var world = new GameWorld(42);
+        world.Execute(new FoundSettlementCommand("a"));
+        world.Execute(new FoundSettlementCommand("b"));
+        var (a, b) = (world.Settlements[0], world.Settlements[1]);
+
+        var outside = a.Territory
+            .SelectMany(t => new[] { (t.X + 1, t.Y), (t.X - 1, t.Y), (t.X, t.Y + 1), (t.X, t.Y - 1) })
+            .First(t => world.Map.GetTile(t.Item1, t.Item2) is { TerritoryId: 0 } tile && tile.IsBuildable);
+        Assert.True(world.Execute(new PlaceRoadCommand(a.Id, new[] { outside })).Ok);
+
+        var theirs = b.Territory.First(t => world.Map.GetTile(t.X, t.Y) is { IsBuildable: true, IsRoad: false });
+        var refused = world.Execute(new PlaceRoadCommand(a.Id, new[] { theirs }));
+        Assert.False(refused.Ok);
+        Assert.Contains("another settlement", refused.Error);
+    }
+
     [Fact]
     public void RoadsAreValidatedPlacedAndRemoved()
     {
@@ -64,6 +99,9 @@ public class RoadTests
         var grass = FindFreeBuildable(world, town);
         int version = town.RoadVersion;
         Assert.True(world.Execute(new PlaceRoadCommand(town.Id, new[] { grass })).Ok);
+        Assert.True(world.Map.GetTile(grass.X, grass.Y).RoadPlanned); // planned: roadworkers build it
+        Assert.False(world.Map.GetTile(grass.X, grass.Y).IsRoad);
+        Roads.FinishAllPlans(world, town);
         Assert.True(world.Map.GetTile(grass.X, grass.Y).IsRoad);
         Assert.Contains(grass, town.Roads);
         Assert.True(town.RoadVersion > version);
@@ -88,22 +126,25 @@ public class RoadTests
         town.Stock.Add("wood", Roads.BridgeWoodPerTile);
         Assert.True(world.Execute(new PlaceRoadCommand(town.Id, new[] { water })).Ok);
         Assert.Equal(0, town.Stock.Get("wood"));
+        Roads.FinishAllPlans(world, town);
         Assert.Equal(Pathfinder.RoadCost, Pathfinder.StepCost(world.Map.GetTile(water.X, water.Y), Pathfinder.Mode.Walk));
     }
 
     [Fact]
-    public void TerritoryGrowsWithPopulation()
+    public void TerritoryGrowsWithPopulationUpToTheTownCentreCap()
     {
         var (world, town, _) = Scenario.NewTown();
-        int start = town.TerritoryRadius;
-        Assert.Equal(Placement.SettlementRadius + town.Citizens.Count / Placement.CitizensPerExtraTile, start);
+        Assert.Equal(TerritoryRules.PopulationAllowance(town.Citizens.Count), town.TerritoryAllowance);
+        Assert.Equal(town.TerritoryAllowance, town.Territory.Count);
+        int start = town.Territory.Count;
 
-        foreach (var c in CitizenFactory.CreateHousehold(world, 4).Concat(CitizenFactory.CreateHousehold(world, 4))
-                     .Concat(Enumerable.Range(0, 40).SelectMany(_ => CitizenFactory.CreateHousehold(world, 1))))
+        foreach (var c in Enumerable.Range(0, 60).SelectMany(_ => CitizenFactory.CreateHousehold(world, 4)))
             town.AddCitizen(c);
+        TerritorySystem.Daily(world, town);
 
-        Assert.True(town.TerritoryRadius > start);
-        Assert.True(town.TerritoryRadius <= Placement.MaxSettlementRadius);
+        Assert.True(town.Territory.Count > start);
+        Assert.Equal(world.Data.Building("keep").TownCentre!.TerritoryCap, town.TerritoryAllowance);
+        Assert.Equal(town.TerritoryAllowance, town.Territory.Count);
     }
 
     [Fact]
@@ -129,7 +170,7 @@ public class RoadTests
 
     internal static (int X, int Y) FindFreeBuildable(GameWorld world, Settlement town)
     {
-        for (int r = 4; r < Placement.SettlementRadius; r++)
+        for (int r = 4; r < TerritoryRules.BaseRadius; r++)
         for (int dx = -r; dx <= r; dx++)
         {
             int x = town.CenterX + dx, y = town.CenterY + r;
@@ -322,6 +363,7 @@ public class RuleCommandTests
         world.Execute(new SetProductionLimitCommand(town.Id, "wood", 0));
         sim.RunDays(1);
         var woodcutter = town.Buildings.First(b => b.Def.Id == "woodcutter");
-        Assert.Empty(woodcutter.WorkerIds);
+        Assert.True(town.IsOnStandby(woodcutter));
+        Assert.Equal("Stock limit reached", woodcutter.Problem);
     }
 }

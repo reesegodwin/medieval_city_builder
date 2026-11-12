@@ -127,6 +127,115 @@ public static class LowPolyMeshes
                 mb.Box(new Vector3(0.4f, 0.04f, 3.0f), new Vector3(0.9f, 0.3f, 3.4f), Wheat.Darkened(0.2f));
                 break;
 
+            case "mine":
+                // A timber-framed adit into a spoil heap, with an ore cart.
+                mb.Box(new Vector3(0.1f, 0, 0.1f), new Vector3(w - 0.1f, 0.05f, h - 0.1f), Stone.Darkened(0.3f));
+                mb.Box(new Vector3(0.3f, 0, 0.2f), new Vector3(w - 0.3f, 0.9f, 1.6f), Stone.Darkened(0.15f));
+                mb.Box(new Vector3(w / 2 - 0.4f, 0, 1.6f), new Vector3(w / 2 + 0.4f, 0.65f, 1.65f), new Color(0.1f, 0.09f, 0.08f));
+                mb.Box(new Vector3(w / 2 - 0.5f, 0, 1.6f), new Vector3(w / 2 - 0.4f, 0.75f, 1.72f), Timber);
+                mb.Box(new Vector3(w / 2 + 0.4f, 0, 1.6f), new Vector3(w / 2 + 0.5f, 0.75f, 1.72f), Timber);
+                mb.Box(new Vector3(w / 2 - 0.55f, 0.75f, 1.6f), new Vector3(w / 2 + 0.55f, 0.85f, 1.72f), Timber);
+                mb.Box(new Vector3(0.5f, 0.05f, 2.2f), new Vector3(1.0f, 0.35f, 2.6f), Wood); // cart
+                mb.Box(new Vector3(0.55f, 0.35f, 2.25f), new Vector3(0.95f, 0.45f, 2.55f), new Color(0.45f, 0.30f, 0.25f)); // ore
+                mb.Box(new Vector3(1.8f, 0.05f, 2.1f), new Vector3(2.6f, 0.3f, 2.8f), new Color(0.50f, 0.36f, 0.28f)); // ore pile
+                break;
+
+            case "smithy":
+                House(mb, new Vector3(0.2f, 0, 0.3f), new Vector3(w - 0.9f, 0.85f, h - 0.3f), Stone, Slate, 0.55f);
+                mb.Box(new Vector3(w - 1.05f, 0.85f, 0.6f), new Vector3(w - 0.75f, 1.9f, 0.9f), Stone.Darkened(0.2f)); // forge chimney
+                mb.Box(new Vector3(w - 0.8f, 0, 0.5f), new Vector3(w - 0.15f, 0.06f, h - 0.5f), Stone.Darkened(0.25f)); // yard
+                mb.Box(new Vector3(w - 0.6f, 0.06f, 1.2f), new Vector3(w - 0.3f, 0.3f, 1.45f), Slate.Darkened(0.3f)); // anvil
+                mb.Box(new Vector3(w - 0.65f, 0.3f, 1.15f), new Vector3(w - 0.25f, 0.36f, 1.5f), Slate.Darkened(0.4f));
+                break;
+
+            case "pasture":
+                mb.Box(new Vector3(0.05f, 0, 0.05f), new Vector3(w - 0.05f, 0.03f, h - 0.05f), Leaf.Lightened(0.12f));
+                foreach (var (x0, z0, x1, z1) in new[]
+                         {
+                             (0.05f, 0.05f, w - 0.05f, 0.11f), (0.05f, h - 0.11f, w - 0.05f, h - 0.05f),
+                             (0.05f, 0.05f, 0.11f, h - 0.05f), (w - 0.11f, 0.05f, w - 0.05f, h - 0.05f),
+                         })
+                    mb.Box(new Vector3(x0, 0.22f, z0), new Vector3(x1, 0.27f, z1), Timber); // fence rail
+                for (float p = 0.05f; p < w; p += 0.65f)
+                {
+                    mb.Box(new Vector3(p, 0, 0.04f), new Vector3(p + 0.07f, 0.32f, 0.12f), Timber);
+                    mb.Box(new Vector3(p, 0, h - 0.12f), new Vector3(p + 0.07f, 0.32f, h - 0.04f), Timber);
+                }
+                foreach (var (sx, sz) in new[] { (0.8f, 0.9f), (2.1f, 1.4f), (1.3f, 2.5f), (2.9f, 2.8f), (3.0f, 0.8f) })
+                {
+                    mb.Box(new Vector3(sx, 0.08f, sz), new Vector3(sx + 0.42f, 0.32f, sz + 0.26f), ClothLight); // sheep
+                    mb.Box(new Vector3(sx + 0.38f, 0.2f, sz + 0.05f), new Vector3(sx + 0.55f, 0.35f, sz + 0.21f), Timber.Darkened(0.4f));
+                }
+                break;
+
+            case "weaver":
+                House(mb, new Vector3(0.2f, 0, 0.25f), new Vector3(w - 0.2f, 0.8f, h - 1.0f), Wattle, Thatch, 0.6f);
+                mb.Box(new Vector3(0.4f, 0, h - 0.9f), new Vector3(1.4f, 0.55f, h - 0.3f), Wood); // loom
+                mb.Box(new Vector3(0.45f, 0.3f, h - 0.85f), new Vector3(1.35f, 0.5f, h - 0.35f), new Color(0.3f, 0.45f, 0.7f));
+                mb.Box(new Vector3(1.7f, 0.0f, h - 0.85f), new Vector3(2.5f, 0.35f, h - 0.35f), ClothLight); // bales
+                break;
+
+            case "carpenter":
+                House(mb, new Vector3(0.2f, 0, 0.25f), new Vector3(w - 0.2f, 0.8f, h - 1.0f), Wattle, Tiles, 0.6f);
+                for (int i = 0; i < 3; i++) // plank stack
+                    mb.Box(new Vector3(0.3f, i * 0.08f, h - 0.85f), new Vector3(1.6f, i * 0.08f + 0.07f, h - 0.55f), Wood.Lightened(0.1f * i));
+                mb.Box(new Vector3(1.9f, 0, h - 0.85f), new Vector3(2.4f, 0.4f, h - 0.4f), Wood.Darkened(0.1f)); // chair-ish
+                mb.Box(new Vector3(1.9f, 0.4f, h - 0.85f), new Vector3(2.4f, 0.75f, h - 0.78f), Wood.Darkened(0.1f));
+                break;
+
+            case "trading_post":
+                // A warehouse with an open-fronted counter, barrels and a striped awning.
+                House(mb, new Vector3(0.2f, 0, 0.2f), new Vector3(w - 0.2f, 0.85f, h - 1.1f), Wattle, Tiles, 0.6f);
+                mb.Box(new Vector3(0.4f, 0, h - 1.0f), new Vector3(w - 0.4f, 0.4f, h - 0.7f), Wood); // counter
+                for (int i = 0; i < 6; i++)
+                {
+                    float x0 = 0.3f + (w - 0.6f) * i / 6, x1 = 0.3f + (w - 0.6f) * (i + 1) / 6;
+                    mb.Quad(new Vector3(x0, 0.95f, h - 1.15f), new Vector3(x1, 0.95f, h - 1.15f),
+                        new Vector3(x1, 0.75f, h - 0.55f), new Vector3(x0, 0.75f, h - 0.55f),
+                        i % 2 == 0 ? new Color(0.85f, 0.65f, 0.2f) : ClothLight, new Vector3(0, 1, 0.3f).Normalized());
+                }
+                foreach (float x in new[] { 0.35f, 0.75f, w - 0.65f })
+                    mb.Box(new Vector3(x, 0, h - 0.45f), new Vector3(x + 0.3f, 0.35f, h - 0.15f), Wood.Darkened(0.15f)); // barrels
+                break;
+
+            case "keep":
+                // A square stone tower with battlements and a banner.
+                mb.Box(new Vector3(0.6f, 0, 0.6f), new Vector3(w - 0.6f, 1.6f, h - 0.6f), Stone);
+                Battlements(mb, 0.55f, 0.55f, w - 0.55f, h - 0.55f, 1.6f, Stone.Darkened(0.05f));
+                mb.Box(new Vector3(w / 2 - 0.2f, 0, h - 0.62f), new Vector3(w / 2 + 0.2f, 0.55f, h - 0.58f), Timber.Darkened(0.3f));
+                Banner(mb, w / 2, h / 2, 1.75f);
+                break;
+
+            case "town_hall":
+                // A stone hall with a tiled roof and a bell tower.
+                mb.Box(new Vector3(0.2f, 0, 0.6f), new Vector3(w - 0.2f, 0.9f, h - 0.3f), Stone);
+                mb.GableRoof(new Vector3(0.1f, 0.9f, 0.5f), new Vector3(w - 0.1f, 0.9f, h - 0.2f), 0.8f, Tiles);
+                mb.Box(new Vector3(w / 2 - 0.45f, 0, 0.15f), new Vector3(w / 2 + 0.45f, 2.1f, 1.05f), Stone.Lightened(0.05f));
+                mb.Cone(new Vector3(w / 2, 2.1f, 0.6f), 0.6f, 0.9f, 4, Slate);
+                mb.Box(new Vector3(w / 2 - 0.25f, 0, h - 0.32f), new Vector3(w / 2 + 0.25f, 0.6f, h - 0.28f), Timber.Darkened(0.3f));
+                Banner(mb, w / 2, 0.6f, 3.0f);
+                break;
+
+            case "castle":
+                // Curtain wall with four corner towers around a central keep.
+                foreach (var (x0, z0, x1, z1) in new[]
+                         {
+                             (0.05f, 0.05f, w - 0.05f, 0.35f), (0.05f, h - 0.35f, w - 0.05f, h - 0.05f),
+                             (0.05f, 0.35f, 0.35f, h - 0.35f), (w - 0.35f, 0.35f, w - 0.05f, h - 0.35f),
+                         })
+                    mb.Box(new Vector3(x0, 0, z0), new Vector3(x1, 0.9f, z1), Stone.Darkened(0.05f));
+                foreach (float x in new[] { 0f, w - 0.6f })
+                foreach (float z in new[] { 0f, h - 0.6f })
+                {
+                    mb.Box(new Vector3(x, 0, z), new Vector3(x + 0.6f, 1.4f, z + 0.6f), Stone);
+                    mb.Cone(new Vector3(x + 0.3f, 1.4f, z + 0.3f), 0.42f, 0.6f, 4, Slate);
+                }
+                mb.Box(new Vector3(0.85f, 0, 0.85f), new Vector3(w - 0.85f, 2.2f, h - 0.85f), Stone.Lightened(0.05f));
+                Battlements(mb, 0.8f, 0.8f, w - 0.8f, h - 0.8f, 2.2f, Stone);
+                mb.Box(new Vector3(w / 2 - 0.25f, 0, h - 0.07f), new Vector3(w / 2 + 0.25f, 0.65f, h - 0.03f), Timber.Darkened(0.3f));
+                Banner(mb, w / 2, h / 2, 2.35f);
+                break;
+
             default:
                 House(mb, new Vector3(0.1f, 0, 0.1f), new Vector3(w - 0.1f, 0.8f, h - 0.1f), Stone, Tiles, 0.6f);
                 break;
@@ -135,6 +244,29 @@ public static class LowPolyMeshes
         var mesh = mb.Commit();
         BuildingCache[def.Id] = mesh;
         return mesh;
+    }
+
+    /// <summary>Crenellations along the top edge of a rectangle.</summary>
+    private static void Battlements(MeshBuilder mb, float x0, float z0, float x1, float z1, float y, Color color)
+    {
+        const float size = 0.18f, height = 0.18f;
+        for (float x = x0; x + size <= x1 + 0.01f; x += size * 2)
+        {
+            mb.Box(new Vector3(x, y, z0), new Vector3(x + size, y + height, z0 + size), color);
+            mb.Box(new Vector3(x, y, z1 - size), new Vector3(x + size, y + height, z1), color);
+        }
+        for (float z = z0 + size * 2; z + size <= z1 - size; z += size * 2)
+        {
+            mb.Box(new Vector3(x0, y, z), new Vector3(x0 + size, y + height, z + size), color);
+            mb.Box(new Vector3(x1 - size, y, z), new Vector3(x1, y + height, z + size), color);
+        }
+    }
+
+    /// <summary>A flagpole with a pennant, marking the town centre.</summary>
+    private static void Banner(MeshBuilder mb, float x, float z, float baseY)
+    {
+        mb.Box(new Vector3(x - 0.03f, baseY, z - 0.03f), new Vector3(x + 0.03f, baseY + 1.0f, z + 0.03f), Timber);
+        mb.Box(new Vector3(x + 0.03f, baseY + 0.6f, z - 0.01f), new Vector3(x + 0.5f, baseY + 0.95f, z + 0.01f), Cloth);
     }
 
     /// <summary>Market stall: four posts, a counter and a striped awning.</summary>
@@ -157,23 +289,6 @@ public static class LowPolyMeshes
         }
     }
 
-    /// <summary>Flat diamond outline showing everything within a Manhattan radius (service coverage).</summary>
-    public static ArrayMesh RadiusOutline(int radius, Color color)
-    {
-        var mb = new MeshBuilder();
-        const float t = 0.25f, y = 0.06f;
-        var corners = new[] { new Vector2(0, -radius), new Vector2(radius, 0), new Vector2(0, radius), new Vector2(-radius, 0) };
-        for (int i = 0; i < 4; i++)
-        {
-            var a = corners[i];
-            var b = corners[(i + 1) % 4];
-            var n = new Vector2(b.Y - a.Y, a.X - b.X).Normalized() * t;
-            mb.Quad(new Vector3(a.X, y, a.Y), new Vector3(b.X, y, b.Y), new Vector3(b.X + n.X, y, b.Y + n.Y),
-                new Vector3(a.X + n.X, y, a.Y + n.Y), color, Vector3.Up);
-        }
-        return mb.Commit(Materials.Overlay);
-    }
-
     private static void House(MeshBuilder mb, Vector3 min, Vector3 max, Color walls, Color roof, float roofHeight)
     {
         mb.Box(min, max, walls);
@@ -185,6 +300,19 @@ public static class LowPolyMeshes
         float cx = (min.X + max.X) / 2;
         mb.Box(new Vector3(cx - 0.12f, 0, max.Z), new Vector3(cx + 0.12f, 0.4f, max.Z + 0.02f), Timber.Darkened(0.3f));
         mb.GableRoof(new Vector3(min.X - 0.1f, max.Y, min.Z - 0.1f), new Vector3(max.X + 0.1f, max.Y, max.Z + 0.1f), roofHeight, roof);
+    }
+
+    private static readonly Dictionary<(int, int), ArrayMesh> FoundationCache = new();
+
+    /// <summary>Packed-earth footing from just below ground level down into the terrain.</summary>
+    public static ArrayMesh Foundation(int width, int height)
+    {
+        if (FoundationCache.TryGetValue((width, height), out var cached)) return cached;
+        var mb = new MeshBuilder { Center = new Vector3(width / 2f, -0.2f, height / 2f) };
+        mb.Box(new Vector3(0.02f, -0.45f, 0.02f), new Vector3(width - 0.02f, -0.005f, height - 0.02f), Soil.Lightened(0.08f));
+        var mesh = mb.Commit();
+        FoundationCache[(width, height)] = mesh;
+        return mesh;
     }
 
     public static ArrayMesh Scaffold(int width, int height)
@@ -225,6 +353,28 @@ public static class LowPolyMeshes
         var mesh = mb.Commit();
         PlotCache[(width, height)] = mesh;
         return mesh;
+    }
+
+    /// <summary>An ox pulling a covered cart with crates, facing +Z, origin under the cart's middle.</summary>
+    public static readonly ArrayMesh Caravan = BuildCaravan();
+
+    private static ArrayMesh BuildCaravan()
+    {
+        var mb = new MeshBuilder { Center = new Vector3(0, 0.4f, 0) };
+        mb.Box(new Vector3(-0.35f, 0.18f, -0.6f), new Vector3(0.35f, 0.32f, 0.3f), Wood); // cart bed
+        foreach (float x in new[] { -0.4f, 0.35f })
+        foreach (float z in new[] { -0.45f, 0.15f })
+            mb.Box(new Vector3(x, 0, z), new Vector3(x + 0.05f, 0.24f, z + 0.24f), Timber.Darkened(0.3f)); // wheels
+        mb.Box(new Vector3(-0.3f, 0.32f, -0.55f), new Vector3(0.0f, 0.55f, -0.25f), Wood.Lightened(0.15f)); // crate
+        mb.Box(new Vector3(0.02f, 0.32f, -0.5f), new Vector3(0.3f, 0.5f, -0.2f), Wheat.Darkened(0.15f)); // sack
+        mb.GableRoof(new Vector3(-0.36f, 0.5f, -0.6f), new Vector3(0.36f, 0.5f, 0.1f), 0.28f, ClothLight); // canvas cover
+        mb.Box(new Vector3(-0.03f, 0.22f, 0.3f), new Vector3(0.03f, 0.27f, 0.7f), Timber); // shaft
+        mb.Box(new Vector3(-0.16f, 0.2f, 0.7f), new Vector3(0.16f, 0.48f, 1.25f), new Color(0.42f, 0.3f, 0.2f)); // ox
+        mb.Box(new Vector3(-0.1f, 0.3f, 1.25f), new Vector3(0.1f, 0.48f, 1.45f), new Color(0.38f, 0.27f, 0.18f)); // head
+        foreach (float x in new[] { -0.14f, 0.08f })
+        foreach (float z in new[] { 0.72f, 1.13f })
+            mb.Box(new Vector3(x, 0, z), new Vector3(x + 0.06f, 0.2f, z + 0.08f), new Color(0.3f, 0.22f, 0.15f)); // legs
+        return mb.Commit();
     }
 
     public static readonly ArrayMesh Tree = BuildTree();

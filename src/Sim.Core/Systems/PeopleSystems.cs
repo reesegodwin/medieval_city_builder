@@ -146,6 +146,7 @@ public static class ServiceSystem
 
         foreach (var need in world.Data.Needs)
         {
+            if (need.IsGoodsNeed) continue; // supplied after the services they come through
             var providers = settlement.Buildings
                 .Where(b => b.Def.Service?.Need == need.Id)
                 .ToList();
@@ -172,7 +173,8 @@ public static class ServiceSystem
                 foreach (var b in open)
                 {
                     int d = b.DistanceTo(home);
-                    if (d > b.Def.Service!.Radius || b.ServedCount >= b.Def.Service.Capacity || d >= bestDistance) continue;
+                    int capacity = (int)(b.Def.Service!.Capacity * EconomySystem.OutputFactor(world, settlement, b));
+                    if (d > b.Def.Service.Radius || b.ServedCount >= capacity || d >= bestDistance) continue;
                     best = b;
                     bestDistance = d;
                 }
@@ -191,6 +193,40 @@ public static class ServiceSystem
                 string? missing = consumes.Keys.FirstOrDefault(r => settlement.Stock.Get(r) < consumes[r]);
                 b.Problem = canServe == 0 && missing != null ? $"Needs {missing}" : null;
             }
+        }
+
+        foreach (var need in world.Data.Needs)
+            if (need.IsGoodsNeed) SupplyGoods(settlement, need);
+    }
+
+    /// <summary>
+    /// Household goods (clothing, furniture...) reach people who have the service they come through (a market),
+    /// in citizen order, as far as the stock lasts. Use builds up fractionally and whole units are taken.
+    /// </summary>
+    private static void SupplyGoods(Settlement settlement, Data.NeedDef need)
+    {
+        int canServe = int.MaxValue;
+        foreach (var (resource, perPerson) in need.Goods)
+        {
+            double available = settlement.Stock.Get(resource) - settlement.GoodsUse.GetValueOrDefault(resource);
+            canServe = Math.Min(canServe, Math.Max(0, (int)(available / perPerson)));
+        }
+
+        int served = 0;
+        foreach (var c in settlement.Citizens)
+        {
+            if (served >= canServe) break;
+            if (!c.CoveredNeeds.Contains(need.Via!)) continue;
+            c.CoveredNeeds.Add(need.Id);
+            served++;
+        }
+
+        foreach (var (resource, perPerson) in need.Goods)
+        {
+            double use = settlement.GoodsUse.GetValueOrDefault(resource) + served * perPerson;
+            int whole = Math.Min(settlement.Stock.Get(resource), (int)use);
+            if (whole > 0) settlement.Stock.TryTake(resource, whole);
+            settlement.GoodsUse[resource] = use - (int)use;
         }
     }
 
@@ -327,6 +363,25 @@ public static class MigrationSystem
     public const double AttractiveMood = 55;
     public const double ArrivalChancePerDay = 0.35;
 
+    /// <summary>
+    /// Newcomers stay away while more adults than this share (and at least <see cref="MinJoblessForArrivals"/>)
+    /// have no work at all. Haulers count as working.
+    /// </summary>
+    public const double JoblessShareLimit = 0.25;
+    public const int MinJoblessForArrivals = 4;
+
+    public static bool HasWorkForNewcomers(Settlement settlement)
+    {
+        int adults = 0, jobless = 0;
+        foreach (var c in settlement.Citizens)
+        {
+            if (!c.IsAdult) continue;
+            adults++;
+            if (c.JobBuildingId == null) jobless++;
+        }
+        return jobless <= Math.Max(MinJoblessForArrivals, JoblessShareLimit * adults);
+    }
+
     public static void Daily(GameWorld world, Settlement settlement)
     {
         foreach (var c in settlement.Citizens.ToList())
@@ -340,7 +395,8 @@ public static class MigrationSystem
 
         if (settlement.Citizens.Count == 0) return;
         double averageMood = settlement.Citizens.Average(c => c.Mood);
-        if (averageMood < AttractiveMood || settlement.FreeHousing < 2 || Needs.FoodDays(world, settlement) < 3)
+        if (averageMood < AttractiveMood || settlement.FreeHousing < 2 || Needs.FoodDays(world, settlement) < 3 ||
+            !HasWorkForNewcomers(settlement))
             return;
         if (!world.Rng.Chance(ArrivalChancePerDay)) return;
 

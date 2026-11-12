@@ -1,3 +1,4 @@
+using Sim.Core.Commands;
 using System.Text;
 using Godot;
 using Sim.Core.Citizens;
@@ -12,8 +13,12 @@ public partial class InspectorPanel : PanelContainer
 {
     private Label _title = null!;
     private RichTextLabel _body = null!;
+    private Button _upgrade = null!;
 
     public event Action? Closed;
+
+    /// <summary>The player asked to upgrade the town centre.</summary>
+    public event Action? UpgradeRequested;
 
     public override void _Ready()
     {
@@ -47,13 +52,18 @@ public partial class InspectorPanel : PanelContainer
             SelectionEnabled = true,
         };
         column.AddChild(_body);
+
+        _upgrade = new Button { Visible = false };
+        _upgrade.Pressed += () => UpgradeRequested?.Invoke();
+        column.AddChild(_upgrade);
     }
 
-    public void ShowBuilding(Settlement town, Building b)
+    public void ShowBuilding(GameWorld world, Settlement town, Building b)
     {
         Visible = true;
         _title.Text = b.Def.Name;
         var sb = new StringBuilder();
+        _upgrade.Visible = false;
 
         string state = b.State switch
         {
@@ -77,7 +87,8 @@ public partial class InspectorPanel : PanelContainer
         }
         sb.AppendLine(b.NoRoute
             ? "[color=#ff8060][b]Hauling:[/b] no walkable route to a stockpile![/color]"
-            : $"[b]Hauling efficiency:[/b] {b.HaulFactor:P0} (walking distance to a stockpile; roads help)");
+            : $"[b]Hauling efficiency:[/b] {Logistics.EffectiveHaulFactor(town, b):P0} " +
+              $"({b.HaulFactor:P0} from walking distance to a stockpile, the rest won back by haulers; roads help)");
 
         if (b.Def.Service is { } service)
         {
@@ -105,8 +116,57 @@ public partial class InspectorPanel : PanelContainer
                     sb.AppendLine($"  {c.FullName} ({(int)c.AgeYears})");
         }
         if (b.Def.Storage > 0) sb.AppendLine($"[b]Town storage:[/b] {town.Stock.Total}/{town.StorageCapacity}");
+        if (b.CurrentJobKind == JobKinds.Hauler)
+            sb.AppendLine($"[b]Hauling:[/b] haulers here carry goods for other workplaces. Across town they cover " +
+                          $"{town.HaulCoverage:P0} of the carrying workers would otherwise do themselves.");
+        else if (b.IsOperational && b.WorkerIds.Count > 0 && town.IsOnStandby(b))
+            sb.AppendLine("[b]Standby:[/b] stock limit reached; workers wait here and help elsewhere when needed.");
+        if (b.Def.Upkeep > 0)
+            sb.AppendLine(town.UpkeepUnpaid
+                ? $"[color=#ff8060][b]Upkeep:[/b] {b.Def.Upkeep:0.#} coin a day, unpaid: running at half output[/color]"
+                : $"[b]Upkeep:[/b] {b.Def.Upkeep:0.#} coin a day");
+        if (b.Def.TownCentre != null) DescribeTownCentre(world, town, b, sb);
+        if (b.Def.Trade)
+        {
+            int offers = world.Trade.Offers.Count(o => o.SettlementId == town.Id);
+            int caravans = world.Trade.Caravans.Count(c => c.FromId == town.Id || c.ToId == town.Id);
+            sb.AppendLine();
+            sb.AppendLine($"[b]Trade:[/b] {offers} open offers, {caravans} caravans on the road, {town.Stock.Get("coin")} coin.");
+            sb.AppendLine(b.WorkerIds.Count > 0
+                ? "Merchants visit while a trader works here. Open the trade panel with J."
+                : "[color=#ffb060]Needs a trader before merchants will visit.[/color]");
+        }
 
         SetBody(sb);
+    }
+
+    private void DescribeTownCentre(GameWorld world, Settlement town, Building b, StringBuilder sb)
+    {
+        sb.AppendLine();
+        sb.AppendLine($"[b]Territory:[/b] {town.Territory.Count} tiles held");
+        sb.AppendLine($"[b]Allowance:[/b] {town.TerritoryAllowance} tiles " +
+                      $"(population allows {TerritoryRules.PopulationAllowance(town.Citizens.Count)}, cap {town.TerritoryCap})");
+        sb.AppendLine("Paint territory with the Territory tool (T), or tick \"Auto land\" to grow it evenly.");
+        sb.AppendLine($"[b]Roads:[/b] {town.RoadPlans.Count} tiles planned; roadworkers here build them (free, but they take time).");
+        sb.AppendLine($"[b]Treasury:[/b] {town.Stock.Get("coin")} coin, taxes {EconomySystem.DailyTax(world, town):0.#} and upkeep " +
+                      $"{EconomySystem.DailyUpkeep(town):0.#} a day.");
+
+        if (b.Def.TownCentre!.UpgradeTo is not { } nextId)
+        {
+            sb.AppendLine("[b]Highest tier.[/b]");
+            return;
+        }
+        var next = world.Data.Building(nextId);
+        string cost = string.Join(", ", next.Cost.Select(kv => $"{kv.Value} {kv.Key}"));
+        sb.AppendLine();
+        sb.AppendLine($"[b]Next tier:[/b] {next.Name}, territory cap {next.TownCentre!.TerritoryCap} tiles");
+        sb.AppendLine($"[b]Needs:[/b] {next.TownCentre.MinPopulation} people; costs {cost}; {next.BuildDays:0.#} worker-days to build");
+
+        string? problem = UpgradeTownCentreCommand.Check(world, town, out _);
+        _upgrade.Visible = true;
+        _upgrade.Disabled = problem != null;
+        _upgrade.Text = $"Upgrade to {next.Name}";
+        _upgrade.TooltipText = problem ?? $"Rebuild as a {next.Name} ({cost}). The current cap stays until it's finished.";
     }
 
     public void ShowCitizen(GameWorld world, Settlement town, Citizen c)

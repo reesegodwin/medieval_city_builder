@@ -23,7 +23,8 @@ public static class SiteFinder
         double bestScore = double.MinValue;
         int validFound = 0;
 
-        int searchRadius = maxRadius ?? settlement.TerritoryRadius;
+        int searchRadius = maxRadius ??
+            settlement.TerritoryExtent + Math.Max(Math.Abs(ox - settlement.CenterX), Math.Abs(oy - settlement.CenterY));
         for (int r = 0; r <= searchRadius; r++)
         {
             foreach (var (x, y) in Ring(ox, oy, r))
@@ -121,10 +122,7 @@ public static class RoadPlanner
     /// </summary>
     public static List<(int X, int Y)>? PlanRoute(GameWorld world, Settlement settlement, Building building)
     {
-        var start = building.AccessTiles()
-            .Prepend(building.DoorTile)
-            .FirstOrDefault(t => Pathfinder.StepCost(world.Map.GetTile(t.X, t.Y), Pathfinder.Mode.BuildRoad) != null,
-                (X: int.MinValue, Y: int.MinValue));
+        var start = RouteStart(world, settlement, building);
         if (start.X == int.MinValue) return null;
 
         var stockpileEntrances = settlement.Buildings
@@ -137,17 +135,70 @@ public static class RoadPlanner
 
         bool IsGoal(int x, int y) =>
             (x, y) != start && !building.Covers(x, y) &&
-            (world.Map.GetTile(x, y).IsRoad || stockpileEntrances.Contains((x, y)));
+            (world.Map.GetTile(x, y) is { IsRoad: true } or { RoadPlanned: true } || stockpileEntrances.Contains((x, y)));
 
-        if (IsGoal(start.X, start.Y) || world.Map.GetTile(start.X, start.Y).IsRoad) return new();
+        if (IsGoal(start.X, start.Y) || world.Map.GetTile(start.X, start.Y) is { IsRoad: true } or { RoadPlanned: true }) return new();
 
-        var path = Pathfinder.FindPathToAny(world.Map, start, IsGoal, Pathfinder.Mode.BuildRoad, MaxSearch, building.Covers);
+        // Roads may only be laid inside the territory (see Roads.Check), so plan within it.
+        bool Blocked(int x, int y) => building.Covers(x, y) || !CanLayRoad(world, settlement, x, y);
+        var path = Pathfinder.FindPathToAny(world.Map, start, IsGoal, Pathfinder.Mode.BuildRoad, MaxSearch, Blocked);
         if (path == null) return null;
 
-        var tiles = path.Where(t => !world.Map.GetTile(t.X, t.Y).IsRoad).ToList();
+        var tiles = path.Where(t => world.Map.GetTile(t.X, t.Y) is { IsRoad: false, RoadPlanned: false }).ToList();
         if (tiles.Count(t => world.Map.GetTile(t.X, t.Y).Terrain == Terrain.Water) > MaxBridgeTiles) return null;
         return tiles;
     }
+
+    /// <summary>
+    /// After <see cref="PlanRoute"/> failed for a building: the land tiles road-connected to its route start
+    /// (without crossing water, including its own footprint), if that land holds no road or stockpile entrance. Any site whose access lies only
+    /// on that land needs the same too-long bridge. Returns null if it isn't such a pocket or is too big to map.
+    /// </summary>
+    public static List<(int X, int Y)>? SealedLandPocket(GameWorld world, Settlement settlement, Building building)
+    {
+        static bool IsLand(in Tile t) =>
+            t.Terrain != Terrain.Water && Pathfinder.StepCost(t, Pathfinder.Mode.BuildRoad) != null;
+
+        var start = RouteStart(world, settlement, building);
+        if (start.X == int.MinValue || world.Map.GetTile(start.X, start.Y).Terrain == Terrain.Water) return null;
+
+        var stockpileEntrances = settlement.Buildings
+            .Where(b => b.Def.IsStockpile)
+            .SelectMany(b => b.AccessTiles())
+            .ToHashSet();
+
+        var pocket = new List<(int X, int Y)> { start };
+        var seen = new HashSet<(int, int)> { start };
+        for (int i = 0; i < pocket.Count; i++)
+        {
+            var (x, y) = pocket[i];
+            if (world.Map.GetTile(x, y) is { IsRoad: true } or { RoadPlanned: true } || stockpileEntrances.Contains((x, y))) return null;
+            if (pocket.Count > MaxSearch) return null;
+            foreach (var (dx, dy) in Neighbours)
+            {
+                var n = (x + dx, y + dy);
+                if (!seen.Add(n)) continue;
+                // The candidate's own footprint is land too (it isn't built), so neighbouring candidates are covered.
+                // Roads count as land: reaching one means this isn't a sealed pocket.
+                if (IsLand(world.Map.GetTile(n.Item1, n.Item2)) && CanLayRoad(world, settlement, n.Item1, n.Item2)) pocket.Add(n);
+            }
+        }
+        return pocket;
+    }
+
+    /// <summary>The tile a building's connecting road starts from, or (int.MinValue, int.MinValue) if none.</summary>
+    private static (int X, int Y) RouteStart(GameWorld world, Settlement settlement, Building building) =>
+        building.AccessTiles()
+            .Prepend(building.DoorTile)
+            .FirstOrDefault(t => Pathfinder.StepCost(world.Map.GetTile(t.X, t.Y), Pathfinder.Mode.BuildRoad) != null &&
+                                 CanLayRoad(world, settlement, t.X, t.Y),
+                (X: int.MinValue, Y: int.MinValue));
+
+    /// <summary>An existing road, or a tile where this settlement may lay one.</summary>
+    private static bool CanLayRoad(GameWorld world, Settlement settlement, int x, int y) =>
+        world.Map.GetTile(x, y) is { IsRoad: true } or { RoadPlanned: true } || Roads.Check(world, settlement, x, y) == null;
+
+    private static readonly (int Dx, int Dy)[] Neighbours = { (0, -1), (1, 0), (0, 1), (-1, 0) };
 }
 
 /// <summary>
@@ -163,20 +214,37 @@ public static class SettlementGovernor
 
     public const int MaxAttemptsPerDay = 3;
 
+    /// <summary>Governed towns build a Trading Post once they have this many people.</summary>
+    public const int TradingPostPopulation = 80;
+
+    /// <summary>The governor upgrades the town centre once population would claim this share of its territory cap.</summary>
+    public const double UpgradeAtCapFraction = 0.85;
+
     /// <summary>Candidate sites per search that get a full road-route check.</summary>
     public const int MaxRouteChecksPerSearch = 10;
+
+    /// <summary>Labour a worker is assumed to give per day when sizing food production (a cautious <see cref="Work.DailyRate"/>).</summary>
+    public const double ExpectedWorkerRate = 1.2;
+
+    /// <summary>Planned food production must exceed the town's daily need by this factor.</summary>
+    public const double FoodSupplyMargin = 1.2;
 
     public static void Daily(GameWorld world, Settlement settlement)
     {
         if (!settlement.Rules.AutoBuild) return;
+        TradeGovernor.Daily(world, settlement);
         int maxSites = MaxActiveConstructionSites + settlement.Citizens.Count / 100;
         if (settlement.Buildings.Count(b => b.IsConstructionSite) >= maxSites) return;
+
+        if (TryUpgradeTownCentre(world, settlement)) return;
 
         // Try wishes in priority order; the first affordable one with a usable site gets built.
         long today = world.Time.Day;
         int attempts = 0;
         CostGrid? field = null;
         bool fieldReady = false;
+        // Land found to be cut off from the road network (beyond bridge range): skipped for the rest of today.
+        var deadLand = new HashSet<(int X, int Y)>();
         foreach (var (defId, near) in Wishes(world, settlement))
         {
             var def = world.Data.Building(defId);
@@ -191,14 +259,25 @@ public static class SettlementGovernor
                 field = Logistics.StockpileField(world, settlement, Pathfinder.Mode.BuildRoad);
                 fieldReady = true;
             }
-            if (TryBuild(world, settlement, def, near, field)) return;
+            if (TryBuild(world, settlement, def, near, field, deadLand)) return;
 
             settlement.FailedSiteSearches[key] = today;
             if (++attempts >= MaxAttemptsPerDay) return;
         }
     }
 
-    private static bool TryBuild(GameWorld world, Settlement settlement, BuildingDef def, (int X, int Y)? near, CostGrid? field)
+    /// <summary>Upgrade the town centre once its territory cap is close to holding the town back and it's affordable.</summary>
+    private static bool TryUpgradeTownCentre(GameWorld world, Settlement settlement)
+    {
+        if (UpgradeTownCentreCommand.Check(world, settlement, out var next) != null || next == null) return false;
+        int wanted = TerritoryRules.PopulationAllowance(settlement.Citizens.Count);
+        if (wanted < settlement.TerritoryCap * UpgradeAtCapFraction) return false;
+        if (!settlement.Stock.Has(next.Cost)) return false;
+        return world.Execute(new UpgradeTownCentreCommand(settlement.Id)).Ok;
+    }
+
+    private static bool TryBuild(GameWorld world, Settlement settlement, BuildingDef def, (int X, int Y)? near, CostGrid? field,
+        HashSet<(int X, int Y)> deadLand)
     {
         // A service building must actually reach the homes it was meant for, so only look nearby.
         int? maxRadius = def.Service is { } service && near != null ? service.Radius / 2 : null;
@@ -213,31 +292,93 @@ public static class SettlementGovernor
             return false;
         }
 
+        bool OnlyOnDeadLand(Building candidate)
+        {
+            if (deadLand.Count == 0) return false;
+            bool any = false;
+            foreach (var t in candidate.AccessTiles().Prepend(candidate.DoorTile))
+            {
+                if (Pathfinder.StepCost(world.Map.GetTile(t.X, t.Y), Pathfinder.Mode.BuildRoad) == null) continue;
+                if (!deadLand.Contains(t)) return false;
+                any = true;
+            }
+            return any;
+        }
+
         // Plan the connecting road (and any bridge) before committing, so nothing gets built and torn
         // down. Route planning is expensive, so only a limited number of candidate sites get one.
         int routeChecks = 0;
         bool Connectable(int left, int top)
         {
-            if (!Reachable(left, top) || routeChecks++ >= MaxRouteChecksPerSearch) return false;
-            var route = RoadPlanner.PlanRoute(world, settlement, new Building(0, def, left, top));
+            if (!Reachable(left, top)) return false;
+            var candidate = new Building(0, def, left, top);
+            if (OnlyOnDeadLand(candidate)) return false;
+            if (routeChecks++ >= MaxRouteChecksPerSearch) return false;
+            var route = RoadPlanner.PlanRoute(world, settlement, candidate);
+            if (route == null && RoadPlanner.SealedLandPocket(world, settlement, candidate) is { } pocket)
+                deadLand.UnionWith(pocket);
             return route != null &&
                    settlement.Stock.Get("wood") >= Roads.BridgeCost(world, route) + def.Cost.GetValueOrDefault("wood");
         }
 
         var site = SiteFinder.Find(world, settlement, def, near, maxRadius, Connectable);
+        if (site == null && def.Service is { } reach && near != null)
+        {
+            // Crowded around that home: anywhere within the service's reach of it still serves it.
+            routeChecks = 0;
+            site = SiteFinder.Find(world, settlement, def, near, reach.Radius - 1, Connectable);
+        }
         if (site is not var (x, y)) return false;
 
         var result = world.Execute(new PlaceBuildingCommand(settlement.Id, def.Id, x, y));
         if (result.CreatedId is not int id || settlement.FindBuilding(id) is not { } placed) return false;
 
-        RoadPlanner.Connect(world, settlement, placed);
-        if (placed.NoRoute && !def.IsStockpile)
+        // The road (and any bridge) is planned and roadworkers will build it, so only a failed plan means cut off.
+        if (!RoadPlanner.Connect(world, settlement, placed) && !def.IsStockpile)
         {
             // Cut off (e.g. across a river with no bridge): take it back.
             world.Execute(new DemolishBuildingCommand(settlement.Id, placed.Id));
             return false;
         }
         return true;
+    }
+
+    /// <summary>
+    /// Nutrition per day the settlement's food buildings (including planned ones) should produce when
+    /// staffed: farm grain, baked into bread as far as bakeries can take it, minus grain for breweries,
+    /// plus garden vegetables. Recipes and nutrition come from the game data.
+    /// </summary>
+    public static double EstimatedFoodSupply(GameWorld world, Settlement s)
+    {
+        double Rate(string defId, out RecipeDef? recipe)
+        {
+            var def = world.Data.Buildings.GetValueOrDefault(defId);
+            recipe = def?.Recipe;
+            if (def == null || recipe == null || recipe.WorkDays <= 0) return 0;
+            return s.CountIncludingPlanned(defId) * def.Jobs * ExpectedWorkerRate / recipe.WorkDays;
+        }
+        double Nutrition(string resource) => world.Data.Resources.GetValueOrDefault(resource)?.Nutrition ?? 0;
+
+        double farmCycles = Rate("farm", out var farm);
+        double grain = farmCycles * (farm?.Outputs.GetValueOrDefault("grain") ?? 0);
+
+        double breweryCycles = Rate("brewery", out var brewery);
+        grain = Math.Max(0, grain - breweryCycles * (brewery?.Inputs.GetValueOrDefault("grain") ?? 0));
+
+        double supply = 0;
+        double bakeryCycles = Rate("bakery", out var bakery);
+        int grainPerBake = bakery?.Inputs.GetValueOrDefault("grain") ?? 0;
+        if (grainPerBake > 0)
+        {
+            double baked = Math.Min(grain, bakeryCycles * grainPerBake);
+            supply += baked / grainPerBake * bakery!.Outputs.GetValueOrDefault("bread") * Nutrition("bread");
+            grain -= baked;
+        }
+        supply += grain * Nutrition("grain");
+
+        double gardenCycles = Rate("garden", out var garden);
+        supply += gardenCycles * (garden?.Outputs.GetValueOrDefault("vegetables") ?? 0) * Nutrition("vegetables");
+        return supply;
     }
 
     /// <summary>What the settlement would like to build next, most important first.</summary>
@@ -294,10 +435,10 @@ public static class SettlementGovernor
         if (plannedHousing < 3 + homeless) Wish("hovel");
         foreach (var spot in ServiceGaps("water")) Wish("well", spot);
 
-        // Each farm (two farmers) reliably covers about 6 nutrition a day.
+        // Size farming to the town's need (counting bread and gardens), with an emergency top-up.
         double dailyFoodNeed = s.Citizens.Sum(Needs.DailyFoodNeed);
         bool grainSurplus = s.Stock.Get("grain") >= s.LimitOf("grain") * 0.8;
-        if ((foodDays < 3 && !grainSurplus) || farms * 6.0 < dailyFoodNeed)
+        if ((foodDays < 3 && !grainSurplus) || EstimatedFoodSupply(world, s) < dailyFoodNeed * FoodSupplyMargin)
         {
             if (!Understaffed("farm")) Wish("farm");
         }
@@ -309,6 +450,22 @@ public static class SettlementGovernor
         if (quarries == 0 || (s.Stock.Get("stone") < 20 && quarries < 1 + population / 30))
             Wish("quarry");
         if (s.FreeStorage < 80) Wish("stockpile");
+        if (population >= TradingPostPopulation && !s.Buildings.Any(b => b.Def.Trade)) Wish("trading_post");
+
+        // Production chains (mine -> smithy, pasture -> weaver, carpenter...), from each building's governor hint.
+        foreach (var def in world.Data.BuildingList)
+        {
+            if (def.Governor is not { } hint || def.Recipe is not { } recipe) continue;
+            if (population < hint.MinPopulation || Understaffed(def.Id)) continue;
+            int count = s.CountIncludingPlanned(def.Id);
+            if (count >= 1 + population / hint.PopulationPerBuilding) continue;
+            if (count > 0 && recipe.Outputs.Keys.Any(r => s.Stock.Get(r) >= hint.LowStock)) continue;
+            // A converter is only worth building once its inputs are in stock or something makes them.
+            bool inputsAvailable = recipe.Inputs.All(kv =>
+                s.Stock.Get(kv.Key) >= kv.Value ||
+                s.Buildings.Any(b => b.Def.Recipe?.Outputs.ContainsKey(kv.Key) == true));
+            if (inputsAvailable) Wish(def.Id);
+        }
 
         // Services and variety as the town grows.
         if (farms >= 2 && s.CountIncludingPlanned("garden") < 1 + population / 40 && !Understaffed("garden"))

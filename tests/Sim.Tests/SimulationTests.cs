@@ -34,9 +34,35 @@ internal static class Scenario
         ConstructionSystem.Complete(world, town, b);
     }
 
+    /// <summary>
+    /// Lays a finished road between two towns' Trading Posts: each town plans the part on its own (or unclaimed)
+    /// land, then the plans are completed at once.
+    /// </summary>
+    public static void ConnectByRoad(GameWorld world, Settlement a, Settlement b)
+    {
+        var from = Sim.Core.Trade.Trading.TradingPost(a)!.DoorTile;
+        var to = Sim.Core.Trade.Trading.TradingPost(b)!.DoorTile;
+        var path = Pathfinder.FindPathTowards(world.Map, from, (x, y) => (x, y) == to, to, Pathfinder.Mode.BuildRoad, 2_000_000)
+                   ?? throw new InvalidOperationException("No way to lay a road");
+        foreach (var town in new[] { a, b })
+        {
+            // B lays the tiles inside its own territory; A lays everything else.
+            var mine = path
+                .Where(t => (world.Map.GetTile(t.X, t.Y).TerritoryId == b.Id) == (town == b))
+                .Where(t => world.Map.GetTile(t.X, t.Y) is { IsRoad: false, RoadPlanned: false }).ToList();
+            town.Stock.Add("wood", Roads.BridgeCost(world, mine));
+            if (mine.Count > 0)
+            {
+                var result = world.Execute(new PlaceRoadCommand(town.Id, mine));
+                if (!result.Ok) throw new InvalidOperationException(result.Error);
+            }
+            Roads.FinishAllPlans(world, town);
+        }
+    }
+
     public static (int X, int Y) FindTile(GameWorld world, Settlement town, Terrain terrain)
     {
-        for (int r = 0; r < Placement.SettlementRadius; r++)
+        for (int r = 0; r < TerritoryRules.BaseRadius; r++)
         for (int dy = -r; dy <= r; dy++)
         for (int dx = -r; dx <= r; dx++)
         {
@@ -152,16 +178,19 @@ public class ProductionTests
     }
 
     [Fact]
-    public void ProductionStopsAtStockLimitAndFreesWorkers()
+    public void ProductionStopsAtStockLimitAndWorkersWaitOnStandby()
     {
         var (world, town, sim) = Scenario.NewTown();
         town.Stock.Add("wood", town.LimitOf("wood"));
+        int wood = town.Stock.Get("wood");
 
         sim.RunDays(1);
 
         var woodcutter = town.Buildings.First(b => b.Def.Id == "woodcutter");
         Assert.True(town.IsAtProductionLimit(woodcutter));
-        Assert.Empty(woodcutter.WorkerIds);
+        Assert.True(town.IsOnStandby(woodcutter));
+        Assert.Equal("Stock limit reached", woodcutter.Problem);
+        Assert.True(town.Stock.Get("wood") <= wood, "No wood should be cut above the limit");
     }
 
     [Fact]
@@ -249,6 +278,31 @@ public class WholeSimulationTests
         Assert.DoesNotContain(world.Events, e => e.Kind == Sim.Core.Events.EventKind.Starvation);
         Assert.Contains(town.Buildings, b => b.Def.Id == "bakery" && b.IsOperational);
         Assert.Contains(town.Buildings, b => b.Def.Id == "quarry" && b.IsOperational);
+        Assert.NotEqual("keep", town.TownCentre!.Def.Id); // the governor upgrades the centre as the town grows
+
+        // Food production is sized to need (bread and gardens counted), not built to twice what's eaten.
+        double need = town.Citizens.Sum(Needs.DailyFoodNeed);
+        double supply = SettlementGovernor.EstimatedFoodSupply(world, town);
+        Assert.True(supply >= need, $"Food supply {supply:0} below need {need:0}");
+        Assert.True(supply <= need * SettlementGovernor.FoodSupplyMargin * 1.15,
+            $"Food overbuilt: supply {supply:0} for need {need:0}");
+        Assert.True(Needs.FoodDays(world, town) > 3, $"Only {Needs.FoodDays(world, town):0.0} days of food");
+    }
+
+    [Fact]
+    public void GovernedTownKeepsBuildingPastUnconnectableLand()
+    {
+        // On seed 42 a pocket of land boxed in by forest and a wide river sits closest to the centre. Site
+        // searches used to spend every route check on it (and on sites whose road would leave the territory),
+        // so the town stopped building homes around day 400.
+        var (world, town, sim) = Scenario.NewTown(42, autoBuild: true);
+        sim.RunDays(420);
+        int housing = town.HousingCapacity;
+        sim.RunDays(40);
+
+        Assert.True(town.HousingCapacity > housing, $"Housing stuck at {housing}");
+        Assert.True(town.Citizens.Count(c => c.HomeBuildingId == null) < 15, "Too many homeless");
+        Assert.DoesNotContain(world.Events, e => e.Kind == Sim.Core.Events.EventKind.BuildingDemolished);
     }
 }
 

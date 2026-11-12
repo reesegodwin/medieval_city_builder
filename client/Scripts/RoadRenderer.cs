@@ -9,6 +9,9 @@ namespace MedievalClient;
 public partial class RoadRenderer : Node3D
 {
     private static readonly Color Dirt = new(0.58f, 0.47f, 0.33f);
+    private static readonly Color Planned = new(0.85f, 0.7f, 0.45f, 0.55f);
+    private static readonly Color PlannedBridge = new(0.55f, 0.38f, 0.22f, 0.7f);
+    private MeshInstance3D _plans = null!;
 
     private Settlement _settlement = null!;
     private WorldMap _map = null!;
@@ -20,6 +23,8 @@ public partial class RoadRenderer : Node3D
         _map = map;
         _settlement = settlement;
         _mesh = new MeshInstance3D { CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        _plans = new MeshInstance3D { CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        AddChild(_plans);
         AddChild(_mesh);
     }
 
@@ -29,7 +34,9 @@ public partial class RoadRenderer : Node3D
         _builtVersion = _settlement.RoadVersion;
 
         var mb = new MeshBuilder();
-        const float y = 0.015f, inset = 0.04f;
+        const float lift = 0.02f, inset = 0.04f;
+        // Roads drape over the (gently uneven) ground instead of floating at a fixed height.
+        Vector3 V(float px, float pz) => new(px, TerrainShape.HeightAt(_map, px, pz) + lift, pz);
         foreach (var (x, z) in _settlement.Roads)
         {
             if (_map.GetTile(x, z).Terrain == Terrain.Water)
@@ -39,18 +46,28 @@ public partial class RoadRenderer : Node3D
             }
             float jitter = (float)(Hashing.Hash01(0x40AD, x, z) - 0.5) * 0.08f;
             var color = Dirt.Lightened(jitter);
-            mb.Quad(new Vector3(x + inset, y, z + inset), new Vector3(x + 1 - inset, y, z + inset),
-                new Vector3(x + 1 - inset, y, z + 1 - inset), new Vector3(x + inset, y, z + 1 - inset), color, Vector3.Up);
+            mb.Quad(V(x + inset, z + inset), V(x + 1 - inset, z + inset), V(x + 1 - inset, z + 1 - inset), V(x + inset, z + 1 - inset),
+                color, Vector3.Up);
 
             // Fill the gaps towards road neighbours so roads read as continuous strips.
             if (_settlement.Roads.Contains((x + 1, z)))
-                mb.Quad(new Vector3(x + 1 - inset, y, z + inset), new Vector3(x + 1 + inset, y, z + inset),
-                    new Vector3(x + 1 + inset, y, z + 1 - inset), new Vector3(x + 1 - inset, y, z + 1 - inset), color, Vector3.Up);
+                mb.Quad(V(x + 1 - inset, z + inset), V(x + 1 + inset, z + inset), V(x + 1 + inset, z + 1 - inset), V(x + 1 - inset, z + 1 - inset),
+                    color, Vector3.Up);
             if (_settlement.Roads.Contains((x, z + 1)))
-                mb.Quad(new Vector3(x + inset, y, z + 1 - inset), new Vector3(x + 1 - inset, y, z + 1 - inset),
-                    new Vector3(x + 1 - inset, y, z + 1 + inset), new Vector3(x + inset, y, z + 1 + inset), color, Vector3.Up);
+                mb.Quad(V(x + inset, z + 1 - inset), V(x + 1 - inset, z + 1 - inset), V(x + 1 - inset, z + 1 + inset), V(x + inset, z + 1 + inset),
+                    color, Vector3.Up);
         }
         _mesh.Mesh = mb.Commit();
+
+        // Planned roads: faint pegged-out strips until the roadworkers get to them.
+        var plans = new MeshBuilder();
+        foreach (var plan in _settlement.RoadPlans)
+        {
+            float px = plan.X, pz = plan.Y;
+            var marker = _map.GetTile(plan.X, plan.Y).Terrain == Terrain.Water ? PlannedBridge : Planned;
+            plans.Quad(V(px + 0.3f, pz + 0.3f), V(px + 0.7f, pz + 0.3f), V(px + 0.7f, pz + 0.7f), V(px + 0.3f, pz + 0.7f), marker, Vector3.Up);
+        }
+        _plans.Mesh = plans.Commit(Materials.Overlay);
     }
 
     /// <summary>A plank deck with posts and rails on the sides that face open water.</summary>

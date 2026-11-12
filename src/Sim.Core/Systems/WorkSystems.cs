@@ -25,7 +25,7 @@ public static class Logistics
     {
         var stockpiles = settlement.Buildings.Where(b => b.IsOperational && b.Def.IsStockpile).ToList();
         if (stockpiles.Count == 0) return null;
-        int r = settlement.TerritoryRadius + 6;
+        int r = settlement.TerritoryExtent + 6;
         return Pathfinder.CostField(world.Map, stockpiles.SelectMany(s => s.AccessTiles()),
             settlement.CenterX - r, settlement.CenterY - r, settlement.CenterX + r, settlement.CenterY + r, mode);
     }
@@ -52,6 +52,62 @@ public static class Logistics
             b.NoRoute = double.IsPositiveInfinity(cost);
             b.HaulFactor = b.NoRoute ? UnreachableHaulFactor : 1.0 / (1.0 + cost / HalfEfficiencyDistance);
         }
+    }
+
+    /// <summary>
+    /// Worker-days per day that workplaces and building sites lose to carrying goods themselves:
+    /// each worker loses (1 - haul factor) of their time. Haulers take this over.
+    /// </summary>
+    public static double HaulingDemand(Settlement settlement)
+    {
+        double demand = 0;
+        foreach (var b in settlement.Buildings)
+        {
+            if (b.Def.IsStockpile || b.NoRoute || b.WorkerIds.Count == 0 || settlement.IsOnStandby(b)) continue;
+            demand += b.WorkerIds.Count * (1 - b.HaulFactor);
+        }
+        return demand;
+    }
+
+    /// <summary>
+    /// A building's hauling efficiency once haulers are counted: they win back the share of its lost time
+    /// that they cover. Buildings without a route get no help, since haulers can't reach them either.
+    /// </summary>
+    public static double EffectiveHaulFactor(Settlement settlement, Building b) =>
+        b.NoRoute ? b.HaulFactor : b.HaulFactor + (1 - b.HaulFactor) * settlement.HaulCoverage;
+
+    /// <summary>Spreads the hauler quota (one per worker-day of carrying, rounded up) over the stockpiles in order.</summary>
+    public static void UpdateHaulerQuota(Settlement settlement)
+    {
+        settlement.HaulerQuota.Clear();
+        int remaining = (int)Math.Ceiling(HaulingDemand(settlement) - 1e-9);
+        foreach (var b in settlement.Buildings)
+        {
+            if (b.CurrentJobKind != JobKinds.Hauler) continue;
+            int take = Math.Min(remaining, b.JobSlots);
+            settlement.HaulerQuota[b.Id] = take;
+            remaining -= take;
+        }
+    }
+
+    /// <summary>How much of the carrying the current haulers cover (0..1); they also gain hauling skill.</summary>
+    public static void UpdateHaulCoverage(Settlement settlement)
+    {
+        double demand = HaulingDemand(settlement);
+        double labour = 0;
+        foreach (var b in settlement.Buildings)
+        {
+            if (b.CurrentJobKind != JobKinds.Hauler) continue;
+            foreach (int id in b.WorkerIds)
+            {
+                if (settlement.FindCitizen(id) is not { } hauler) continue;
+                labour += Work.DailyRate(hauler, JobKinds.Hauler);
+                double skill = hauler.Skill(JobKinds.Hauler);
+                hauler.Skills[JobKinds.Hauler] = Math.Min(Citizen.MaxSkill,
+                    skill + Work.SkillGainPerDay / 24 * (1 - skill / Citizen.MaxSkill));
+            }
+        }
+        settlement.HaulCoverage = demand <= 0 ? 1 : Math.Min(1, labour / demand);
     }
 
     /// <summary>The operational stockpile closest to a building, or null if there is none.</summary>
@@ -109,6 +165,8 @@ public static class ConstructionSystem
 {
     public static void Tick(GameWorld world, Settlement settlement)
     {
+        double tools = Tools.Multiplier(world, settlement);
+        int workersThisTick = 0;
         foreach (var b in settlement.Buildings)
         {
             if (b.State == BuildingState.AwaitingMaterials)
@@ -127,7 +185,8 @@ public static class ConstructionSystem
 
             if (b.State != BuildingState.UnderConstruction) continue;
 
-            b.ConstructionProgress += Work.LabourThisTick(settlement, b, JobKinds.Builder) * b.HaulFactor;
+            b.ConstructionProgress += Work.LabourThisTick(settlement, b, JobKinds.Builder) * tools * Logistics.EffectiveHaulFactor(settlement, b);
+            workersThisTick += b.WorkerIds.Count;
             b.Problem = b.WorkerIds.Count == 0 ? "No builders" : b.NoRoute ? Logistics.NoRouteProblem : null;
 
             if (b.ConstructionProgress >= b.Def.BuildDays)
@@ -135,6 +194,7 @@ public static class ConstructionSystem
                 Complete(world, settlement, b);
             }
         }
+        Tools.Wear(world, settlement, workersThisTick);
     }
 
     public static void Complete(GameWorld world, Settlement settlement, Building b)
@@ -144,6 +204,7 @@ public static class ConstructionSystem
         b.ConstructionProgress = b.Def.BuildDays;
         b.Problem = null;
         if (b.Def.IsStockpile) Logistics.UpdateHaulFactors(world, settlement);
+        if (b.Def.TownCentre is { } centre) settlement.TerritoryCap = Math.Max(settlement.TerritoryCap, centre.TerritoryCap);
         world.Log(EventKind.BuildingCompleted, settlement, $"{b.Def.Name} completed");
     }
 }
@@ -153,6 +214,8 @@ public static class ProductionSystem
     public static void Tick(GameWorld world, Settlement settlement)
     {
         int freeStorage = settlement.FreeStorage; // computed once per tick; updated as goods are stored
+        double tools = Tools.Multiplier(world, settlement);
+        int workersThisTick = 0;
         foreach (var b in settlement.Buildings)
         {
             var recipe = b.Def.Recipe;
@@ -186,7 +249,9 @@ public static class ProductionSystem
 
             if (b.CycleProgress < recipe.WorkDays)
             {
-                b.CycleProgress += Work.LabourThisTick(settlement, b, b.Def.JobKind) * b.HaulFactor;
+                b.CycleProgress += Work.LabourThisTick(settlement, b, b.Def.JobKind) * tools * Logistics.EffectiveHaulFactor(settlement, b) *
+                                   EconomySystem.OutputFactor(world, settlement, b);
+                workersThisTick += b.WorkerIds.Count;
             }
 
             if (b.CycleProgress < recipe.WorkDays)
@@ -210,6 +275,7 @@ public static class ProductionSystem
             b.InputsLoaded = false;
             b.Problem = null;
         }
+        Tools.Wear(world, settlement, workersThisTick);
     }
 }
 
@@ -238,6 +304,7 @@ public static class JobSystem
                 c.JobBuildingId = null;
             }
         }
+        Logistics.UpdateHaulerQuota(settlement);
         foreach (var b in settlement.Buildings)
         {
             while (b.WorkerIds.Count > settlement.WantedWorkers(b))
@@ -267,11 +334,18 @@ public static class JobSystem
             .ToList();
 
         var unemployed = settlement.Citizens.Where(c => c.IsAdult && c.JobBuildingId == null).ToList();
+        // Spare hands any other job may take without counting as a reassignment: first workers on standby at
+        // workplaces that reached their stock limit (who may also haul meanwhile), then haulers.
+        var spare = settlement.Citizens
+            .Where(c => c.JobBuildingId is int j && settlement.FindBuilding(j) is { } w && settlement.IsOnStandby(w))
+            .Concat(settlement.Citizens
+                .Where(c => c.JobBuildingId is int j && settlement.FindBuilding(j)?.CurrentJobKind == JobKinds.Hauler))
+            .ToList();
         int reassignments = 0;
         bool canSteal = true;
         foreach (var b in openSlots)
         {
-            if (unemployed.Count == 0 && !canSteal) break;
+            if (unemployed.Count == 0 && spare.Count == 0 && !canSteal) break;
             string kind = b.CurrentJobKind!;
             int priority = Priority(b);
 
@@ -281,6 +355,27 @@ public static class JobSystem
                 if (candidate == null || c.Skill(kind) > candidate.Skill(kind)) candidate = c;
             }
             if (candidate != null) unemployed.Remove(candidate);
+
+            // A workplace on standby only takes people with no job at all; it has nothing for them to do yet.
+            if (candidate == null && settlement.IsOnStandby(b)) continue;
+
+            if (candidate == null)
+            {
+                foreach (var c in spare)
+                {
+                    if (c.JobBuildingId == b.Id) continue;
+                    // Workers waiting on standby may haul meanwhile; haulers don't move between stockpiles.
+                    if (kind == JobKinds.Hauler && settlement.FindBuilding(c.JobBuildingId!.Value)!.CurrentJobKind == JobKinds.Hauler)
+                        continue;
+                    if (candidate == null || c.Skill(kind) > candidate.Skill(kind)) candidate = c;
+                }
+                if (candidate != null)
+                {
+                    spare.Remove(candidate);
+                    settlement.FindBuilding(candidate.JobBuildingId!.Value)!.WorkerIds.Remove(candidate.Id);
+                    candidate.JobBuildingId = null;
+                }
+            }
 
             if (candidate == null && canSteal && reassignments < MaxReassignmentsPerHour)
             {
@@ -308,6 +403,8 @@ public static class JobSystem
             candidate.JobBuildingId = b.Id;
             b.WorkerIds.Add(candidate.Id);
         }
+
+        Logistics.UpdateHaulCoverage(settlement);
     }
 }
 
@@ -338,5 +435,119 @@ public static class HousingSystem
             home.ResidentIds.Add(c.Id);
             c.HomeBuildingId = home.Id;
         }
+    }
+}
+
+/// <summary>
+/// Tools (any resource with a work bonus) make workers and builders more productive while the settlement has
+/// some in stock, and wear out with use.
+/// </summary>
+public static class Tools
+{
+    /// <summary>Output multiplier from the tools currently in stock (1 when there are none).</summary>
+    public static double Multiplier(GameWorld world, Settlement settlement)
+    {
+        double m = 1;
+        foreach (var tool in world.Data.Tools)
+            if (settlement.Stock.Get(tool.Id) > 0) m *= 1 + tool.WorkBonus;
+        return m;
+    }
+
+    /// <summary>Records one tick of work by this many workers; whole tools are used up as wear adds up.</summary>
+    public static void Wear(GameWorld world, Settlement settlement, int workers)
+    {
+        if (workers == 0) return;
+        foreach (var tool in world.Data.Tools)
+        {
+            int stock = settlement.Stock.Get(tool.Id);
+            if (stock == 0) continue;
+            double wear = settlement.ToolWear.GetValueOrDefault(tool.Id) + workers * tool.WearPerWorkerDay / TimeScale.TicksPerDay;
+            int used = Math.Min(stock, (int)wear);
+            if (used > 0) settlement.Stock.TryTake(tool.Id, used);
+            settlement.ToolWear[tool.Id] = wear - (int)wear;
+        }
+    }
+}
+
+/// <summary>
+/// Roadworkers at the town centre build planned road tiles in order. Far-off tiles take longer, since the crew
+/// walks there and back. A settlement with no town centre (very old saves) gets its roads at once.
+/// </summary>
+public static class RoadSystem
+{
+    public static void Tick(GameWorld world, Settlement settlement)
+    {
+        if (settlement.RoadPlans.Count == 0) return;
+        var crew = settlement.TownCentre;
+        if (crew == null)
+        {
+            Commands.Roads.FinishAllPlans(world, settlement);
+            return;
+        }
+        if (!crew.IsOperational || crew.CurrentJobKind != JobKinds.Roadworker) return; // being upgraded
+
+        double labour = Work.LabourThisTick(settlement, crew, JobKinds.Roadworker) * Tools.Multiplier(world, settlement);
+        bool built = false;
+        while (labour > 1e-12 && settlement.RoadPlans.Count > 0)
+        {
+            var plan = settlement.RoadPlans[0];
+            double distance = Math.Abs(plan.X - settlement.CenterX) + Math.Abs(plan.Y - settlement.CenterY);
+            double slowdown = 1 + distance / Commands.Roads.WalkHalfDistance;
+            double needed = (Commands.Roads.WorkDays(world.Map.GetTile(plan.X, plan.Y)) - plan.Progress) * slowdown;
+            if (labour < needed)
+            {
+                plan.Progress += labour / slowdown;
+                break;
+            }
+            labour -= needed;
+            Commands.Roads.Finish(world, settlement, plan);
+            built = true;
+        }
+        // Hauling distances are recomputed every few tiles and when the plans are done (derived from saved state,
+        // so a loaded game recomputes at the same moments).
+        if (built && (settlement.Roads.Count % 8 == 0 || settlement.RoadPlans.Count == 0))
+            Logistics.UpdateHaulFactors(world, settlement);
+    }
+}
+
+/// <summary>
+/// The treasury, daily: adults pay taxes, and finished buildings with upkeep cost coin. If the treasury can't pay,
+/// those buildings run at reduced output until it can. Construction costs in coin are taken like any material.
+/// </summary>
+public static class EconomySystem
+{
+    public static double DailyTax(GameWorld world, Settlement s) =>
+        s.Citizens.Count(c => c.IsAdult) * world.Data.Trade.TaxPerAdultDay;
+
+    public static double DailyUpkeep(Settlement s) => s.Buildings.Where(b => b.IsOperational).Sum(b => b.Def.Upkeep);
+
+    /// <summary>Output factor for a building, given the state of the treasury.</summary>
+    public static double OutputFactor(GameWorld world, Settlement s, Building b) =>
+        s.UpkeepUnpaid && b.Def.Upkeep > 0 ? world.Data.Trade.UnpaidOutput : 1;
+
+    public static void Daily(GameWorld world, Settlement s)
+    {
+        const string coin = Economy.Inventory.Coin;
+        s.TaxAccrued += DailyTax(world, s);
+        int taxes = (int)s.TaxAccrued;
+        s.TaxAccrued -= taxes;
+        s.Stock.Add(coin, taxes);
+
+        double upkeep = DailyUpkeep(s);
+        // Debt doesn't pile up beyond a day's upkeep: unpaid buildings simply run at reduced output.
+        s.UpkeepOwed = Math.Min(s.UpkeepOwed + upkeep, upkeep + 1);
+        int due = (int)s.UpkeepOwed;
+        int paid = Math.Min(due, s.Stock.Get(coin));
+        s.Stock.TryTake(coin, paid);
+        s.UpkeepOwed -= paid;
+
+        bool unpaid = paid < due;
+        if (unpaid != s.UpkeepUnpaid)
+        {
+            world.Log(Events.EventKind.Shortage, s, unpaid
+                ? "The treasury can't pay upkeep: markets, taverns, workshops and the like run at half output"
+                : "Upkeep is paid again");
+        }
+        s.UpkeepUnpaid = unpaid;
     }
 }

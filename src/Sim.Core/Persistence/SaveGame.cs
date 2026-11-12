@@ -1,3 +1,4 @@
+using Sim.Core.Commands;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Sim.Core.Citizens;
@@ -16,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 7;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -39,7 +40,11 @@ public static class SaveGame
     {
         if (file.Version > CurrentVersion)
             throw new InvalidDataException($"Save is from a newer version ({file.Version}) of the game");
-        // Future: upgrade older versions step by step here.
+        // Version 1 had a fixed territory radius and no town centre. Mark those settlements so that, once
+        // restored, they get the territory the old radius gave them (see RestoreSettlement).
+        if (file.Version < 2)
+            foreach (var s in file.Settlements) s.Territory = null;
+        file.Version = CurrentVersion;
         return file;
     }
 
@@ -54,6 +59,9 @@ public static class SaveGame
         Random = world.Rng.GetState(),
         TotalBirths = world.TotalBirths,
         TotalDeaths = world.TotalDeaths,
+        Settings = world.Settings.Clone(),
+        LastActiveUtc = world.LastActiveUtc,
+        Trade = world.Trade,
         Settlements = world.Settlements.Select(CaptureSettlement).ToList(),
         Events = world.Events.Select(e => new EventSave(e.Time.Tick, e.Kind, e.SettlementId, e.Message)).ToList(),
     };
@@ -62,6 +70,7 @@ public static class SaveGame
     {
         Id = s.Id,
         Name = s.Name,
+        OwnerId = s.OwnerId,
         CenterX = s.CenterX,
         CenterY = s.CenterY,
         Stock = s.Stock.Items.ToDictionary(kv => kv.Key, kv => kv.Value),
@@ -73,6 +82,7 @@ public static class SaveGame
             PerCitizenLimits = new(s.Rules.PerCitizenLimits),
             LowStockThreshold = s.Rules.LowStockThreshold,
             AutoBuild = s.Rules.AutoBuild,
+            AutoExpandTerritory = s.Rules.AutoExpandTerritory,
         },
         Buildings = s.Buildings.Select(b => new BuildingSave
         {
@@ -116,9 +126,32 @@ public static class SaveGame
             History = c.History.ToList(),
         }).ToList(),
         Roads = s.Roads.Select(r => new[] { r.X, r.Y }).ToList(),
+        RoadPlans = s.RoadPlans.Select(p => new RoadPlan { X = p.X, Y = p.Y, Progress = p.Progress }).ToList(),
         RoadVersion = s.RoadVersion,
+        Territory = TerritoryRuns(s),
+        TerritoryVersion = s.TerritoryVersion,
+        TerritoryCap = s.TerritoryCap,
+        HaulCoverage = s.HaulCoverage,
+        TaxAccrued = s.TaxAccrued,
+        UpkeepOwed = s.UpkeepOwed,
+        UpkeepUnpaid = s.UpkeepUnpaid,
+        ToolWear = new(s.ToolWear),
+        GoodsUse = new(s.GoodsUse),
         FailedSiteSearches = new(s.FailedSiteSearches),
     };
+
+    /// <summary>Territory as row runs [y, firstX, lastX], which is far smaller than one entry per tile.</summary>
+    private static List<int[]> TerritoryRuns(Settlement s)
+    {
+        var runs = new List<int[]>();
+        int[]? run = null;
+        foreach (var (x, y) in s.Territory.OrderBy(t => t.Y).ThenBy(t => t.X))
+        {
+            if (run != null && run[0] == y && run[2] == x - 1) run[2] = x;
+            else runs.Add(run = new[] { y, x, x });
+        }
+        return runs;
+    }
 
     // ---------- restore ----------
 
@@ -129,6 +162,11 @@ public static class SaveGame
         world.Rng.SetState(file.Random);
         world.TotalBirths = file.TotalBirths;
         world.TotalDeaths = file.TotalDeaths;
+        // Version 4 and older had no world settings: they keep the defaults (1 day per hour, paused while away).
+        world.Settings = file.Settings ?? new WorldSettings();
+        world.LastActiveUtc = file.LastActiveUtc;
+        // Version 5 and older had no trade.
+        world.Trade = file.Trade ?? new Trade.TradeBook();
 
         foreach (var save in file.Settlements) world.Settlements.Add(RestoreSettlement(world, save));
         foreach (var e in file.Events)
@@ -138,7 +176,7 @@ public static class SaveGame
 
     private static Settlement RestoreSettlement(GameWorld world, SettlementSave save)
     {
-        var s = new Settlement(save.Id, save.Name, save.CenterX, save.CenterY);
+        var s = new Settlement(save.Id, save.Name, save.CenterX, save.CenterY) { OwnerId = save.OwnerId };
         foreach (var (resource, amount) in save.Stock) s.Stock.Add(resource, amount);
 
         CopyInto(save.Rules.JobPriority, s.Rules.JobPriority);
@@ -147,6 +185,7 @@ public static class SaveGame
         CopyInto(save.Rules.PerCitizenLimits, s.Rules.PerCitizenLimits);
         s.Rules.LowStockThreshold = save.Rules.LowStockThreshold;
         s.Rules.AutoBuild = save.Rules.AutoBuild;
+        s.Rules.AutoExpandTerritory = save.Rules.AutoExpandTerritory ?? true;
 
         foreach (var b in save.Buildings)
         {
@@ -200,7 +239,35 @@ public static class SaveGame
             s.Roads.Add((r[0], r[1]));
         }
         s.RoadVersion = save.RoadVersion;
+        foreach (var plan in save.RoadPlans) // version 6 and older built roads instantly and have none
+        {
+            world.Map.GetTile(plan.X, plan.Y).RoadPlanned = true;
+            s.RoadPlans.Add(plan);
+        }
         foreach (var (key, day) in save.FailedSiteSearches) s.FailedSiteSearches[key] = day;
+
+        // Version 2 and older had no haulers: coverage starts at 0 and is set at the next hour.
+        s.HaulCoverage = save.HaulCoverage;
+        s.TaxAccrued = save.TaxAccrued;
+        s.UpkeepOwed = save.UpkeepOwed;
+        s.UpkeepUnpaid = save.UpkeepUnpaid;
+        // Version 3 and older had no tools or household goods; both start with nothing carried over.
+        CopyInto(save.ToolWear, s.ToolWear);
+        CopyInto(save.GoodsUse, s.GoodsUse);
+
+        if (save.Territory is { } runs)
+        {
+            foreach (var run in runs)
+                for (int x = run[1]; x <= run[2]; x++) TerritoryRules.Claim(world, s, x, run[0]);
+            s.TerritoryCap = save.TerritoryCap;
+            s.TerritoryVersion = save.TerritoryVersion;
+        }
+        else
+        {
+            // Old save: no town centre, so keep the old maximum, and claim the diamond its radius gave.
+            s.TerritoryCap = TerritoryRules.DefaultCap;
+            TerritoryRules.ExpandEvenly(world, s);
+        }
         return s;
     }
 
@@ -221,6 +288,9 @@ public static class SaveGame
         public ulong[] Random { get; set; } = Array.Empty<ulong>();
         public int TotalBirths { get; set; }
         public int TotalDeaths { get; set; }
+        public WorldSettings? Settings { get; set; }
+        public DateTimeOffset? LastActiveUtc { get; set; }
+        public Trade.TradeBook? Trade { get; set; }
         public List<SettlementSave> Settlements { get; set; } = new();
         public List<EventSave> Events { get; set; } = new();
     }
@@ -231,6 +301,7 @@ public static class SaveGame
     {
         public int Id { get; set; }
         public string Name { get; set; } = "";
+        public string? OwnerId { get; set; }
         public int CenterX { get; set; }
         public int CenterY { get; set; }
         public Dictionary<string, int> Stock { get; set; } = new();
@@ -239,6 +310,18 @@ public static class SaveGame
         public List<CitizenSave> Citizens { get; set; } = new();
         public List<int[]> Roads { get; set; } = new();
         public int RoadVersion { get; set; }
+        public List<RoadPlan> RoadPlans { get; set; } = new();
+
+        /// <summary>Row runs [y, firstX, lastX]; null in version-1 saves.</summary>
+        public List<int[]>? Territory { get; set; }
+        public int TerritoryVersion { get; set; }
+        public int TerritoryCap { get; set; }
+        public double HaulCoverage { get; set; }
+        public double TaxAccrued { get; set; }
+        public double UpkeepOwed { get; set; }
+        public bool UpkeepUnpaid { get; set; }
+        public SortedDictionary<string, double> ToolWear { get; set; } = new(StringComparer.Ordinal);
+        public SortedDictionary<string, double> GoodsUse { get; set; } = new(StringComparer.Ordinal);
         public Dictionary<string, long> FailedSiteSearches { get; set; } = new();
     }
 
@@ -250,6 +333,7 @@ public static class SaveGame
         public SortedDictionary<string, int> PerCitizenLimits { get; set; } = new(StringComparer.Ordinal);
         public int LowStockThreshold { get; set; }
         public bool AutoBuild { get; set; }
+        public bool? AutoExpandTerritory { get; set; }
     }
 
     private sealed class BuildingSave
