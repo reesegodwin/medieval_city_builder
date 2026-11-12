@@ -16,6 +16,17 @@ public sealed class ResourceDef
     public double MealMood { get; set; }
 
     public bool IsFood => Nutrition > 0;
+
+    /// <summary>
+    /// Tools: while the settlement has any in stock, workers at workplaces and building sites get this much
+    /// extra output (0.25 = +25%).
+    /// </summary>
+    public double WorkBonus { get; set; }
+
+    /// <summary>Tools used up per worker-day of work done with them.</summary>
+    public double WearPerWorkerDay { get; set; }
+
+    public bool IsTool => WorkBonus > 0;
 }
 
 public sealed class RecipeDef
@@ -40,6 +51,17 @@ public sealed class NeedDef
     public double MissingMood { get; set; }
 
     public int MinPopulation { get; set; }
+
+    /// <summary>
+    /// For household goods (clothing, furniture...): the service need people must have covered to get them,
+    /// e.g. "market". Null for needs met directly by service buildings.
+    /// </summary>
+    public string? Via { get; set; }
+
+    /// <summary>Goods each person supplied uses up per day.</summary>
+    public Dictionary<string, double> Goods { get; set; } = new();
+
+    public bool IsGoodsNeed => Via != null;
 }
 
 /// <summary>Makes a building serve a need to homes within a radius.</summary>
@@ -76,6 +98,19 @@ public sealed class TownCentreDef
     public int MinPopulation { get; set; }
 }
 
+/// <summary>When the governor AI builds a production-chain building (data-driven, so new chains need no code).</summary>
+public sealed class GovernorHint
+{
+    /// <summary>Not before the settlement has this many people.</summary>
+    public int MinPopulation { get; set; }
+
+    /// <summary>At most one more of these per this many people.</summary>
+    public int PopulationPerBuilding { get; set; } = 100;
+
+    /// <summary>Only add more while every output is below this stock.</summary>
+    public int LowStock { get; set; } = 20;
+}
+
 public sealed class BuildingDef
 {
     public string Id { get; set; } = "";
@@ -103,6 +138,8 @@ public sealed class BuildingDef
 
     public TownCentreDef? TownCentre { get; set; }
 
+    public GovernorHint? Governor { get; set; }
+
     public bool IsTownCentre => TownCentre != null;
     public bool IsStockpile => Storage > 0;
     public bool IsWorkplace => Jobs > 0 && JobKind != null;
@@ -117,14 +154,22 @@ public sealed class GameData
     /// <summary>Needs in id order (deterministic iteration).</summary>
     public IReadOnlyList<NeedDef> Needs { get; }
 
+    /// <summary>Buildings in data-file order (deterministic iteration).</summary>
+    public IReadOnlyList<BuildingDef> BuildingList { get; }
+
+    /// <summary>Tool resources (see <see cref="ResourceDef.WorkBonus"/>) in id order.</summary>
+    public IReadOnlyList<ResourceDef> Tools { get; }
+
     /// <summary>Food resources ordered best meal first.</summary>
     public IReadOnlyList<ResourceDef> FoodsByPreference { get; }
 
     public GameData(IEnumerable<ResourceDef> resources, IEnumerable<BuildingDef> buildings, IEnumerable<NeedDef>? needs = null)
     {
         Resources = resources.ToDictionary(r => r.Id);
-        Buildings = buildings.ToDictionary(b => b.Id);
+        BuildingList = buildings.ToList();
+        Buildings = BuildingList.ToDictionary(b => b.Id);
         Needs = (needs ?? Enumerable.Empty<NeedDef>()).OrderBy(n => n.Id, StringComparer.Ordinal).ToList();
+        Tools = Resources.Values.Where(r => r.IsTool).OrderBy(r => r.Id, StringComparer.Ordinal).ToList();
         FoodsByPreference = Resources.Values.Where(r => r.IsFood)
             .OrderByDescending(r => r.MealMood).ThenBy(r => r.Id, StringComparer.Ordinal).ToList();
         Validate();
@@ -161,6 +206,14 @@ public sealed class GameData
 
     private void Validate()
     {
+        foreach (var n in Needs)
+        {
+            if (n.Via != null && !Needs.Any(other => other.Id == n.Via && !other.IsGoodsNeed))
+                throw new InvalidDataException($"Need '{n.Id}' is supplied via unknown service need '{n.Via}'");
+            foreach (var r in n.Goods.Keys)
+                if (!Resources.ContainsKey(r)) throw new InvalidDataException($"Need '{n.Id}' uses unknown resource '{r}'");
+        }
+
         var centres = Buildings.Values.Where(b => b.IsTownCentre).OrderBy(b => b.Id, StringComparer.Ordinal).ToList();
         foreach (var c in centres)
         {

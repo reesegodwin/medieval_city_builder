@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -127,6 +127,8 @@ public static class SaveGame
         TerritoryVersion = s.TerritoryVersion,
         TerritoryCap = s.TerritoryCap,
         HaulCoverage = s.HaulCoverage,
+        ToolWear = new(s.ToolWear),
+        GoodsUse = new(s.GoodsUse),
         FailedSiteSearches = new(s.FailedSiteSearches),
     };
 
@@ -228,6 +230,9 @@ public static class SaveGame
 
         // Version 2 and older had no haulers: coverage starts at 0 and is set at the next hour.
         s.HaulCoverage = save.HaulCoverage;
+        // Version 3 and older had no tools or household goods; both start with nothing carried over.
+        CopyInto(save.ToolWear, s.ToolWear);
+        CopyInto(save.GoodsUse, s.GoodsUse);
 
         if (save.Territory is { } runs)
         {
@@ -286,6 +291,8 @@ public static class SaveGame
         public int TerritoryVersion { get; set; }
         public int TerritoryCap { get; set; }
         public double HaulCoverage { get; set; }
+        public SortedDictionary<string, double> ToolWear { get; set; } = new(StringComparer.Ordinal);
+        public SortedDictionary<string, double> GoodsUse { get; set; } = new(StringComparer.Ordinal);
         public Dictionary<string, long> FailedSiteSearches { get; set; } = new();
     }
 

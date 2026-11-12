@@ -17,8 +17,13 @@ public sealed class SettlementRules
         ["woodcutter"] = 3,
         ["barkeep"] = 3,
         ["trader"] = 3,
+        ["smith"] = 3,
         ["quarrier"] = 2,
         ["brewer"] = 2,
+        ["miner"] = 2,
+        ["shepherd"] = 2,
+        ["weaver"] = 2,
+        ["carpenter"] = 2,
         [JobKinds.Hauler] = 1, // only people nobody else needs; the first to be pulled into other work
     };
 
@@ -40,6 +45,11 @@ public sealed class SettlementRules
         ["ale"] = 150,
         ["wood"] = 250,
         ["stone"] = 200,
+        ["iron_ore"] = 80,
+        ["tools"] = 60,
+        ["wool"] = 60,
+        ["cloth"] = 60,
+        ["furniture"] = 40,
     };
 
     /// <summary>Per-citizen stock targets; the effective limit is the larger of this and the flat limit.</summary>
@@ -195,6 +205,12 @@ public sealed class Settlement
     /// Set hourly by the job system.
     /// </summary>
     public double HaulCoverage { get; set; }
+
+    /// <summary>Wear on tools not yet amounting to a whole tool, per tool resource.</summary>
+    public SortedDictionary<string, double> ToolWear { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Household goods used but not yet amounting to a whole unit, per resource.</summary>
+    public SortedDictionary<string, double> GoodsUse { get; } = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Job slots the settlement wants filled. Workplaces that reached their stock limit keep their workers on

@@ -1,8 +1,13 @@
 [
-  { "id": "grain", "name": "Grain", "nutrition": 0.6, "mealMood": -6 },
-  { "id": "bread", "name": "Bread", "nutrition": 1.0, "mealMood": 6 },
-  { "id": "vegetables", "name": "Vegetables", "nutrition": 0.7, "mealMood": 2 },
-  { "id": "ale", "name": "Ale" },
-  { "id": "wood", "name": "Wood" },
-  { "id": "stone", "name": "Stone" }
+  {"id": "grain", "name": "Grain", "nutrition": 0.6, "mealMood": -6},
+  {"id": "bread", "name": "Bread", "nutrition": 1.0, "mealMood": 6},
+  {"id": "vegetables", "name": "Vegetables", "nutrition": 0.7, "mealMood": 2},
+  {"id": "ale", "name": "Ale"},
+  {"id": "wood", "name": "Wood"},
+  {"id": "stone", "name": "Stone"},
+  {"id": "iron_ore", "name": "Iron ore"},
+  {"id": "tools", "name": "Tools", "workBonus": 0.25, "wearPerWorkerDay": 0.01},
+  {"id": "wool", "name": "Wool"},
+  {"id": "cloth", "name": "Cloth"},
+  {"id": "furniture", "name": "Furniture"}
 ]

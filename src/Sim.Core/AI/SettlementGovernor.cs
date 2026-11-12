@@ -441,6 +441,21 @@ public static class SettlementGovernor
             Wish("quarry");
         if (s.FreeStorage < 80) Wish("stockpile");
 
+        // Production chains (mine -> smithy, pasture -> weaver, carpenter...), from each building's governor hint.
+        foreach (var def in world.Data.BuildingList)
+        {
+            if (def.Governor is not { } hint || def.Recipe is not { } recipe) continue;
+            if (population < hint.MinPopulation || Understaffed(def.Id)) continue;
+            int count = s.CountIncludingPlanned(def.Id);
+            if (count >= 1 + population / hint.PopulationPerBuilding) continue;
+            if (count > 0 && recipe.Outputs.Keys.Any(r => s.Stock.Get(r) >= hint.LowStock)) continue;
+            // A converter is only worth building once its inputs are in stock or something makes them.
+            bool inputsAvailable = recipe.Inputs.All(kv =>
+                s.Stock.Get(kv.Key) >= kv.Value ||
+                s.Buildings.Any(b => b.Def.Recipe?.Outputs.ContainsKey(kv.Key) == true));
+            if (inputsAvailable) Wish(def.Id);
+        }
+
         // Services and variety as the town grows.
         if (farms >= 2 && s.CountIncludingPlanned("garden") < 1 + population / 40 && !Understaffed("garden"))
             Wish("garden");

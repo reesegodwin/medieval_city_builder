@@ -146,6 +146,7 @@ public static class ServiceSystem
 
         foreach (var need in world.Data.Needs)
         {
+            if (need.IsGoodsNeed) continue; // supplied after the services they come through
             var providers = settlement.Buildings
                 .Where(b => b.Def.Service?.Need == need.Id)
                 .ToList();
@@ -191,6 +192,40 @@ public static class ServiceSystem
                 string? missing = consumes.Keys.FirstOrDefault(r => settlement.Stock.Get(r) < consumes[r]);
                 b.Problem = canServe == 0 && missing != null ? $"Needs {missing}" : null;
             }
+        }
+
+        foreach (var need in world.Data.Needs)
+            if (need.IsGoodsNeed) SupplyGoods(settlement, need);
+    }
+
+    /// <summary>
+    /// Household goods (clothing, furniture...) reach people who have the service they come through (a market),
+    /// in citizen order, as far as the stock lasts. Use builds up fractionally and whole units are taken.
+    /// </summary>
+    private static void SupplyGoods(Settlement settlement, Data.NeedDef need)
+    {
+        int canServe = int.MaxValue;
+        foreach (var (resource, perPerson) in need.Goods)
+        {
+            double available = settlement.Stock.Get(resource) - settlement.GoodsUse.GetValueOrDefault(resource);
+            canServe = Math.Min(canServe, Math.Max(0, (int)(available / perPerson)));
+        }
+
+        int served = 0;
+        foreach (var c in settlement.Citizens)
+        {
+            if (served >= canServe) break;
+            if (!c.CoveredNeeds.Contains(need.Via!)) continue;
+            c.CoveredNeeds.Add(need.Id);
+            served++;
+        }
+
+        foreach (var (resource, perPerson) in need.Goods)
+        {
+            double use = settlement.GoodsUse.GetValueOrDefault(resource) + served * perPerson;
+            int whole = Math.Min(settlement.Stock.Get(resource), (int)use);
+            if (whole > 0) settlement.Stock.TryTake(resource, whole);
+            settlement.GoodsUse[resource] = use - (int)use;
         }
     }
 

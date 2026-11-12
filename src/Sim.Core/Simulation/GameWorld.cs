@@ -65,6 +65,8 @@ public sealed class GameWorld
         foreach (var s in Settlements)
         {
             h.Add(s.Id).Add(s.Territory.Count).Add(s.TerritoryCap).Add(s.HaulCoverage);
+            foreach (var (tool, wear) in s.ToolWear) h.Add(tool).Add(wear);
+            foreach (var (good, use) in s.GoodsUse) h.Add(good).Add(use);
             foreach (var (resource, amount) in s.Stock.Items) h.Add(resource).Add(amount);
             foreach (var b in s.Buildings)
             {

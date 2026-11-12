@@ -243,7 +243,8 @@ public partial class Hud : CanvasLayer
             $"Pop {town.Citizens.Count} ({adults} adults, {haulers} hauling, {idle} idle{(homeless > 0 ? $", {homeless} homeless" : "")})   " +
             $"Food {Needs.FoodDays(world, town):0.0} days (grain {town.Stock.Get("grain")}, bread {town.Stock.Get("bread")}, " +
             $"veg {town.Stock.Get("vegetables")})   Ale {town.Stock.Get("ale")}   " +
-            $"Wood {town.Stock.Get("wood")}   Stone {town.Stock.Get("stone")}\n" +
+            $"Wood {town.Stock.Get("wood")}   Stone {town.Stock.Get("stone")}   Tools {town.Stock.Get("tools")}   " +
+            $"Cloth {town.Stock.Get("cloth")}   Furniture {town.Stock.Get("furniture")}\n" +
             $"Storage {town.Stock.Total}/{town.StorageCapacity}   Land {town.Territory.Count}/{town.TerritoryAllowance} " +
             $"(cap {town.TerritoryCap})   Needs met: " +
             string.Join("   ", world.Data.Needs.Select(n => $"{n.Name} {ServiceSystem.Coverage(town, n.Id):P0}"));

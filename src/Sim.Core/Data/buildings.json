@@ -268,5 +268,137 @@
       "radius": 24,
       "capacity": 120
     }
+  },
+  {
+    "id": "mine",
+    "name": "Iron Mine",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.5,
+    "cost": {
+      "wood": 25
+    },
+    "jobs": 2,
+    "jobKind": "miner",
+    "recipe": {
+      "outputs": {
+        "iron_ore": 3
+      },
+      "workDays": 1
+    },
+    "nearTerrain": {
+      "terrain": "IronDeposit",
+      "radius": 6,
+      "min": 3
+    },
+    "governor": {
+      "minPopulation": 60,
+      "populationPerBuilding": 200,
+      "lowStock": 20
+    }
+  },
+  {
+    "id": "smithy",
+    "name": "Smithy",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.6,
+    "cost": {
+      "wood": 20,
+      "stone": 15
+    },
+    "jobs": 1,
+    "jobKind": "smith",
+    "recipe": {
+      "inputs": {
+        "iron_ore": 2,
+        "wood": 1
+      },
+      "outputs": {
+        "tools": 2
+      },
+      "workDays": 1
+    },
+    "governor": {
+      "minPopulation": 60,
+      "populationPerBuilding": 150,
+      "lowStock": 15
+    }
+  },
+  {
+    "id": "pasture",
+    "name": "Sheep Pasture",
+    "width": 4,
+    "height": 4,
+    "buildDays": 0.3,
+    "cost": {
+      "wood": 12
+    },
+    "jobs": 1,
+    "jobKind": "shepherd",
+    "recipe": {
+      "outputs": {
+        "wool": 3
+      },
+      "workDays": 1
+    },
+    "governor": {
+      "minPopulation": 80,
+      "populationPerBuilding": 150,
+      "lowStock": 20
+    }
+  },
+  {
+    "id": "weaver",
+    "name": "Weaver",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.5,
+    "cost": {
+      "wood": 20
+    },
+    "jobs": 1,
+    "jobKind": "weaver",
+    "recipe": {
+      "inputs": {
+        "wool": 3
+      },
+      "outputs": {
+        "cloth": 2
+      },
+      "workDays": 1
+    },
+    "governor": {
+      "minPopulation": 80,
+      "populationPerBuilding": 150,
+      "lowStock": 15
+    }
+  },
+  {
+    "id": "carpenter",
+    "name": "Carpenter",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.5,
+    "cost": {
+      "wood": 20,
+      "stone": 5
+    },
+    "jobs": 1,
+    "jobKind": "carpenter",
+    "recipe": {
+      "inputs": {
+        "wood": 3
+      },
+      "outputs": {
+        "furniture": 1
+      },
+      "workDays": 1
+    },
+    "governor": {
+      "minPopulation": 150,
+      "populationPerBuilding": 250,
+      "lowStock": 10
+    }
   }
 ]

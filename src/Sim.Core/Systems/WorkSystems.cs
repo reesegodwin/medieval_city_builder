@@ -165,6 +165,8 @@ public static class ConstructionSystem
 {
     public static void Tick(GameWorld world, Settlement settlement)
     {
+        double tools = Tools.Multiplier(world, settlement);
+        int workersThisTick = 0;
         foreach (var b in settlement.Buildings)
         {
             if (b.State == BuildingState.AwaitingMaterials)
@@ -183,7 +185,8 @@ public static class ConstructionSystem
 
             if (b.State != BuildingState.UnderConstruction) continue;
 
-            b.ConstructionProgress += Work.LabourThisTick(settlement, b, JobKinds.Builder) * Logistics.EffectiveHaulFactor(settlement, b);
+            b.ConstructionProgress += Work.LabourThisTick(settlement, b, JobKinds.Builder) * tools * Logistics.EffectiveHaulFactor(settlement, b);
+            workersThisTick += b.WorkerIds.Count;
             b.Problem = b.WorkerIds.Count == 0 ? "No builders" : b.NoRoute ? Logistics.NoRouteProblem : null;
 
             if (b.ConstructionProgress >= b.Def.BuildDays)
@@ -191,6 +194,7 @@ public static class ConstructionSystem
                 Complete(world, settlement, b);
             }
         }
+        Tools.Wear(world, settlement, workersThisTick);
     }
 
     public static void Complete(GameWorld world, Settlement settlement, Building b)
@@ -210,6 +214,8 @@ public static class ProductionSystem
     public static void Tick(GameWorld world, Settlement settlement)
     {
         int freeStorage = settlement.FreeStorage; // computed once per tick; updated as goods are stored
+        double tools = Tools.Multiplier(world, settlement);
+        int workersThisTick = 0;
         foreach (var b in settlement.Buildings)
         {
             var recipe = b.Def.Recipe;
@@ -243,7 +249,8 @@ public static class ProductionSystem
 
             if (b.CycleProgress < recipe.WorkDays)
             {
-                b.CycleProgress += Work.LabourThisTick(settlement, b, b.Def.JobKind) * Logistics.EffectiveHaulFactor(settlement, b);
+                b.CycleProgress += Work.LabourThisTick(settlement, b, b.Def.JobKind) * tools * Logistics.EffectiveHaulFactor(settlement, b);
+                workersThisTick += b.WorkerIds.Count;
             }
 
             if (b.CycleProgress < recipe.WorkDays)
@@ -267,6 +274,7 @@ public static class ProductionSystem
             b.InputsLoaded = false;
             b.Problem = null;
         }
+        Tools.Wear(world, settlement, workersThisTick);
     }
 }
 
@@ -425,6 +433,37 @@ public static class HousingSystem
             if (home == null) continue;
             home.ResidentIds.Add(c.Id);
             c.HomeBuildingId = home.Id;
+        }
+    }
+}
+
+/// <summary>
+/// Tools (any resource with a work bonus) make workers and builders more productive while the settlement has
+/// some in stock, and wear out with use.
+/// </summary>
+public static class Tools
+{
+    /// <summary>Output multiplier from the tools currently in stock (1 when there are none).</summary>
+    public static double Multiplier(GameWorld world, Settlement settlement)
+    {
+        double m = 1;
+        foreach (var tool in world.Data.Tools)
+            if (settlement.Stock.Get(tool.Id) > 0) m *= 1 + tool.WorkBonus;
+        return m;
+    }
+
+    /// <summary>Records one tick of work by this many workers; whole tools are used up as wear adds up.</summary>
+    public static void Wear(GameWorld world, Settlement settlement, int workers)
+    {
+        if (workers == 0) return;
+        foreach (var tool in world.Data.Tools)
+        {
+            int stock = settlement.Stock.Get(tool.Id);
+            if (stock == 0) continue;
+            double wear = settlement.ToolWear.GetValueOrDefault(tool.Id) + workers * tool.WearPerWorkerDay / TimeScale.TicksPerDay;
+            int used = Math.Min(stock, (int)wear);
+            if (used > 0) settlement.Stock.TryTake(tool.Id, used);
+            settlement.ToolWear[tool.Id] = wear - (int)wear;
         }
     }
 }
