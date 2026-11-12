@@ -56,6 +56,12 @@ public sealed class SettlementRules
     /// <summary>Whether the settlement's governor AI may place new buildings on its own.</summary>
     public bool AutoBuild { get; set; } = true;
 
+    /// <summary>
+    /// Whether spare territory allowance is claimed automatically, evenly around the centre. Turn it off to
+    /// paint territory by hand (e.g. only along one bank of a river).
+    /// </summary>
+    public bool AutoExpandTerritory { get; set; } = true;
+
     public int PriorityOf(string jobKind) => JobPriority.TryGetValue(jobKind, out int p) ? p : 0;
     public int ReserveOf(string resource) => Reserves.TryGetValue(resource, out int r) ? r : 0;
     public int LimitOf(string resource, int population)
@@ -104,9 +110,28 @@ public sealed class Settlement
         CenterY = centerY;
     }
 
-    /// <summary>How far from the centre this settlement may build; grows with its population.</summary>
-    public int TerritoryRadius => Math.Min(Commands.Placement.MaxSettlementRadius,
-        Commands.Placement.SettlementRadius + Citizens.Count / Commands.Placement.CitizensPerExtraTile);
+    /// <summary>Tiles this settlement has claimed, in sorted order. Buildings and roads may only go on them.</summary>
+    public SortedSet<(int X, int Y)> Territory { get; } = new();
+
+    /// <summary>Bumped whenever territory changes, so renderers know to rebuild.</summary>
+    public int TerritoryVersion { get; set; }
+
+    /// <summary>
+    /// Most territory the settlement may hold, set by its best town-centre tier so far (it doesn't drop while
+    /// the centre is being upgraded).
+    /// </summary>
+    public int TerritoryCap { get; set; }
+
+    /// <summary>Territory the settlement may hold right now: grows with population, up to <see cref="TerritoryCap"/>.</summary>
+    public int TerritoryAllowance => Math.Min(TerritoryCap, Commands.TerritoryRules.PopulationAllowance(Citizens.Count));
+
+    /// <summary>Farthest claimed tile from the centre (Chebyshev distance), for bounding searches.</summary>
+    public int TerritoryExtent { get; internal set; }
+
+    public bool OwnsTile(World.WorldMap map, int x, int y) => map.GetTile(x, y).TerritoryId == Id;
+
+    /// <summary>The settlement's town centre (keep, town hall...), or null if it has none.</summary>
+    public Building? TownCentre => Buildings.FirstOrDefault(b => b.Def.IsTownCentre);
 
     public int StorageCapacity => Buildings.Where(b => b.IsOperational).Sum(b => b.Def.Storage);
     public int FreeStorage => Math.Max(0, StorageCapacity - Stock.Total);

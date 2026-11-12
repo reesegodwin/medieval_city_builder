@@ -131,6 +131,7 @@ internal static class Report
         PrintDay(world, s);
         Console.WriteLine($"Births {world.TotalBirths}, deaths {world.TotalDeaths}. Storage {s.Stock.Total}/{s.StorageCapacity}, " +
                           $"housing {s.HousingCapacity - s.FreeHousing}/{s.HousingCapacity}, road tiles {s.Roads.Count}.");
+        Console.WriteLine($"Territory {s.Territory.Count}/{s.TerritoryAllowance} tiles (cap {s.TerritoryCap}, {s.TownCentre?.Def.Name ?? "no town centre"}).");
         Console.WriteLine("Stock: " + string.Join(", ", s.Stock.Items.Select(kv => $"{kv.Key} {kv.Value}")));
         Console.WriteLine("Buildings:");
         foreach (var group in s.Buildings.GroupBy(b => b.Def.Name))

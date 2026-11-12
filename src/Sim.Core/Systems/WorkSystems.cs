@@ -25,7 +25,7 @@ public static class Logistics
     {
         var stockpiles = settlement.Buildings.Where(b => b.IsOperational && b.Def.IsStockpile).ToList();
         if (stockpiles.Count == 0) return null;
-        int r = settlement.TerritoryRadius + 6;
+        int r = settlement.TerritoryExtent + 6;
         return Pathfinder.CostField(world.Map, stockpiles.SelectMany(s => s.AccessTiles()),
             settlement.CenterX - r, settlement.CenterY - r, settlement.CenterX + r, settlement.CenterY + r, mode);
     }
@@ -144,6 +144,7 @@ public static class ConstructionSystem
         b.ConstructionProgress = b.Def.BuildDays;
         b.Problem = null;
         if (b.Def.IsStockpile) Logistics.UpdateHaulFactors(world, settlement);
+        if (b.Def.TownCentre is { } centre) settlement.TerritoryCap = Math.Max(settlement.TerritoryCap, centre.TerritoryCap);
         world.Log(EventKind.BuildingCompleted, settlement, $"{b.Def.Name} completed");
     }
 }

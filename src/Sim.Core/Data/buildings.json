@@ -1,5 +1,52 @@
 [
   {
+    "id": "keep",
+    "name": "Keep",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0,
+    "cost": {},
+    "builderSlots": 2,
+    "townCentre": {
+      "territoryCap": 7321,
+      "upgradeTo": "town_hall",
+      "minPopulation": 0
+    }
+  },
+  {
+    "id": "town_hall",
+    "name": "Town Hall",
+    "width": 3,
+    "height": 3,
+    "buildDays": 3,
+    "cost": {
+      "wood": 100,
+      "stone": 60
+    },
+    "builderSlots": 4,
+    "townCentre": {
+      "territoryCap": 12961,
+      "upgradeTo": "castle",
+      "minPopulation": 90
+    }
+  },
+  {
+    "id": "castle",
+    "name": "Castle",
+    "width": 3,
+    "height": 3,
+    "buildDays": 6,
+    "cost": {
+      "wood": 200,
+      "stone": 180
+    },
+    "builderSlots": 6,
+    "townCentre": {
+      "territoryCap": 20201,
+      "minPopulation": 240
+    }
+  },
+  {
     "id": "stockpile",
     "name": "Stockpile",
     "width": 3,

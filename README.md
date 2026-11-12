@@ -84,6 +84,7 @@ dotnet test
 | Left-click | Select a building or citizen, or place a building |
 | R | Road tool: click the start, then click the end (lays an L-shaped road; over water it builds a bridge) |
 | X | Demolish tool: click a building or road tile |
+| T | Territory tool: drag to claim land, Shift+drag to give it back, `[` / `]` change the brush size |
 | Right-click / Esc | Cancel the current tool or close the inspector |
 | P | Rules panel: job priorities, stock limits, reserves |
 | F5 / F9 | Quick-save / load (saved in Godot's user data folder) |
@@ -92,6 +93,8 @@ dotnet test
 | 1–4 | Speed: 1× (real time, 1 game day per hour), 60×, 600×, 3600× |
 
 The bottom bar places buildings and starts the Roads and Demolish tools: a green ghost means the spot is valid, and red shows the reason it isn't. Service buildings show their reach as a yellow diamond. Placed buildings wait for materials, go up inside a scaffold, then start working. **Auto-build** lets the town's governor keep building on its own.
+
+Territory is the land you may build on. You choose where it goes by painting it (T), so you can grow along one bank of a river or up to a mountain and no further. How much you may hold grows with population, up to the cap of your town centre. Select the Keep and upgrade it to a Town Hall, then a Castle, to raise the cap. **Auto land** claims spare allowance evenly around the centre each day; turn it off to paint by hand. **Expand evenly** does the same once.
 
 ### Command-line options
 
@@ -104,6 +107,8 @@ These go after `--` on Godot's command line:
 | `--inspect` | Open the inspector on a citizen at start |
 | `--screenshot out.png` | Save a screenshot after a few frames, then quit |
 | `--rules` | Open the rules panel at start |
+| `--territory` | Open the territory tool at start |
+| `--zoom N` | Start with the camera N units away (6–90) |
 | `--save-load-test` | Save, reload the game from that save, and print both state hashes (they should match) |
 | `--export-sounds DIR` | Write every generated sound to `DIR` as `.wav` files |
 

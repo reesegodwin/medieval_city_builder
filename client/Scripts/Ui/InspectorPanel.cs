@@ -1,3 +1,4 @@
+using Sim.Core.Commands;
 using System.Text;
 using Godot;
 using Sim.Core.Citizens;
@@ -12,8 +13,12 @@ public partial class InspectorPanel : PanelContainer
 {
     private Label _title = null!;
     private RichTextLabel _body = null!;
+    private Button _upgrade = null!;
 
     public event Action? Closed;
+
+    /// <summary>The player asked to upgrade the town centre.</summary>
+    public event Action? UpgradeRequested;
 
     public override void _Ready()
     {
@@ -47,13 +52,18 @@ public partial class InspectorPanel : PanelContainer
             SelectionEnabled = true,
         };
         column.AddChild(_body);
+
+        _upgrade = new Button { Visible = false };
+        _upgrade.Pressed += () => UpgradeRequested?.Invoke();
+        column.AddChild(_upgrade);
     }
 
-    public void ShowBuilding(Settlement town, Building b)
+    public void ShowBuilding(GameWorld world, Settlement town, Building b)
     {
         Visible = true;
         _title.Text = b.Def.Name;
         var sb = new StringBuilder();
+        _upgrade.Visible = false;
 
         string state = b.State switch
         {
@@ -105,8 +115,35 @@ public partial class InspectorPanel : PanelContainer
                     sb.AppendLine($"  {c.FullName} ({(int)c.AgeYears})");
         }
         if (b.Def.Storage > 0) sb.AppendLine($"[b]Town storage:[/b] {town.Stock.Total}/{town.StorageCapacity}");
+        if (b.Def.TownCentre != null) DescribeTownCentre(world, town, b, sb);
 
         SetBody(sb);
+    }
+
+    private void DescribeTownCentre(GameWorld world, Settlement town, Building b, StringBuilder sb)
+    {
+        sb.AppendLine();
+        sb.AppendLine($"[b]Territory:[/b] {town.Territory.Count} tiles held");
+        sb.AppendLine($"[b]Allowance:[/b] {town.TerritoryAllowance} tiles " +
+                      $"(population allows {TerritoryRules.PopulationAllowance(town.Citizens.Count)}, cap {town.TerritoryCap})");
+        sb.AppendLine("Paint territory with the Territory tool (T), or tick \"Auto land\" to grow it evenly.");
+
+        if (b.Def.TownCentre!.UpgradeTo is not { } nextId)
+        {
+            sb.AppendLine("[b]Highest tier.[/b]");
+            return;
+        }
+        var next = world.Data.Building(nextId);
+        string cost = string.Join(", ", next.Cost.Select(kv => $"{kv.Value} {kv.Key}"));
+        sb.AppendLine();
+        sb.AppendLine($"[b]Next tier:[/b] {next.Name}, territory cap {next.TownCentre!.TerritoryCap} tiles");
+        sb.AppendLine($"[b]Needs:[/b] {next.TownCentre.MinPopulation} people; costs {cost}; {next.BuildDays:0.#} worker-days to build");
+
+        string? problem = UpgradeTownCentreCommand.Check(world, town, out _);
+        _upgrade.Visible = true;
+        _upgrade.Disabled = problem != null;
+        _upgrade.Text = $"Upgrade to {next.Name}";
+        _upgrade.TooltipText = problem ?? $"Rebuild as a {next.Name} ({cost}). The current cap stays until it's finished.";
     }
 
     public void ShowCitizen(GameWorld world, Settlement town, Citizen c)

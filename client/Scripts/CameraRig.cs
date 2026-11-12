@@ -35,6 +35,9 @@ public partial class CameraRig : Node3D
 
     public void LookAtTile(int x, int y) => Position = new Vector3(x + 0.5f, 0, y + 0.5f);
 
+    /// <summary>Jumps to a zoom distance (clamped to the allowed range).</summary>
+    public void SetDistance(float distance) => _distance = _targetDistance = Mathf.Clamp(distance, MinDistance, MaxDistance);
+
     public override void _UnhandledInput(InputEvent @event)
     {
         switch (@event)

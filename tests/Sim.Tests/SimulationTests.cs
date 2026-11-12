@@ -36,7 +36,7 @@ internal static class Scenario
 
     public static (int X, int Y) FindTile(GameWorld world, Settlement town, Terrain terrain)
     {
-        for (int r = 0; r < Placement.SettlementRadius; r++)
+        for (int r = 0; r < TerritoryRules.BaseRadius; r++)
         for (int dy = -r; dy <= r; dy++)
         for (int dx = -r; dx <= r; dx++)
         {
@@ -249,6 +249,7 @@ public class WholeSimulationTests
         Assert.DoesNotContain(world.Events, e => e.Kind == Sim.Core.Events.EventKind.Starvation);
         Assert.Contains(town.Buildings, b => b.Def.Id == "bakery" && b.IsOperational);
         Assert.Contains(town.Buildings, b => b.Def.Id == "quarry" && b.IsOperational);
+        Assert.NotEqual("keep", town.TownCentre!.Def.Id); // the governor upgrades the centre as the town grows
 
         // Food production is sized to need (bread and gardens counted), not built to twice what's eaten.
         double need = town.Citizens.Sum(Needs.DailyFoodNeed);

@@ -92,18 +92,20 @@ public class RoadTests
     }
 
     [Fact]
-    public void TerritoryGrowsWithPopulation()
+    public void TerritoryGrowsWithPopulationUpToTheTownCentreCap()
     {
         var (world, town, _) = Scenario.NewTown();
-        int start = town.TerritoryRadius;
-        Assert.Equal(Placement.SettlementRadius + town.Citizens.Count / Placement.CitizensPerExtraTile, start);
+        Assert.Equal(TerritoryRules.PopulationAllowance(town.Citizens.Count), town.TerritoryAllowance);
+        Assert.Equal(town.TerritoryAllowance, town.Territory.Count);
+        int start = town.Territory.Count;
 
-        foreach (var c in CitizenFactory.CreateHousehold(world, 4).Concat(CitizenFactory.CreateHousehold(world, 4))
-                     .Concat(Enumerable.Range(0, 40).SelectMany(_ => CitizenFactory.CreateHousehold(world, 1))))
+        foreach (var c in Enumerable.Range(0, 60).SelectMany(_ => CitizenFactory.CreateHousehold(world, 4)))
             town.AddCitizen(c);
+        TerritorySystem.Daily(world, town);
 
-        Assert.True(town.TerritoryRadius > start);
-        Assert.True(town.TerritoryRadius <= Placement.MaxSettlementRadius);
+        Assert.True(town.Territory.Count > start);
+        Assert.Equal(world.Data.Building("keep").TownCentre!.TerritoryCap, town.TerritoryAllowance);
+        Assert.Equal(town.TerritoryAllowance, town.Territory.Count);
     }
 
     [Fact]
@@ -129,7 +131,7 @@ public class RoadTests
 
     internal static (int X, int Y) FindFreeBuildable(GameWorld world, Settlement town)
     {
-        for (int r = 4; r < Placement.SettlementRadius; r++)
+        for (int r = 4; r < TerritoryRules.BaseRadius; r++)
         for (int dx = -r; dx <= r; dx++)
         {
             int x = town.CenterX + dx, y = town.CenterY + r;

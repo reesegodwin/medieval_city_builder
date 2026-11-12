@@ -52,6 +52,7 @@ public sealed class Simulator
                 LifeSystem.Daily(World, s);
                 ServiceSystem.Daily(World, s);
                 MigrationSystem.Daily(World, s);
+                Commands.TerritorySystem.Daily(World, s);
                 SettlementGovernor.Daily(World, s);
             }
             DayEnded?.Invoke(World);
@@ -83,12 +84,23 @@ public static class SettlementFounder
         settlement.Stock.Add("grain", 120);
         settlement.Stock.Add("bread", 20);
 
-        foreach (string id in new[] { "stockpile", "well", "hovel", "hovel", "hovel", "hovel", "farm", "farm", "woodcutter" })
+        // Territory: the starting town centre's cap, claimed evenly around the centre.
+        var centre = world.Data.StartingTownCentre;
+        settlement.TerritoryCap = centre?.TownCentre!.TerritoryCap ?? Commands.TerritoryRules.DefaultCap;
+        Commands.TerritoryRules.ExpandEvenly(world, settlement);
+
+        var starting = new List<string>();
+        if (centre != null) starting.Add(centre.Id);
+        starting.AddRange(new[] { "stockpile", "well", "hovel", "hovel", "hovel", "hovel", "farm", "farm", "woodcutter" });
+        foreach (string id in starting)
         {
             var def = world.Data.Building(id);
             if (SiteFinder.Find(world, settlement, def) is not var (x, y)) continue;
-            var result = world.Execute(new Commands.PlaceBuildingCommand(settlement.Id, id, x, y));
-            if (result.CreatedId is int bid)
+            // The town centre can't be placed by command (only upgraded), so founding places it directly.
+            int? created = def.IsTownCentre
+                ? Commands.Placement.Place(world, settlement, def, x, y).Id
+                : world.Execute(new Commands.PlaceBuildingCommand(settlement.Id, id, x, y)).CreatedId;
+            if (created is int bid)
             {
                 // Founding buildings start finished and free.
                 var b = settlement.FindBuilding(bid)!;
@@ -107,6 +119,7 @@ public static class SettlementFounder
             }
         }
 
+        Commands.TerritoryRules.ExpandEvenly(world, settlement);
         HousingSystem.Tick(world, settlement);
         JobSystem.Tick(world, settlement);
         ServiceSystem.Daily(world, settlement);

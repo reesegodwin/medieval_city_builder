@@ -28,6 +28,7 @@ public sealed record PlaceBuildingCommand(int SettlementId, string BuildingDefId
         var settlement = world.FindSettlement(SettlementId);
         if (settlement == null) return CommandResult.Fail("Unknown settlement");
         if (!world.Data.Buildings.TryGetValue(BuildingDefId, out var def)) return CommandResult.Fail("Unknown building type");
+        if (def.IsTownCentre) return CommandResult.Fail("Each settlement has one town centre; upgrade it instead");
 
         string? error = Placement.Check(world, settlement, def, X, Y);
         if (error != null) return CommandResult.Fail(error);
@@ -89,26 +90,15 @@ public sealed record SetAutoBuildCommand(int SettlementId, bool Enabled) : IComm
 
 public static class Placement
 {
-    /// <summary>Starting territory radius: how far from the centre a new settlement may build.</summary>
-    public const int SettlementRadius = 44;
-
-    /// <summary>Territory never grows beyond this.</summary>
-    public const int MaxSettlementRadius = 100;
-
-    /// <summary>Territory grows by one tile for this many citizens.</summary>
-    public const int CitizensPerExtraTile = 8;
-
     /// <summary>Returns null if the building can go here, otherwise the reason it can't.</summary>
     public static string? Check(GameWorld world, Settlement settlement, Data.BuildingDef def, int x, int y)
     {
         int cx = x + def.Width / 2, cy = y + def.Height / 2;
-        if (Math.Abs(cx - settlement.CenterX) + Math.Abs(cy - settlement.CenterY) > settlement.TerritoryRadius)
-            return "Outside the settlement's territory";
-
         for (int dy = 0; dy < def.Height; dy++)
         for (int dx = 0; dx < def.Width; dx++)
         {
             var tile = world.Map.GetTile(x + dx, y + dy);
+            if (tile.TerritoryId != settlement.Id) return "Outside the settlement's territory";
             if (tile.BuildingId != 0) return "Blocked by another building";
             if (!tile.IsBuildable) return $"Cannot build on {tile.Terrain}";
         }
@@ -152,9 +142,8 @@ public static class Roads
     /// <summary>Returns null if a road can go on this tile, otherwise why not.</summary>
     public static string? Check(GameWorld world, Settlement settlement, int x, int y)
     {
-        if (Math.Abs(x - settlement.CenterX) + Math.Abs(y - settlement.CenterY) > settlement.TerritoryRadius)
-            return "Outside the settlement's territory";
         var tile = world.Map.GetTile(x, y);
+        if (tile.TerritoryId != settlement.Id) return "Outside the settlement's territory";
         if (tile.BuildingId != 0) return "Blocked by a building";
         if (!tile.IsBuildable && tile.Terrain != Terrain.Water) return $"Cannot build a road on {tile.Terrain}";
         return null;
@@ -242,6 +231,7 @@ public sealed record DemolishBuildingCommand(int SettlementId, int BuildingId) :
         if (settlement == null) return CommandResult.Fail("Unknown settlement");
         var b = settlement.FindBuilding(BuildingId);
         if (b == null) return CommandResult.Fail("Unknown building");
+        if (b.Def.IsTownCentre) return CommandResult.Fail("The town centre can't be demolished");
 
         Work.ReleaseWorkers(settlement, b);
         foreach (int id in b.ResidentIds)

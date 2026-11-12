@@ -1,3 +1,4 @@
+using Sim.Core.Commands;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Sim.Core.Citizens;
@@ -16,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -39,7 +40,11 @@ public static class SaveGame
     {
         if (file.Version > CurrentVersion)
             throw new InvalidDataException($"Save is from a newer version ({file.Version}) of the game");
-        // Future: upgrade older versions step by step here.
+        // Version 1 had a fixed territory radius and no town centre. Mark those settlements so that, once
+        // restored, they get the territory the old radius gave them (see RestoreSettlement).
+        if (file.Version < 2)
+            foreach (var s in file.Settlements) s.Territory = null;
+        file.Version = CurrentVersion;
         return file;
     }
 
@@ -73,6 +78,7 @@ public static class SaveGame
             PerCitizenLimits = new(s.Rules.PerCitizenLimits),
             LowStockThreshold = s.Rules.LowStockThreshold,
             AutoBuild = s.Rules.AutoBuild,
+            AutoExpandTerritory = s.Rules.AutoExpandTerritory,
         },
         Buildings = s.Buildings.Select(b => new BuildingSave
         {
@@ -117,8 +123,24 @@ public static class SaveGame
         }).ToList(),
         Roads = s.Roads.Select(r => new[] { r.X, r.Y }).ToList(),
         RoadVersion = s.RoadVersion,
+        Territory = TerritoryRuns(s),
+        TerritoryVersion = s.TerritoryVersion,
+        TerritoryCap = s.TerritoryCap,
         FailedSiteSearches = new(s.FailedSiteSearches),
     };
+
+    /// <summary>Territory as row runs [y, firstX, lastX], which is far smaller than one entry per tile.</summary>
+    private static List<int[]> TerritoryRuns(Settlement s)
+    {
+        var runs = new List<int[]>();
+        int[]? run = null;
+        foreach (var (x, y) in s.Territory.OrderBy(t => t.Y).ThenBy(t => t.X))
+        {
+            if (run != null && run[0] == y && run[2] == x - 1) run[2] = x;
+            else runs.Add(run = new[] { y, x, x });
+        }
+        return runs;
+    }
 
     // ---------- restore ----------
 
@@ -147,6 +169,7 @@ public static class SaveGame
         CopyInto(save.Rules.PerCitizenLimits, s.Rules.PerCitizenLimits);
         s.Rules.LowStockThreshold = save.Rules.LowStockThreshold;
         s.Rules.AutoBuild = save.Rules.AutoBuild;
+        s.Rules.AutoExpandTerritory = save.Rules.AutoExpandTerritory ?? true;
 
         foreach (var b in save.Buildings)
         {
@@ -201,6 +224,20 @@ public static class SaveGame
         }
         s.RoadVersion = save.RoadVersion;
         foreach (var (key, day) in save.FailedSiteSearches) s.FailedSiteSearches[key] = day;
+
+        if (save.Territory is { } runs)
+        {
+            foreach (var run in runs)
+                for (int x = run[1]; x <= run[2]; x++) TerritoryRules.Claim(world, s, x, run[0]);
+            s.TerritoryCap = save.TerritoryCap;
+            s.TerritoryVersion = save.TerritoryVersion;
+        }
+        else
+        {
+            // Old save: no town centre, so keep the old maximum, and claim the diamond its radius gave.
+            s.TerritoryCap = TerritoryRules.DefaultCap;
+            TerritoryRules.ExpandEvenly(world, s);
+        }
         return s;
     }
 
@@ -239,6 +276,11 @@ public static class SaveGame
         public List<CitizenSave> Citizens { get; set; } = new();
         public List<int[]> Roads { get; set; } = new();
         public int RoadVersion { get; set; }
+
+        /// <summary>Row runs [y, firstX, lastX]; null in version-1 saves.</summary>
+        public List<int[]>? Territory { get; set; }
+        public int TerritoryVersion { get; set; }
+        public int TerritoryCap { get; set; }
         public Dictionary<string, long> FailedSiteSearches { get; set; } = new();
     }
 
@@ -250,6 +292,7 @@ public static class SaveGame
         public SortedDictionary<string, int> PerCitizenLimits { get; set; } = new(StringComparer.Ordinal);
         public int LowStockThreshold { get; set; }
         public bool AutoBuild { get; set; }
+        public bool? AutoExpandTerritory { get; set; }
     }
 
     private sealed class BuildingSave

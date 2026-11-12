@@ -127,6 +127,44 @@ public static class LowPolyMeshes
                 mb.Box(new Vector3(0.4f, 0.04f, 3.0f), new Vector3(0.9f, 0.3f, 3.4f), Wheat.Darkened(0.2f));
                 break;
 
+            case "keep":
+                // A square stone tower with battlements and a banner.
+                mb.Box(new Vector3(0.6f, 0, 0.6f), new Vector3(w - 0.6f, 1.6f, h - 0.6f), Stone);
+                Battlements(mb, 0.55f, 0.55f, w - 0.55f, h - 0.55f, 1.6f, Stone.Darkened(0.05f));
+                mb.Box(new Vector3(w / 2 - 0.2f, 0, h - 0.62f), new Vector3(w / 2 + 0.2f, 0.55f, h - 0.58f), Timber.Darkened(0.3f));
+                Banner(mb, w / 2, h / 2, 1.75f);
+                break;
+
+            case "town_hall":
+                // A stone hall with a tiled roof and a bell tower.
+                mb.Box(new Vector3(0.2f, 0, 0.6f), new Vector3(w - 0.2f, 0.9f, h - 0.3f), Stone);
+                mb.GableRoof(new Vector3(0.1f, 0.9f, 0.5f), new Vector3(w - 0.1f, 0.9f, h - 0.2f), 0.8f, Tiles);
+                mb.Box(new Vector3(w / 2 - 0.45f, 0, 0.15f), new Vector3(w / 2 + 0.45f, 2.1f, 1.05f), Stone.Lightened(0.05f));
+                mb.Cone(new Vector3(w / 2, 2.1f, 0.6f), 0.6f, 0.9f, 4, Slate);
+                mb.Box(new Vector3(w / 2 - 0.25f, 0, h - 0.32f), new Vector3(w / 2 + 0.25f, 0.6f, h - 0.28f), Timber.Darkened(0.3f));
+                Banner(mb, w / 2, 0.6f, 3.0f);
+                break;
+
+            case "castle":
+                // Curtain wall with four corner towers around a central keep.
+                foreach (var (x0, z0, x1, z1) in new[]
+                         {
+                             (0.05f, 0.05f, w - 0.05f, 0.35f), (0.05f, h - 0.35f, w - 0.05f, h - 0.05f),
+                             (0.05f, 0.35f, 0.35f, h - 0.35f), (w - 0.35f, 0.35f, w - 0.05f, h - 0.35f),
+                         })
+                    mb.Box(new Vector3(x0, 0, z0), new Vector3(x1, 0.9f, z1), Stone.Darkened(0.05f));
+                foreach (float x in new[] { 0f, w - 0.6f })
+                foreach (float z in new[] { 0f, h - 0.6f })
+                {
+                    mb.Box(new Vector3(x, 0, z), new Vector3(x + 0.6f, 1.4f, z + 0.6f), Stone);
+                    mb.Cone(new Vector3(x + 0.3f, 1.4f, z + 0.3f), 0.42f, 0.6f, 4, Slate);
+                }
+                mb.Box(new Vector3(0.85f, 0, 0.85f), new Vector3(w - 0.85f, 2.2f, h - 0.85f), Stone.Lightened(0.05f));
+                Battlements(mb, 0.8f, 0.8f, w - 0.8f, h - 0.8f, 2.2f, Stone);
+                mb.Box(new Vector3(w / 2 - 0.25f, 0, h - 0.07f), new Vector3(w / 2 + 0.25f, 0.65f, h - 0.03f), Timber.Darkened(0.3f));
+                Banner(mb, w / 2, h / 2, 2.35f);
+                break;
+
             default:
                 House(mb, new Vector3(0.1f, 0, 0.1f), new Vector3(w - 0.1f, 0.8f, h - 0.1f), Stone, Tiles, 0.6f);
                 break;
@@ -135,6 +173,29 @@ public static class LowPolyMeshes
         var mesh = mb.Commit();
         BuildingCache[def.Id] = mesh;
         return mesh;
+    }
+
+    /// <summary>Crenellations along the top edge of a rectangle.</summary>
+    private static void Battlements(MeshBuilder mb, float x0, float z0, float x1, float z1, float y, Color color)
+    {
+        const float size = 0.18f, height = 0.18f;
+        for (float x = x0; x + size <= x1 + 0.01f; x += size * 2)
+        {
+            mb.Box(new Vector3(x, y, z0), new Vector3(x + size, y + height, z0 + size), color);
+            mb.Box(new Vector3(x, y, z1 - size), new Vector3(x + size, y + height, z1), color);
+        }
+        for (float z = z0 + size * 2; z + size <= z1 - size; z += size * 2)
+        {
+            mb.Box(new Vector3(x0, y, z), new Vector3(x0 + size, y + height, z + size), color);
+            mb.Box(new Vector3(x1 - size, y, z), new Vector3(x1, y + height, z + size), color);
+        }
+    }
+
+    /// <summary>A flagpole with a pennant, marking the town centre.</summary>
+    private static void Banner(MeshBuilder mb, float x, float z, float baseY)
+    {
+        mb.Box(new Vector3(x - 0.03f, baseY, z - 0.03f), new Vector3(x + 0.03f, baseY + 1.0f, z + 0.03f), Timber);
+        mb.Box(new Vector3(x + 0.03f, baseY + 0.6f, z - 0.01f), new Vector3(x + 0.5f, baseY + 0.95f, z + 0.01f), Cloth);
     }
 
     /// <summary>Market stall: four posts, a counter and a striped awning.</summary>

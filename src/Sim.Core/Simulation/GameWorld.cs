@@ -64,7 +64,7 @@ public sealed class GameWorld
         h.Add(Time.Tick).Add(TotalBirths).Add(TotalDeaths).Add(Events.Count).Add(Rng.StateFingerprint);
         foreach (var s in Settlements)
         {
-            h.Add(s.Id);
+            h.Add(s.Id).Add(s.Territory.Count).Add(s.TerritoryCap);
             foreach (var (resource, amount) in s.Stock.Items) h.Add(resource).Add(amount);
             foreach (var b in s.Buildings)
             {

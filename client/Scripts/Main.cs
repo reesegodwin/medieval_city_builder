@@ -13,6 +13,8 @@ namespace MedievalClient;
 ///   --screenshot file.png save a screenshot after a few frames and quit (automated checks)
 ///   --inspect             select a citizen on start (shows the inspector panel)
 ///   --rules               open the rules panel on start
+///   --territory           open the territory paint tool on start
+///   --zoom N              start with the camera N units away (6-90)
 ///   --save-load-test      save, reload the scene from the save, then continue (automated check)
 ///   --export-sounds DIR   write every generated sound to DIR as .wav files
 /// </summary>
@@ -27,6 +29,8 @@ public partial class Main : Node3D
     private PlacementTool _placement = null!;
     private RoadTool _roadTool = null!;
     private DemolishTool _demolishTool = null!;
+    private TerritoryTool _territoryTool = null!;
+    private TerritoryRenderer _territory = null!;
     private Hud _hud = null!;
     private InspectorPanel _inspector = null!;
     private RulesPanel _rules = null!;
@@ -76,6 +80,10 @@ public partial class Main : Node3D
         AddChild(roads);
         roads.Initialize(_session.World.Map, town);
 
+        _territory = new TerritoryRenderer { Name = "Territory" };
+        AddChild(_territory);
+        _territory.Initialize(_session.World.Map, town);
+
         _placement = new PlacementTool { Name = "Placement" };
         AddChild(_placement);
         _placement.Initialize(_session, _camera);
@@ -88,6 +96,10 @@ public partial class Main : Node3D
         AddChild(_demolishTool);
         _demolishTool.Initialize(_session, _camera);
 
+        _territoryTool = new TerritoryTool { Name = "TerritoryTool" };
+        AddChild(_territoryTool);
+        _territoryTool.Initialize(_session, _camera);
+
         _sound = new SoundManager { Name = "Sound" };
         AddChild(_sound);
         _sound.Initialize(town, () => _camera.Focus);
@@ -97,7 +109,7 @@ public partial class Main : Node3D
 
         _hud = new Hud { Name = "Hud" };
         AddChild(_hud);
-        _hud.Build(_session.World.Data, town.Rules.AutoBuild);
+        _hud.Build(_session.World.Data, town.Rules.AutoBuild, town.Rules.AutoExpandTerritory);
         _hud.BuildRequested += id =>
         {
             CancelTools();
@@ -113,10 +125,30 @@ public partial class Main : Node3D
         };
         _hud.PauseToggled += () => _session.Paused = !_session.Paused;
         _hud.AutoBuildToggled += on => _session.Execute(new SetAutoBuildCommand(town.Id, on));
+        _hud.AutoTerritoryToggled += on => _session.Execute(new SetAutoExpandTerritoryCommand(town.Id, on));
+        _hud.TerritoryRequested += StartTerritoryTool;
+        _hud.ExpandTerritoryRequested += () =>
+        {
+            var result = _session.Execute(new ExpandTerritoryCommand(town.Id));
+            Report(result, "Can't expand");
+            if (result.Ok) Flash($"Territory: {town.Territory.Count}/{town.TerritoryAllowance} tiles");
+        };
 
         _inspector = new InspectorPanel { Name = "Inspector" };
         _hud.AddChild(_inspector);
         _inspector.Closed += ClearSelection;
+        _inspector.UpgradeRequested += () =>
+        {
+            var result = _session.Execute(new UpgradeTownCentreCommand(town.Id));
+            Report(result, "Can't upgrade");
+            if (result is { Ok: true, CreatedId: int id })
+            {
+                _sound.Placed();
+                _selectedBuilding = id;
+                Flash($"{town.FindBuilding(id)?.Def.Name} planned. Builders start once the materials are in.");
+            }
+            RefreshInspector();
+        };
 
         _rules = new RulesPanel { Name = "Rules" };
         _rules.Initialize(_session);
@@ -138,6 +170,8 @@ public partial class Main : Node3D
             _session.RunDays(warmup);
         _screenshotPath = SimSession.UserArg("--screenshot");
         if (SimSession.UserArg("--rules") != null) _rules.Toggle();
+        if (SimSession.UserArg("--territory") != null) StartTerritoryTool();
+        if (float.TryParse(SimSession.UserArg("--zoom"), out float zoom)) _camera.SetDistance(zoom);
         if (SimSession.UserArg("--inspect") != null)
             _selectedCitizen = town.Citizens.FirstOrDefault(c => c.IsAdult && c.JobBuildingId != null)?.Id;
 
@@ -210,7 +244,9 @@ public partial class Main : Node3D
             ? _placement.Problem is { } p ? $"{def.Name}: {p}" : $"Place {def.Name} (right-click to stop)"
             : _roadTool.Active ? _roadTool.Status
             : _demolishTool.Active ? _demolishTool.Status
+            : _territoryTool.Active ? _territoryTool.Status
             : null));
+        _territory.ShowFill = _territoryTool.Active;
 
         UpdateMarker((float)delta);
         _sound.Tick(delta, !_session.Paused);
@@ -247,6 +283,7 @@ public partial class Main : Node3D
                     if (road is { Ok: true }) _sound.Placed();
                     else if (road == null) _sound.Click();
                 }
+                else if (_territoryTool.Active) _territoryTool.BeginStroke(Input.IsKeyPressed(Key.Shift));
                 else if (_demolishTool.Active)
                 {
                     var torn = _demolishTool.Click();
@@ -254,6 +291,10 @@ public partial class Main : Node3D
                     if (torn is { Ok: true }) _sound.Demolished();
                 }
                 else Select();
+                break;
+
+            case InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: false }:
+                _territoryTool.EndStroke();
                 break;
 
             case InputEventMouseButton { ButtonIndex: MouseButton.Right, Pressed: true }:
@@ -268,6 +309,18 @@ public partial class Main : Node3D
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.X }:
                 StartDemolishTool();
+                break;
+
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.T }:
+                StartTerritoryTool();
+                break;
+
+            case InputEventKey { Pressed: true, Keycode: Key.Bracketleft } when _territoryTool.Active:
+                _territoryTool.ResizeBrush(-1);
+                break;
+
+            case InputEventKey { Pressed: true, Keycode: Key.Bracketright } when _territoryTool.Active:
+                _territoryTool.ResizeBrush(+1);
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.P }:
@@ -299,13 +352,21 @@ public partial class Main : Node3D
         }
     }
 
-    private bool AnyToolActive => _placement.Active != null || _roadTool.Active || _demolishTool.Active;
+    private bool AnyToolActive => _placement.Active != null || _roadTool.Active || _demolishTool.Active || _territoryTool.Active;
 
     private void CancelTools()
     {
         _placement.Cancel();
         _roadTool.Cancel();
         _demolishTool.Cancel();
+        _territoryTool.Cancel();
+    }
+
+    private void StartTerritoryTool()
+    {
+        CancelTools();
+        ClearSelection();
+        _territoryTool.Begin();
     }
 
     private void StartRoadTool()
@@ -419,7 +480,7 @@ public partial class Main : Node3D
         }
         else if (_selectedBuilding is int bid && town.FindBuilding(bid) is { } b)
         {
-            _inspector.ShowBuilding(town, b);
+            _inspector.ShowBuilding(_session.World, town, b);
         }
     }
 

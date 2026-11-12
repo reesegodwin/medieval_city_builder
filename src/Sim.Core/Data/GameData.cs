@@ -60,6 +60,22 @@ public sealed class NearTerrainRequirement
     public int Min { get; set; }
 }
 
+/// <summary>
+/// Marks a town-centre tier (keep, town hall, castle...). Each settlement has exactly one centre; it can't be
+/// placed or demolished, only upgraded in place. Its tier caps how much territory the settlement may hold.
+/// </summary>
+public sealed class TownCentreDef
+{
+    /// <summary>Most territory tiles a settlement with this centre may claim (population grows it up to this).</summary>
+    public int TerritoryCap { get; set; }
+
+    /// <summary>The next tier, or null at the top.</summary>
+    public string? UpgradeTo { get; set; }
+
+    /// <summary>Population needed before the settlement may upgrade into this tier.</summary>
+    public int MinPopulation { get; set; }
+}
+
 public sealed class BuildingDef
 {
     public string Id { get; set; } = "";
@@ -85,6 +101,9 @@ public sealed class BuildingDef
 
     public ServiceDef? Service { get; set; }
 
+    public TownCentreDef? TownCentre { get; set; }
+
+    public bool IsTownCentre => TownCentre != null;
     public bool IsStockpile => Storage > 0;
     public bool IsWorkplace => Jobs > 0 && JobKind != null;
 }
@@ -137,8 +156,25 @@ public sealed class GameData
                ?? throw new InvalidDataException($"Could not parse {fileName}");
     }
 
+    /// <summary>The first town-centre tier (the one a new settlement starts with), or null if the data has none.</summary>
+    public BuildingDef? StartingTownCentre { get; private set; }
+
     private void Validate()
     {
+        var centres = Buildings.Values.Where(b => b.IsTownCentre).OrderBy(b => b.Id, StringComparer.Ordinal).ToList();
+        foreach (var c in centres)
+        {
+            if (c.TownCentre!.UpgradeTo is not { } next) continue;
+            if (!Buildings.TryGetValue(next, out var up) || !up.IsTownCentre)
+                throw new InvalidDataException($"Town centre '{c.Id}' upgrades to '{next}', which isn't a town centre");
+            if (up.Width != c.Width || up.Height != c.Height)
+                throw new InvalidDataException($"Town centre '{c.Id}' and its upgrade '{next}' must have the same size");
+        }
+        var upgraded = centres.Select(c => c.TownCentre!.UpgradeTo).Where(u => u != null).ToHashSet();
+        var roots = centres.Where(c => !upgraded.Contains(c.Id)).ToList();
+        if (roots.Count > 1) throw new InvalidDataException("There must be only one starting town-centre tier");
+        StartingTownCentre = roots.FirstOrDefault();
+
         foreach (var b in Buildings.Values)
         {
             var referenced = b.Cost.Keys

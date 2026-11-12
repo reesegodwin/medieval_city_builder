@@ -18,6 +18,7 @@ public partial class Hud : CanvasLayer
     private Label _status = null!;
     private Button _pause = null!;
     private CheckBox _autoBuild = null!;
+    private CheckBox _autoTerritory = null!;
 
     public event Action<string>? BuildRequested;
     public event Action? RoadRequested;
@@ -25,6 +26,9 @@ public partial class Hud : CanvasLayer
     public event Action<double>? SpeedRequested;
     public event Action? PauseToggled;
     public event Action<bool>? AutoBuildToggled;
+    public event Action<bool>? AutoTerritoryToggled;
+    public event Action? TerritoryRequested;
+    public event Action? ExpandTerritoryRequested;
     public event Action? RulesRequested;
     public event Action? SaveRequested;
     public event Action? LoadRequested;
@@ -33,7 +37,7 @@ public partial class Hud : CanvasLayer
     /// <summary>Raised whenever any HUD button is pressed (for the click sound).</summary>
     public event Action? ButtonClicked;
 
-    public void Build(GameData data, bool autoBuild)
+    public void Build(GameData data, bool autoBuild, bool autoTerritory)
     {
         // --- Top bar ---
         var top = new PanelContainer();
@@ -71,6 +75,16 @@ public partial class Hud : CanvasLayer
         };
         _autoBuild.Toggled += on => AutoBuildToggled?.Invoke(on);
         topRow.AddChild(_autoBuild);
+
+        _autoTerritory = new CheckBox
+        {
+            Text = "Auto land",
+            ButtonPressed = autoTerritory,
+            TooltipText = "Spend spare territory allowance evenly around the town centre each day.\nTurn off to paint territory yourself (T).",
+            FocusMode = Control.FocusModeEnum.None,
+        };
+        _autoTerritory.Toggled += on => AutoTerritoryToggled?.Invoke(on);
+        topRow.AddChild(_autoTerritory);
 
         foreach (var (text, tip, action) in new (string, string, Action)[]
                  {
@@ -111,9 +125,15 @@ public partial class Hud : CanvasLayer
         }
         ToolButton("Roads\nbridges: wood", "Lay roads (R). Free on land; over water they become bridges (4 wood per tile). Roads make hauling faster; people walk along them.", () => RoadRequested?.Invoke());
         ToolButton("Demolish\nrefund", "Tear down buildings or roads (X). Refunds part of the cost.", () => DemolishRequested?.Invoke());
+        ToolButton("Territory\npaint", "Paint where your territory goes (T): drag to claim, Shift+drag to give land back, [ ] brush size.\n" +
+            "Your allowance grows with population, up to the cap of your town centre (upgrade it to raise the cap).",
+            () => TerritoryRequested?.Invoke());
+        ToolButton("Territory\nexpand evenly", "Claim all spare territory allowance evenly around the town centre.",
+            () => ExpandTerritoryRequested?.Invoke());
 
         foreach (var def in data.Buildings.Values)
         {
+            if (def.IsTownCentre) continue; // upgraded from the inspector, never placed
             string cost = def.Cost.Count == 0 ? "free" : string.Join(", ", def.Cost.Select(kv => $"{kv.Value} {kv.Key}"));
             var b = new Button
             {
@@ -159,7 +179,7 @@ public partial class Hud : CanvasLayer
         // --- Controls help (top-right, under the bar) ---
         var help = new Label
         {
-            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   X: demolish   P: rules\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
+            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   X: demolish   T: territory   P: rules\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
             HorizontalAlignment = HorizontalAlignment.Right,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
@@ -197,6 +217,7 @@ public partial class Hud : CanvasLayer
         }
         if (def.FertileBonus > 0) lines.Add($"+{def.FertileBonus:P0} output on fertile soil");
         if (def.NearTerrain is { } near) lines.Add($"Needs {near.Terrain} within {near.Radius} tiles");
+        if (def.TownCentre is { } centre) lines.Add($"Town centre: territory up to {centre.TerritoryCap} tiles");
         if (def.Service is { } service)
         {
             lines.Add($"Serves {service.Need} to up to {service.Capacity} people within {service.Radius} tiles of their home");
@@ -221,13 +242,15 @@ public partial class Hud : CanvasLayer
             $"Food {Needs.FoodDays(world, town):0.0} days (grain {town.Stock.Get("grain")}, bread {town.Stock.Get("bread")}, " +
             $"veg {town.Stock.Get("vegetables")})   Ale {town.Stock.Get("ale")}   " +
             $"Wood {town.Stock.Get("wood")}   Stone {town.Stock.Get("stone")}\n" +
-            $"Storage {town.Stock.Total}/{town.StorageCapacity}   Needs met: " +
+            $"Storage {town.Stock.Total}/{town.StorageCapacity}   Land {town.Territory.Count}/{town.TerritoryAllowance} " +
+            $"(cap {town.TerritoryCap})   Needs met: " +
             string.Join("   ", world.Data.Needs.Select(n => $"{n.Name} {ServiceSystem.Coverage(town, n.Id):P0}"));
 
         _pause.SetPressedNoSignal(session.Paused);
         foreach (var (speed, button) in _speedButtons)
             button.SetPressedNoSignal(!session.Paused && Math.Abs(session.Speed - speed) < 0.001);
         _autoBuild.SetPressedNoSignal(town.Rules.AutoBuild);
+        _autoTerritory.SetPressedNoSignal(town.Rules.AutoExpandTerritory);
     }
 
     public void AddEvents(IEnumerable<GameEvent> events)

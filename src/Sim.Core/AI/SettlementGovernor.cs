@@ -23,7 +23,8 @@ public static class SiteFinder
         double bestScore = double.MinValue;
         int validFound = 0;
 
-        int searchRadius = maxRadius ?? settlement.TerritoryRadius;
+        int searchRadius = maxRadius ??
+            settlement.TerritoryExtent + Math.Max(Math.Abs(ox - settlement.CenterX), Math.Abs(oy - settlement.CenterY));
         for (int r = 0; r <= searchRadius; r++)
         {
             foreach (var (x, y) in Ring(ox, oy, r))
@@ -213,6 +214,9 @@ public static class SettlementGovernor
 
     public const int MaxAttemptsPerDay = 3;
 
+    /// <summary>The governor upgrades the town centre once population would claim this share of its territory cap.</summary>
+    public const double UpgradeAtCapFraction = 0.85;
+
     /// <summary>Candidate sites per search that get a full road-route check.</summary>
     public const int MaxRouteChecksPerSearch = 10;
 
@@ -227,6 +231,8 @@ public static class SettlementGovernor
         if (!settlement.Rules.AutoBuild) return;
         int maxSites = MaxActiveConstructionSites + settlement.Citizens.Count / 100;
         if (settlement.Buildings.Count(b => b.IsConstructionSite) >= maxSites) return;
+
+        if (TryUpgradeTownCentre(world, settlement)) return;
 
         // Try wishes in priority order; the first affordable one with a usable site gets built.
         long today = world.Time.Day;
@@ -254,6 +260,16 @@ public static class SettlementGovernor
             settlement.FailedSiteSearches[key] = today;
             if (++attempts >= MaxAttemptsPerDay) return;
         }
+    }
+
+    /// <summary>Upgrade the town centre once its territory cap is close to holding the town back and it's affordable.</summary>
+    private static bool TryUpgradeTownCentre(GameWorld world, Settlement settlement)
+    {
+        if (UpgradeTownCentreCommand.Check(world, settlement, out var next) != null || next == null) return false;
+        int wanted = TerritoryRules.PopulationAllowance(settlement.Citizens.Count);
+        if (wanted < settlement.TerritoryCap * UpgradeAtCapFraction) return false;
+        if (!settlement.Stock.Has(next.Cost)) return false;
+        return world.Execute(new UpgradeTownCentreCommand(settlement.Id)).Ok;
     }
 
     private static bool TryBuild(GameWorld world, Settlement settlement, BuildingDef def, (int X, int Y)? near, CostGrid? field,
