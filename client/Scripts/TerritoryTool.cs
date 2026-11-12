@@ -143,10 +143,14 @@ public partial class TerritoryTool : Node3D
             if (erase) color = mine && TerritoryRules.CheckRelease(world, town, x, y) == null ? Erase : mine ? Blocked : Owned with { A = 0 };
             else color = mine ? Owned : TerritoryRules.CheckClaim(world, town, x, y) == null ? Claimable : Blocked;
             if (color.A <= 0) continue;
-            _preview.SetInstanceTransform(n, new Transform3D(Basis.Identity, Coords.TileCenter(x, y) + new Vector3(0, 0.04f, 0)));
+            _preview.SetInstanceTransform(n, new Transform3D(Basis.Identity, Coords.TileCenter(x, y) + new Vector3(0, GroundY(x, y) + 0.04f, 0)));
             _preview.SetInstanceColor(n, color);
             n++;
         }
         _preview.VisibleInstanceCount = n;
     }
+
+    /// <summary>Ground (or water surface) height at a tile's centre, so previews sit on the land.</summary>
+    private float GroundY(int x, int y) =>
+        Mathf.Max(TerrainShape.HeightAt(_session.World.Map, x + 0.5f, y + 0.5f), TerrainShape.WaterLevel);
 }

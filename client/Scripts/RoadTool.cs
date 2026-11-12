@@ -81,7 +81,7 @@ public partial class RoadTool : Node3D
             bool isRoad = world.Map.GetTile(x, y).IsRoad;
             string? error = isRoad ? null : Roads.Check(world, _session.PlayerTown, x, y);
             Problem ??= error;
-            _preview.SetInstanceTransform(i, new Transform3D(Basis.Identity, Coords.TileCenter(x, y) + new Vector3(0, 0.05f, 0)));
+            _preview.SetInstanceTransform(i, new Transform3D(Basis.Identity, Coords.TileCenter(x, y) + new Vector3(0, GroundY(x, y) + 0.05f, 0)));
             _preview.SetInstanceColor(i, isRoad ? Existing : error == null ? Valid : Invalid);
         }
         _preview.VisibleInstanceCount = n;
@@ -120,4 +120,8 @@ public partial class RoadTool : Node3D
         }
         return tiles;
     }
+
+    /// <summary>Ground (or water surface) height at a tile's centre, so previews sit on the land.</summary>
+    private float GroundY(int x, int y) =>
+        Mathf.Max(TerrainShape.HeightAt(_session.World.Map, x + 0.5f, y + 0.5f), TerrainShape.WaterLevel);
 }

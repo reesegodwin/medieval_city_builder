@@ -218,23 +218,6 @@ public static class LowPolyMeshes
         }
     }
 
-    /// <summary>Flat diamond outline showing everything within a Manhattan radius (service coverage).</summary>
-    public static ArrayMesh RadiusOutline(int radius, Color color)
-    {
-        var mb = new MeshBuilder();
-        const float t = 0.25f, y = 0.06f;
-        var corners = new[] { new Vector2(0, -radius), new Vector2(radius, 0), new Vector2(0, radius), new Vector2(-radius, 0) };
-        for (int i = 0; i < 4; i++)
-        {
-            var a = corners[i];
-            var b = corners[(i + 1) % 4];
-            var n = new Vector2(b.Y - a.Y, a.X - b.X).Normalized() * t;
-            mb.Quad(new Vector3(a.X, y, a.Y), new Vector3(b.X, y, b.Y), new Vector3(b.X + n.X, y, b.Y + n.Y),
-                new Vector3(a.X + n.X, y, a.Y + n.Y), color, Vector3.Up);
-        }
-        return mb.Commit(Materials.Overlay);
-    }
-
     private static void House(MeshBuilder mb, Vector3 min, Vector3 max, Color walls, Color roof, float roofHeight)
     {
         mb.Box(min, max, walls);

@@ -15,6 +15,8 @@ namespace MedievalClient;
 ///   --rules               open the rules panel on start
 ///   --territory           open the territory paint tool on start
 ///   --zoom N              start with the camera N units away (6-90)
+///   --place ID            start placing building ID with the cursor mid-screen (automated checks)
+///   --cursor X,Y          with --place, put the cursor at this pixel instead
 ///   --save-load-test      save, reload the scene from the save, then continue (automated check)
 ///   --export-sounds DIR   write every generated sound to DIR as .wav files
 /// </summary>
@@ -172,6 +174,8 @@ public partial class Main : Node3D
         if (SimSession.UserArg("--rules") != null) _rules.Toggle();
         if (SimSession.UserArg("--territory") != null) StartTerritoryTool();
         if (float.TryParse(SimSession.UserArg("--zoom"), out float zoom)) _camera.SetDistance(zoom);
+        if (SimSession.UserArg("--place") is { Length: > 0 } placeId && _session.World.Data.Buildings.TryGetValue(placeId, out var placeDef))
+            _placement.Begin(placeDef);
         if (SimSession.UserArg("--inspect") != null)
             _selectedCitizen = town.Citizens.FirstOrDefault(c => c.IsAdult && c.JobBuildingId != null)?.Id;
 
@@ -252,6 +256,15 @@ public partial class Main : Node3D
         _sound.Tick(delta, !_session.Paused);
 
         _frames++;
+        // Automated checks: put the cursor mid-screen so a tool's preview shows in the screenshot.
+        if (_frames == 5 && SimSession.UserArg("--place") != null)
+        {
+            var cursor = GetViewport().GetVisibleRect().Size / 2;
+            if (SimSession.UserArg("--cursor")?.Split(',') is [var cx, var cy] &&
+                float.TryParse(cx, out float px) && float.TryParse(cy, out float py))
+                cursor = new Vector2(px, py);
+            GetViewport().WarpMouse(cursor);
+        }
         if (_frames == 20 && !_saveLoadTestDone && SimSession.UserArg("--save-load-test") != null)
         {
             _saveLoadTestDone = true;

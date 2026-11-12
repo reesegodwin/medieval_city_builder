@@ -109,6 +109,8 @@ These go after `--` on Godot's command line:
 | `--rules` | Open the rules panel at start |
 | `--territory` | Open the territory tool at start |
 | `--zoom N` | Start with the camera N units away (6–90) |
+| `--place ID` | Start placing building `ID` (e.g. `chapel`) with the cursor in the middle of the screen |
+| `--cursor X,Y` | With `--place`, put the cursor at this pixel instead |
 | `--save-load-test` | Save, reload the game from that save, and print both state hashes (they should match) |
 | `--export-sounds DIR` | Write every generated sound to `DIR` as `.wav` files |
 
