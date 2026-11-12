@@ -258,6 +258,22 @@ public class WholeSimulationTests
             $"Food overbuilt: supply {supply:0} for need {need:0}");
         Assert.True(Needs.FoodDays(world, town) > 3, $"Only {Needs.FoodDays(world, town):0.0} days of food");
     }
+
+    [Fact]
+    public void GovernedTownKeepsBuildingPastUnconnectableLand()
+    {
+        // On seed 42 a pocket of land boxed in by forest and a wide river sits closest to the centre. Site
+        // searches used to spend every route check on it (and on sites whose road would leave the territory),
+        // so the town stopped building homes around day 400.
+        var (world, town, sim) = Scenario.NewTown(42, autoBuild: true);
+        sim.RunDays(420);
+        int housing = town.HousingCapacity;
+        sim.RunDays(40);
+
+        Assert.True(town.HousingCapacity > housing, $"Housing stuck at {housing}");
+        Assert.True(town.Citizens.Count(c => c.HomeBuildingId == null) < 15, "Too many homeless");
+        Assert.DoesNotContain(world.Events, e => e.Kind == Sim.Core.Events.EventKind.BuildingDemolished);
+    }
 }
 
 public class CommandTests

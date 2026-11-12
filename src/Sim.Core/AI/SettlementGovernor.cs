@@ -121,10 +121,7 @@ public static class RoadPlanner
     /// </summary>
     public static List<(int X, int Y)>? PlanRoute(GameWorld world, Settlement settlement, Building building)
     {
-        var start = building.AccessTiles()
-            .Prepend(building.DoorTile)
-            .FirstOrDefault(t => Pathfinder.StepCost(world.Map.GetTile(t.X, t.Y), Pathfinder.Mode.BuildRoad) != null,
-                (X: int.MinValue, Y: int.MinValue));
+        var start = RouteStart(world, settlement, building);
         if (start.X == int.MinValue) return null;
 
         var stockpileEntrances = settlement.Buildings
@@ -141,13 +138,66 @@ public static class RoadPlanner
 
         if (IsGoal(start.X, start.Y) || world.Map.GetTile(start.X, start.Y).IsRoad) return new();
 
-        var path = Pathfinder.FindPathToAny(world.Map, start, IsGoal, Pathfinder.Mode.BuildRoad, MaxSearch, building.Covers);
+        // Roads may only be laid inside the territory (see Roads.Check), so plan within it.
+        bool Blocked(int x, int y) => building.Covers(x, y) || !CanLayRoad(world, settlement, x, y);
+        var path = Pathfinder.FindPathToAny(world.Map, start, IsGoal, Pathfinder.Mode.BuildRoad, MaxSearch, Blocked);
         if (path == null) return null;
 
         var tiles = path.Where(t => !world.Map.GetTile(t.X, t.Y).IsRoad).ToList();
         if (tiles.Count(t => world.Map.GetTile(t.X, t.Y).Terrain == Terrain.Water) > MaxBridgeTiles) return null;
         return tiles;
     }
+
+    /// <summary>
+    /// After <see cref="PlanRoute"/> failed for a building: the land tiles road-connected to its route start
+    /// (without crossing water, including its own footprint), if that land holds no road or stockpile entrance. Any site whose access lies only
+    /// on that land needs the same too-long bridge. Returns null if it isn't such a pocket or is too big to map.
+    /// </summary>
+    public static List<(int X, int Y)>? SealedLandPocket(GameWorld world, Settlement settlement, Building building)
+    {
+        static bool IsLand(in Tile t) =>
+            t.Terrain != Terrain.Water && Pathfinder.StepCost(t, Pathfinder.Mode.BuildRoad) != null;
+
+        var start = RouteStart(world, settlement, building);
+        if (start.X == int.MinValue || world.Map.GetTile(start.X, start.Y).Terrain == Terrain.Water) return null;
+
+        var stockpileEntrances = settlement.Buildings
+            .Where(b => b.Def.IsStockpile)
+            .SelectMany(b => b.AccessTiles())
+            .ToHashSet();
+
+        var pocket = new List<(int X, int Y)> { start };
+        var seen = new HashSet<(int, int)> { start };
+        for (int i = 0; i < pocket.Count; i++)
+        {
+            var (x, y) = pocket[i];
+            if (world.Map.GetTile(x, y).IsRoad || stockpileEntrances.Contains((x, y))) return null;
+            if (pocket.Count > MaxSearch) return null;
+            foreach (var (dx, dy) in Neighbours)
+            {
+                var n = (x + dx, y + dy);
+                if (!seen.Add(n)) continue;
+                // The candidate's own footprint is land too (it isn't built), so neighbouring candidates are covered.
+                // Roads count as land: reaching one means this isn't a sealed pocket.
+                if (IsLand(world.Map.GetTile(n.Item1, n.Item2)) && CanLayRoad(world, settlement, n.Item1, n.Item2)) pocket.Add(n);
+            }
+        }
+        return pocket;
+    }
+
+    /// <summary>The tile a building's connecting road starts from, or (int.MinValue, int.MinValue) if none.</summary>
+    private static (int X, int Y) RouteStart(GameWorld world, Settlement settlement, Building building) =>
+        building.AccessTiles()
+            .Prepend(building.DoorTile)
+            .FirstOrDefault(t => Pathfinder.StepCost(world.Map.GetTile(t.X, t.Y), Pathfinder.Mode.BuildRoad) != null &&
+                                 CanLayRoad(world, settlement, t.X, t.Y),
+                (X: int.MinValue, Y: int.MinValue));
+
+    /// <summary>An existing road, or a tile where this settlement may lay one.</summary>
+    private static bool CanLayRoad(GameWorld world, Settlement settlement, int x, int y) =>
+        world.Map.GetTile(x, y).IsRoad || Roads.Check(world, settlement, x, y) == null;
+
+    private static readonly (int Dx, int Dy)[] Neighbours = { (0, -1), (1, 0), (0, 1), (-1, 0) };
 }
 
 /// <summary>
@@ -183,6 +233,8 @@ public static class SettlementGovernor
         int attempts = 0;
         CostGrid? field = null;
         bool fieldReady = false;
+        // Land found to be cut off from the road network (beyond bridge range): skipped for the rest of today.
+        var deadLand = new HashSet<(int X, int Y)>();
         foreach (var (defId, near) in Wishes(world, settlement))
         {
             var def = world.Data.Building(defId);
@@ -197,14 +249,15 @@ public static class SettlementGovernor
                 field = Logistics.StockpileField(world, settlement, Pathfinder.Mode.BuildRoad);
                 fieldReady = true;
             }
-            if (TryBuild(world, settlement, def, near, field)) return;
+            if (TryBuild(world, settlement, def, near, field, deadLand)) return;
 
             settlement.FailedSiteSearches[key] = today;
             if (++attempts >= MaxAttemptsPerDay) return;
         }
     }
 
-    private static bool TryBuild(GameWorld world, Settlement settlement, BuildingDef def, (int X, int Y)? near, CostGrid? field)
+    private static bool TryBuild(GameWorld world, Settlement settlement, BuildingDef def, (int X, int Y)? near, CostGrid? field,
+        HashSet<(int X, int Y)> deadLand)
     {
         // A service building must actually reach the homes it was meant for, so only look nearby.
         int? maxRadius = def.Service is { } service && near != null ? service.Radius / 2 : null;
@@ -219,13 +272,31 @@ public static class SettlementGovernor
             return false;
         }
 
+        bool OnlyOnDeadLand(Building candidate)
+        {
+            if (deadLand.Count == 0) return false;
+            bool any = false;
+            foreach (var t in candidate.AccessTiles().Prepend(candidate.DoorTile))
+            {
+                if (Pathfinder.StepCost(world.Map.GetTile(t.X, t.Y), Pathfinder.Mode.BuildRoad) == null) continue;
+                if (!deadLand.Contains(t)) return false;
+                any = true;
+            }
+            return any;
+        }
+
         // Plan the connecting road (and any bridge) before committing, so nothing gets built and torn
         // down. Route planning is expensive, so only a limited number of candidate sites get one.
         int routeChecks = 0;
         bool Connectable(int left, int top)
         {
-            if (!Reachable(left, top) || routeChecks++ >= MaxRouteChecksPerSearch) return false;
-            var route = RoadPlanner.PlanRoute(world, settlement, new Building(0, def, left, top));
+            if (!Reachable(left, top)) return false;
+            var candidate = new Building(0, def, left, top);
+            if (OnlyOnDeadLand(candidate)) return false;
+            if (routeChecks++ >= MaxRouteChecksPerSearch) return false;
+            var route = RoadPlanner.PlanRoute(world, settlement, candidate);
+            if (route == null && RoadPlanner.SealedLandPocket(world, settlement, candidate) is { } pocket)
+                deadLand.UnionWith(pocket);
             return route != null &&
                    settlement.Stock.Get("wood") >= Roads.BridgeCost(world, route) + def.Cost.GetValueOrDefault("wood");
         }
