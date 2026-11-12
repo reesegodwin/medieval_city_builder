@@ -7,7 +7,11 @@ public sealed class Inventory
 
     public IEnumerable<KeyValuePair<string, int>> Items => _amounts;
 
-    public int Total => _amounts.Values.Sum();
+    /// <summary>Coin is kept in the treasury, not in stockpiles, so it never fills storage.</summary>
+    public const string Coin = "coin";
+
+    /// <summary>Goods that take stockpile space (everything but coin).</summary>
+    public int Total => _amounts.Where(kv => kv.Key != Coin).Sum(kv => kv.Value);
 
     public int Get(string resource) => _amounts.TryGetValue(resource, out int amount) ? amount : 0;
 

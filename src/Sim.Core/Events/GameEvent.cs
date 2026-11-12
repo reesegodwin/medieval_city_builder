@@ -15,6 +15,7 @@ public enum EventKind
     Departure,
     Starvation,
     Shortage,
+    Trade,
 }
 
 /// <summary>

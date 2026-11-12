@@ -32,6 +32,7 @@ public partial class Hud : CanvasLayer
     public event Action? TerritoryRequested;
     public event Action? ExpandTerritoryRequested;
     public event Action? RulesRequested;
+    public event Action? TradeRequested;
     public event Action? SaveRequested;
     public event Action? LoadRequested;
     public event Action? SoundToggled;
@@ -103,6 +104,7 @@ public partial class Hud : CanvasLayer
         foreach (var (text, tip, action) in new (string, string, Action)[]
                  {
                      ("Rules", "Job priorities, stock limits and reserves (P)", () => RulesRequested?.Invoke()),
+                     ("Trade", "Offers, trade routes and caravans (J). Needs a Trading Post.", () => TradeRequested?.Invoke()),
                      ("Save", "Quick-save (F5)", () => SaveRequested?.Invoke()),
                      ("Load", "Load the quick-save (F9)", () => LoadRequested?.Invoke()),
                      ("Sound", "Sound on/off (M)", () => SoundToggled?.Invoke()),
@@ -193,7 +195,7 @@ public partial class Hud : CanvasLayer
         // --- Controls help (top-right, under the bar) ---
         var help = new Label
         {
-            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   X: demolish   T: territory   P: rules\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
+            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   X: demolish   T: territory   P: rules   J: trade\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
             HorizontalAlignment = HorizontalAlignment.Right,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
@@ -263,7 +265,7 @@ public partial class Hud : CanvasLayer
             $"Pop {town.Citizens.Count} ({adults} adults, {haulers} hauling, {idle} idle{(homeless > 0 ? $", {homeless} homeless" : "")})   " +
             $"Food {Needs.FoodDays(world, town):0.0} days (grain {town.Stock.Get("grain")}, bread {town.Stock.Get("bread")}, " +
             $"veg {town.Stock.Get("vegetables")})   Ale {town.Stock.Get("ale")}   " +
-            $"Wood {town.Stock.Get("wood")}   Stone {town.Stock.Get("stone")}   Tools {town.Stock.Get("tools")}   " +
+            $"Coin {town.Stock.Get("coin")}   Wood {town.Stock.Get("wood")}   Stone {town.Stock.Get("stone")}   Tools {town.Stock.Get("tools")}   " +
             $"Cloth {town.Stock.Get("cloth")}   Furniture {town.Stock.Get("furniture")}\n" +
             $"Storage {town.Stock.Total}/{town.StorageCapacity}   Land {town.Territory.Count}/{town.TerritoryAllowance} " +
             $"(cap {town.TerritoryCap})   Needs met: " +

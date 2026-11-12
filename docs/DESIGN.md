@@ -136,6 +136,18 @@ Grows the way Minecraft does, from single-player up to a 24/7 server, with the s
 
 **Not yet:** accounts and authentication (names are trusted, so this suits friends' servers, not public ones), Steam relay, interaction between towns, and PostgreSQL persistence. For public servers, run on a separate rented machine, never a home network.
 
+## Trade (Phase 2)
+One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair values are `value` in `resources.json`.
+- **Coin** is a normal resource that caravans carry. It's kept in the treasury, so it doesn't fill stockpiles. Towns start with 50.
+- **Trading Post** (`trade: true` in `buildings.json`, one trader job): needed to post or accept offers and routes. Caravans leave from its door.
+- **Offers:** "give X, want Y". Selling is goods for coin, buying is coin for goods, barter is goods for goods. The *give* side is set aside when posted and returns to stock on cancel or after 10 game days. A town has at most 8 open offers.
+- **Fair price:** sellers get `value × amount`; buyers pay that × 1.25 (the merchant markup). The trade panel's **Fair price** button fills these in, and a price factor raises them for goods you'd rather keep.
+- **Accepting is instant in the UI, but goods travel:** both sides' goods leave at once as caravans and arrive after distance ÷ 40 tiles per game day (at least 1 day). Caravans are simulation state and can later be intercepted in war.
+- **Trade routes:** A proposes "every N days I send X, you send Y". Once B accepts, each round sends caravans both ways, or is skipped and logged if either side is short. Either side can end it.
+- **Merchants:** every 10 game days a merchant caravan visits each town with a staffed Trading Post, from about 120 tiles beyond its land. It buys the town's sale offers priced at or below the fair price (purse 300 coin) and fills its buy offers for goods it carries (tools, cloth, ore, stone, wood, grain, wool) at or above the fair price plus markup (cargo 200). This makes trade work in single-player and gives towns without iron a way to get tools.
+- **AI towns** (Auto on): build a Trading Post at 80 people. Daily they accept one other town's fair offer for something they're short of, accept routes that trade surpluses for shortages, list surpluses (90% of the stock limit or more) at the fair price, and post buy offers for shortages they can afford. They keep one offer per good, so they never buy what they're selling.
+- **Known gaps:** caravans travel in a straight line, even over water (road and bridge paths are planned). Coin piles up with nothing to spend it on, which needs coin sinks (wages, coin building costs, upkeep).
+
 ## Colony Simulation (Dwarf Fortress / Songs of Syx-inspired depth, Stronghold look)
 
 **Principle:** *the people are real, their footsteps are not.* Every citizen is a full data record simulated on the server. Their moment-to-moment walking is drawn by the client and doesn't drive the simulation.

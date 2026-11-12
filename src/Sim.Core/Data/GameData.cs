@@ -27,6 +27,40 @@ public sealed class ResourceDef
     public double WearPerWorkerDay { get; set; }
 
     public bool IsTool => WorkBonus > 0;
+
+    /// <summary>Fair value in coin of one unit, used for fair prices and by merchants.</summary>
+    public double Value { get; set; }
+}
+
+/// <summary>Trade tuning (trade.json).</summary>
+public sealed class TradeRules
+{
+    /// <summary>Open offers expire after this many game days; set-aside goods go back to stock.</summary>
+    public double OfferDays { get; set; } = 10;
+
+    /// <summary>How far a caravan travels per game day.</summary>
+    public double CaravanTilesPerDay { get; set; } = 40;
+
+    /// <summary>Buyers pay this times the fair value (what merchants charge); sellers get the fair value.</summary>
+    public double MerchantMarkup { get; set; } = 1.25;
+
+    public double MerchantVisitDays { get; set; } = 10;
+
+    /// <summary>Coin a visiting merchant can spend per visit.</summary>
+    public int MerchantPurse { get; set; } = 300;
+
+    /// <summary>Units of goods a visiting merchant can bring per visit.</summary>
+    public int MerchantCargo { get; set; } = 200;
+
+    /// <summary>How far away merchants come from.</summary>
+    public int MerchantDistance { get; set; } = 120;
+
+    /// <summary>Goods merchants sell to towns.</summary>
+    public List<string> MerchantGoods { get; set; } = new();
+
+    public int StartingCoin { get; set; } = 50;
+    public int MaxOpenOffers { get; set; } = 8;
+    public int MaxRoutes { get; set; } = 6;
 }
 
 public sealed class RecipeDef
@@ -140,6 +174,9 @@ public sealed class BuildingDef
 
     public GovernorHint? Governor { get; set; }
 
+    /// <summary>A Trading Post: needed to post or accept offers and routes; caravans leave from it.</summary>
+    public bool Trade { get; set; }
+
     public bool IsTownCentre => TownCentre != null;
     public bool IsStockpile => Storage > 0;
     public bool IsWorkplace => Jobs > 0 && JobKind != null;
@@ -163,8 +200,12 @@ public sealed class GameData
     /// <summary>Food resources ordered best meal first.</summary>
     public IReadOnlyList<ResourceDef> FoodsByPreference { get; }
 
-    public GameData(IEnumerable<ResourceDef> resources, IEnumerable<BuildingDef> buildings, IEnumerable<NeedDef>? needs = null)
+    public TradeRules Trade { get; }
+
+    public GameData(IEnumerable<ResourceDef> resources, IEnumerable<BuildingDef> buildings, IEnumerable<NeedDef>? needs = null,
+        TradeRules? trade = null)
     {
+        Trade = trade ?? new TradeRules();
         Resources = resources.ToDictionary(r => r.Id);
         BuildingList = buildings.ToList();
         Buildings = BuildingList.ToDictionary(b => b.Id);
@@ -189,7 +230,8 @@ public sealed class GameData
         var resources = LoadEmbedded<List<ResourceDef>>("resources.json");
         var buildings = LoadEmbedded<List<BuildingDef>>("buildings.json");
         var needs = LoadEmbedded<List<NeedDef>>("needs.json");
-        return new GameData(resources, buildings, needs);
+        var trade = LoadEmbedded<TradeRules>("trade.json");
+        return new GameData(resources, buildings, needs, trade);
     }
 
     private static T LoadEmbedded<T>(string fileName)
@@ -206,6 +248,9 @@ public sealed class GameData
 
     private void Validate()
     {
+        foreach (var r in Trade.MerchantGoods)
+            if (!Resources.ContainsKey(r)) throw new InvalidDataException($"Merchants sell unknown resource '{r}'");
+
         foreach (var n in Needs)
         {
             if (n.Via != null && !Needs.Any(other => other.Id == n.Via && !other.IsGoodsNeed))

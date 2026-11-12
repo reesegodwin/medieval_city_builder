@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 5;
+    public const int CurrentVersion = 6;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -61,6 +61,7 @@ public static class SaveGame
         TotalDeaths = world.TotalDeaths,
         Settings = world.Settings.Clone(),
         LastActiveUtc = world.LastActiveUtc,
+        Trade = world.Trade,
         Settlements = world.Settlements.Select(CaptureSettlement).ToList(),
         Events = world.Events.Select(e => new EventSave(e.Time.Tick, e.Kind, e.SettlementId, e.Message)).ToList(),
     };
@@ -160,6 +161,8 @@ public static class SaveGame
         // Version 4 and older had no world settings: they keep the defaults (1 day per hour, paused while away).
         world.Settings = file.Settings ?? new WorldSettings();
         world.LastActiveUtc = file.LastActiveUtc;
+        // Version 5 and older had no trade.
+        world.Trade = file.Trade ?? new Trade.TradeBook();
 
         foreach (var save in file.Settlements) world.Settlements.Add(RestoreSettlement(world, save));
         foreach (var e in file.Events)
@@ -275,6 +278,7 @@ public static class SaveGame
         public int TotalDeaths { get; set; }
         public WorldSettings? Settings { get; set; }
         public DateTimeOffset? LastActiveUtc { get; set; }
+        public Trade.TradeBook? Trade { get; set; }
         public List<SettlementSave> Settlements { get; set; } = new();
         public List<EventSave> Events { get; set; } = new();
     }

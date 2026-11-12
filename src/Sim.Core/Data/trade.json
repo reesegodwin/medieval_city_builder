@@ -1,0 +1,21 @@
+{
+  "offerDays": 10,
+  "caravanTilesPerDay": 40,
+  "merchantMarkup": 1.25,
+  "merchantVisitDays": 10,
+  "merchantPurse": 300,
+  "merchantCargo": 200,
+  "merchantDistance": 120,
+  "merchantGoods": [
+    "tools",
+    "cloth",
+    "iron_ore",
+    "stone",
+    "wood",
+    "grain",
+    "wool"
+  ],
+  "startingCoin": 50,
+  "maxOpenOffers": 8,
+  "maxRoutes": 6
+}

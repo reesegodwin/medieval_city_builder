@@ -183,6 +183,21 @@ public static class LowPolyMeshes
                 mb.Box(new Vector3(1.9f, 0.4f, h - 0.85f), new Vector3(2.4f, 0.75f, h - 0.78f), Wood.Darkened(0.1f));
                 break;
 
+            case "trading_post":
+                // A warehouse with an open-fronted counter, barrels and a striped awning.
+                House(mb, new Vector3(0.2f, 0, 0.2f), new Vector3(w - 0.2f, 0.85f, h - 1.1f), Wattle, Tiles, 0.6f);
+                mb.Box(new Vector3(0.4f, 0, h - 1.0f), new Vector3(w - 0.4f, 0.4f, h - 0.7f), Wood); // counter
+                for (int i = 0; i < 6; i++)
+                {
+                    float x0 = 0.3f + (w - 0.6f) * i / 6, x1 = 0.3f + (w - 0.6f) * (i + 1) / 6;
+                    mb.Quad(new Vector3(x0, 0.95f, h - 1.15f), new Vector3(x1, 0.95f, h - 1.15f),
+                        new Vector3(x1, 0.75f, h - 0.55f), new Vector3(x0, 0.75f, h - 0.55f),
+                        i % 2 == 0 ? new Color(0.85f, 0.65f, 0.2f) : ClothLight, new Vector3(0, 1, 0.3f).Normalized());
+                }
+                foreach (float x in new[] { 0.35f, 0.75f, w - 0.65f })
+                    mb.Box(new Vector3(x, 0, h - 0.45f), new Vector3(x + 0.3f, 0.35f, h - 0.15f), Wood.Darkened(0.15f)); // barrels
+                break;
+
             case "keep":
                 // A square stone tower with battlements and a banner.
                 mb.Box(new Vector3(0.6f, 0, 0.6f), new Vector3(w - 0.6f, 1.6f, h - 0.6f), Stone);
@@ -338,6 +353,28 @@ public static class LowPolyMeshes
         var mesh = mb.Commit();
         PlotCache[(width, height)] = mesh;
         return mesh;
+    }
+
+    /// <summary>An ox pulling a covered cart with crates, facing +Z, origin under the cart's middle.</summary>
+    public static readonly ArrayMesh Caravan = BuildCaravan();
+
+    private static ArrayMesh BuildCaravan()
+    {
+        var mb = new MeshBuilder { Center = new Vector3(0, 0.4f, 0) };
+        mb.Box(new Vector3(-0.35f, 0.18f, -0.6f), new Vector3(0.35f, 0.32f, 0.3f), Wood); // cart bed
+        foreach (float x in new[] { -0.4f, 0.35f })
+        foreach (float z in new[] { -0.45f, 0.15f })
+            mb.Box(new Vector3(x, 0, z), new Vector3(x + 0.05f, 0.24f, z + 0.24f), Timber.Darkened(0.3f)); // wheels
+        mb.Box(new Vector3(-0.3f, 0.32f, -0.55f), new Vector3(0.0f, 0.55f, -0.25f), Wood.Lightened(0.15f)); // crate
+        mb.Box(new Vector3(0.02f, 0.32f, -0.5f), new Vector3(0.3f, 0.5f, -0.2f), Wheat.Darkened(0.15f)); // sack
+        mb.GableRoof(new Vector3(-0.36f, 0.5f, -0.6f), new Vector3(0.36f, 0.5f, 0.1f), 0.28f, ClothLight); // canvas cover
+        mb.Box(new Vector3(-0.03f, 0.22f, 0.3f), new Vector3(0.03f, 0.27f, 0.7f), Timber); // shaft
+        mb.Box(new Vector3(-0.16f, 0.2f, 0.7f), new Vector3(0.16f, 0.48f, 1.25f), new Color(0.42f, 0.3f, 0.2f)); // ox
+        mb.Box(new Vector3(-0.1f, 0.3f, 1.25f), new Vector3(0.1f, 0.48f, 1.45f), new Color(0.38f, 0.27f, 0.18f)); // head
+        foreach (float x in new[] { -0.14f, 0.08f })
+        foreach (float z in new[] { 0.72f, 1.13f })
+            mb.Box(new Vector3(x, 0, z), new Vector3(x + 0.06f, 0.2f, z + 0.08f), new Color(0.3f, 0.22f, 0.15f)); // legs
+        return mb.Commit();
     }
 
     public static readonly ArrayMesh Tree = BuildTree();

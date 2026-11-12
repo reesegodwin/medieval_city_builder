@@ -122,6 +122,16 @@ public partial class InspectorPanel : PanelContainer
         else if (b.IsOperational && b.WorkerIds.Count > 0 && town.IsOnStandby(b))
             sb.AppendLine("[b]Standby:[/b] stock limit reached; workers wait here and help elsewhere when needed.");
         if (b.Def.TownCentre != null) DescribeTownCentre(world, town, b, sb);
+        if (b.Def.Trade)
+        {
+            int offers = world.Trade.Offers.Count(o => o.SettlementId == town.Id);
+            int caravans = world.Trade.Caravans.Count(c => c.FromId == town.Id || c.ToId == town.Id);
+            sb.AppendLine();
+            sb.AppendLine($"[b]Trade:[/b] {offers} open offers, {caravans} caravans on the road, {town.Stock.Get("coin")} coin.");
+            sb.AppendLine(b.WorkerIds.Count > 0
+                ? "Merchants visit while a trader works here. Open the trade panel with J."
+                : "[color=#ffb060]Needs a trader before merchants will visit.[/color]");
+        }
 
         SetBody(sb);
     }

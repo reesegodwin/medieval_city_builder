@@ -1,13 +1,14 @@
 [
-  {"id": "grain", "name": "Grain", "nutrition": 0.6, "mealMood": -6},
-  {"id": "bread", "name": "Bread", "nutrition": 1.0, "mealMood": 6},
-  {"id": "vegetables", "name": "Vegetables", "nutrition": 0.7, "mealMood": 2},
-  {"id": "ale", "name": "Ale"},
-  {"id": "wood", "name": "Wood"},
-  {"id": "stone", "name": "Stone"},
-  {"id": "iron_ore", "name": "Iron ore"},
-  {"id": "tools", "name": "Tools", "workBonus": 0.25, "wearPerWorkerDay": 0.01},
-  {"id": "wool", "name": "Wool"},
-  {"id": "cloth", "name": "Cloth"},
-  {"id": "furniture", "name": "Furniture"}
+  {"id": "grain", "name": "Grain", "nutrition": 0.6, "mealMood": -6, "value": 1},
+  {"id": "bread", "name": "Bread", "nutrition": 1.0, "mealMood": 6, "value": 2},
+  {"id": "vegetables", "name": "Vegetables", "nutrition": 0.7, "mealMood": 2, "value": 2},
+  {"id": "ale", "name": "Ale", "value": 3},
+  {"id": "wood", "name": "Wood", "value": 1},
+  {"id": "stone", "name": "Stone", "value": 2},
+  {"id": "iron_ore", "name": "Iron ore", "value": 3},
+  {"id": "tools", "name": "Tools", "workBonus": 0.25, "wearPerWorkerDay": 0.01, "value": 12},
+  {"id": "wool", "name": "Wool", "value": 2},
+  {"id": "cloth", "name": "Cloth", "value": 6},
+  {"id": "furniture", "name": "Furniture", "value": 10},
+  {"id": "coin", "name": "Coin", "value": 1}
 ]

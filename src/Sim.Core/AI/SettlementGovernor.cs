@@ -214,6 +214,9 @@ public static class SettlementGovernor
 
     public const int MaxAttemptsPerDay = 3;
 
+    /// <summary>Governed towns build a Trading Post once they have this many people.</summary>
+    public const int TradingPostPopulation = 80;
+
     /// <summary>The governor upgrades the town centre once population would claim this share of its territory cap.</summary>
     public const double UpgradeAtCapFraction = 0.85;
 
@@ -229,6 +232,7 @@ public static class SettlementGovernor
     public static void Daily(GameWorld world, Settlement settlement)
     {
         if (!settlement.Rules.AutoBuild) return;
+        TradeGovernor.Daily(world, settlement);
         int maxSites = MaxActiveConstructionSites + settlement.Citizens.Count / 100;
         if (settlement.Buildings.Count(b => b.IsConstructionSite) >= maxSites) return;
 
@@ -440,6 +444,7 @@ public static class SettlementGovernor
         if (quarries == 0 || (s.Stock.Get("stone") < 20 && quarries < 1 + population / 30))
             Wish("quarry");
         if (s.FreeStorage < 80) Wish("stockpile");
+        if (population >= TradingPostPopulation && !s.Buildings.Any(b => b.Def.Trade)) Wish("trading_post");
 
         // Production chains (mine -> smithy, pasture -> weaver, carpenter...), from each building's governor hint.
         foreach (var def in world.Data.BuildingList)

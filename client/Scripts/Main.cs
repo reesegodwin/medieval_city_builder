@@ -19,6 +19,8 @@ namespace MedievalClient;
 ///   --screenshot file.png save a screenshot after a few frames and quit (automated checks)
 ///   --inspect             select a citizen on start (shows the inspector panel)
 ///   --rules               open the rules panel on start
+///   --trade [TAB]         open the trade panel on start (tab 0-4)
+///   --follow-caravan      keep the camera on a caravan on the road (automated checks)
 ///   --territory           open the territory paint tool on start
 ///   --zoom N              start with the camera N units away (6-90)
 ///   --place ID            start placing building ID with the cursor mid-screen (automated checks)
@@ -42,6 +44,7 @@ public partial class Main : Node3D
     private Hud _hud = null!;
     private InspectorPanel _inspector = null!;
     private RulesPanel _rules = null!;
+    private TradePanel _trade = null!;
     private SoundManager _sound = null!;
     private MeshInstance3D _marker = null!;
 
@@ -55,6 +58,7 @@ public partial class Main : Node3D
     private int _frames;
     private static bool _saveLoadTestDone;
     private static bool _justLoaded;
+    private bool _followCaravan;
     private readonly HashSet<int> _renderedSettlements = new();
     private Node3D _world3D = null!;
 
@@ -157,6 +161,10 @@ public partial class Main : Node3D
         AddChild(_world3D);
         AddNewSettlements();
 
+        var caravans = new CaravanRenderer { Name = "Caravans" };
+        AddChild(caravans);
+        caravans.Initialize(_session.World);
+
         _placement = new PlacementTool { Name = "Placement" };
         AddChild(_placement);
         _placement.Initialize(_session, _camera);
@@ -231,6 +239,11 @@ public partial class Main : Node3D
         _rules.Initialize(_session);
         _hud.AddChild(_rules);
         _hud.RulesRequested += _rules.Toggle;
+
+        _trade = new TradePanel { Name = "Trade" };
+        _trade.Initialize(_session);
+        _hud.AddChild(_trade);
+        _hud.TradeRequested += ToggleTrade;
         _hud.SaveRequested += SaveGame;
         _hud.LoadRequested += LoadGame;
         _hud.SoundToggled += _sound.ToggleMute;
@@ -249,8 +262,14 @@ public partial class Main : Node3D
             _session.RunDays(warmup);
         _screenshotPath = SimSession.UserArg("--screenshot");
         if (SimSession.UserArg("--rules") != null) _rules.Toggle();
+        if (SimSession.UserArg("--trade") is { } tradeTab)
+        {
+            _trade.Toggle();
+            if (int.TryParse(tradeTab, out int tab)) _trade.ShowTab(tab);
+        }
         if (SimSession.UserArg("--territory") != null) StartTerritoryTool();
         if (float.TryParse(SimSession.UserArg("--zoom"), out float zoom)) _camera.SetDistance(zoom);
+        _followCaravan = SimSession.UserArg("--follow-caravan") != null;
         if (SimSession.UserArg("--place") is { Length: > 0 } placeId && _session.World.Data.Buildings.TryGetValue(placeId, out var placeDef))
             _placement.Begin(placeDef);
         if (SimSession.UserArg("--inspect") != null)
@@ -345,6 +364,11 @@ public partial class Main : Node3D
         }
         _session.Advance(delta);
         if (_session.World.Settlements.Count != _renderedSettlements.Count) AddNewSettlements();
+        if (_followCaravan && _session.World.Trade.Caravans.FirstOrDefault() is { } caravan)
+        {
+            float t = (float)caravan.Progress(_session.World.Time.Tick);
+            _camera.Position = new Vector3(Mathf.Lerp(caravan.StartX, caravan.EndX, t) + 0.5f, 0, Mathf.Lerp(caravan.StartY, caravan.EndY, t) + 0.5f);
+        }
         _citizens.Animate = !_session.Paused;
 
         _uiTimer += delta;
@@ -357,7 +381,8 @@ public partial class Main : Node3D
             _sound.OnEvents(events);
             RefreshInspector();
             if (_rules.Visible) _rules.Refresh();
-            _hud.FeedVisible = !_rules.Visible;
+            _trade.Refresh();
+            _hud.FeedVisible = !_rules.Visible && !_trade.Visible;
         }
 
         if (_flashTimer > 0)
@@ -460,7 +485,12 @@ public partial class Main : Node3D
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.P }:
+                if (_trade.Visible) _trade.Toggle();
                 _rules.Toggle();
+                break;
+
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.J }:
+                ToggleTrade();
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.M }:
@@ -488,6 +518,12 @@ public partial class Main : Node3D
                 _session.Paused = false;
                 break;
         }
+    }
+
+    private void ToggleTrade()
+    {
+        if (_rules.Visible) _rules.Toggle(); // they share the left side of the screen
+        _trade.Toggle();
     }
 
     private bool AnyToolActive => _placement.Active != null || _roadTool.Active || _demolishTool.Active || _territoryTool.Active;

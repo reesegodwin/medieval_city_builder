@@ -400,5 +400,19 @@
       "populationPerBuilding": 250,
       "lowStock": 10
     }
+  },
+  {
+    "id": "trading_post",
+    "name": "Trading Post",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.5,
+    "cost": {
+      "wood": 30,
+      "stone": 10
+    },
+    "jobs": 1,
+    "jobKind": "merchant",
+    "trade": true
   }
 ]
