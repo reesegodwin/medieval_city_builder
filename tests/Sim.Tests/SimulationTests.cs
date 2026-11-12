@@ -152,16 +152,19 @@ public class ProductionTests
     }
 
     [Fact]
-    public void ProductionStopsAtStockLimitAndFreesWorkers()
+    public void ProductionStopsAtStockLimitAndWorkersWaitOnStandby()
     {
         var (world, town, sim) = Scenario.NewTown();
         town.Stock.Add("wood", town.LimitOf("wood"));
+        int wood = town.Stock.Get("wood");
 
         sim.RunDays(1);
 
         var woodcutter = town.Buildings.First(b => b.Def.Id == "woodcutter");
         Assert.True(town.IsAtProductionLimit(woodcutter));
-        Assert.Empty(woodcutter.WorkerIds);
+        Assert.True(town.IsOnStandby(woodcutter));
+        Assert.Equal("Stock limit reached", woodcutter.Problem);
+        Assert.True(town.Stock.Get("wood") <= wood, "No wood should be cut above the limit");
     }
 
     [Fact]

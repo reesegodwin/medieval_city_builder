@@ -106,4 +106,7 @@ public sealed class Building
 public static class JobKinds
 {
     public const string Builder = "builder";
+
+    /// <summary>Carries goods between stockpiles and workplaces, so the workers there don't have to.</summary>
+    public const string Hauler = "hauler";
 }

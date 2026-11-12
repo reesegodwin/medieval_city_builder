@@ -19,6 +19,7 @@ public sealed class SettlementRules
         ["trader"] = 3,
         ["quarrier"] = 2,
         ["brewer"] = 2,
+        [JobKinds.Hauler] = 1, // only people nobody else needs; the first to be pulled into other work
     };
 
     /// <summary>Production may not consume a resource below this stock (e.g. keep grain for eating).</summary>
@@ -186,8 +187,24 @@ public sealed class Settlement
 
     public int LimitOf(string resource) => Rules.LimitOf(resource, Citizens.Count);
 
-    /// <summary>Job slots the settlement actually wants filled right now.</summary>
-    public int WantedWorkers(Building b) => IsAtProductionLimit(b) ? 0 : b.JobSlots;
+    /// <summary>Haulers each stockpile should have, sized to the carrying there is to do (rebuilt hourly).</summary>
+    public Dictionary<int, int> HaulerQuota { get; } = new();
+
+    /// <summary>
+    /// Share (0..1) of the carrying that workplaces would otherwise do themselves that haulers currently cover.
+    /// Set hourly by the job system.
+    /// </summary>
+    public double HaulCoverage { get; set; }
+
+    /// <summary>
+    /// Job slots the settlement wants filled. Workplaces that reached their stock limit keep their workers on
+    /// standby (they keep the job, and any other job may take them at once); haulers follow the hauling quota.
+    /// </summary>
+    public int WantedWorkers(Building b) =>
+        b.CurrentJobKind == JobKinds.Hauler ? Math.Min(b.JobSlots, HaulerQuota.GetValueOrDefault(b.Id)) : b.JobSlots;
+
+    /// <summary>Workers here have nothing to do right now and can be moved to other work freely.</summary>
+    public bool IsOnStandby(Building b) => IsAtProductionLimit(b) && !b.InputsLoaded;
 
     public override string ToString() => Name;
 }

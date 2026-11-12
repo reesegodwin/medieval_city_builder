@@ -54,6 +54,62 @@ public static class Logistics
         }
     }
 
+    /// <summary>
+    /// Worker-days per day that workplaces and building sites lose to carrying goods themselves:
+    /// each worker loses (1 - haul factor) of their time. Haulers take this over.
+    /// </summary>
+    public static double HaulingDemand(Settlement settlement)
+    {
+        double demand = 0;
+        foreach (var b in settlement.Buildings)
+        {
+            if (b.Def.IsStockpile || b.NoRoute || b.WorkerIds.Count == 0 || settlement.IsOnStandby(b)) continue;
+            demand += b.WorkerIds.Count * (1 - b.HaulFactor);
+        }
+        return demand;
+    }
+
+    /// <summary>
+    /// A building's hauling efficiency once haulers are counted: they win back the share of its lost time
+    /// that they cover. Buildings without a route get no help, since haulers can't reach them either.
+    /// </summary>
+    public static double EffectiveHaulFactor(Settlement settlement, Building b) =>
+        b.NoRoute ? b.HaulFactor : b.HaulFactor + (1 - b.HaulFactor) * settlement.HaulCoverage;
+
+    /// <summary>Spreads the hauler quota (one per worker-day of carrying, rounded up) over the stockpiles in order.</summary>
+    public static void UpdateHaulerQuota(Settlement settlement)
+    {
+        settlement.HaulerQuota.Clear();
+        int remaining = (int)Math.Ceiling(HaulingDemand(settlement) - 1e-9);
+        foreach (var b in settlement.Buildings)
+        {
+            if (b.CurrentJobKind != JobKinds.Hauler) continue;
+            int take = Math.Min(remaining, b.JobSlots);
+            settlement.HaulerQuota[b.Id] = take;
+            remaining -= take;
+        }
+    }
+
+    /// <summary>How much of the carrying the current haulers cover (0..1); they also gain hauling skill.</summary>
+    public static void UpdateHaulCoverage(Settlement settlement)
+    {
+        double demand = HaulingDemand(settlement);
+        double labour = 0;
+        foreach (var b in settlement.Buildings)
+        {
+            if (b.CurrentJobKind != JobKinds.Hauler) continue;
+            foreach (int id in b.WorkerIds)
+            {
+                if (settlement.FindCitizen(id) is not { } hauler) continue;
+                labour += Work.DailyRate(hauler, JobKinds.Hauler);
+                double skill = hauler.Skill(JobKinds.Hauler);
+                hauler.Skills[JobKinds.Hauler] = Math.Min(Citizen.MaxSkill,
+                    skill + Work.SkillGainPerDay / 24 * (1 - skill / Citizen.MaxSkill));
+            }
+        }
+        settlement.HaulCoverage = demand <= 0 ? 1 : Math.Min(1, labour / demand);
+    }
+
     /// <summary>The operational stockpile closest to a building, or null if there is none.</summary>
     public static Building? NearestStockpile(Settlement settlement, Building from) =>
         settlement.Buildings
@@ -127,7 +183,7 @@ public static class ConstructionSystem
 
             if (b.State != BuildingState.UnderConstruction) continue;
 
-            b.ConstructionProgress += Work.LabourThisTick(settlement, b, JobKinds.Builder) * b.HaulFactor;
+            b.ConstructionProgress += Work.LabourThisTick(settlement, b, JobKinds.Builder) * Logistics.EffectiveHaulFactor(settlement, b);
             b.Problem = b.WorkerIds.Count == 0 ? "No builders" : b.NoRoute ? Logistics.NoRouteProblem : null;
 
             if (b.ConstructionProgress >= b.Def.BuildDays)
@@ -187,7 +243,7 @@ public static class ProductionSystem
 
             if (b.CycleProgress < recipe.WorkDays)
             {
-                b.CycleProgress += Work.LabourThisTick(settlement, b, b.Def.JobKind) * b.HaulFactor;
+                b.CycleProgress += Work.LabourThisTick(settlement, b, b.Def.JobKind) * Logistics.EffectiveHaulFactor(settlement, b);
             }
 
             if (b.CycleProgress < recipe.WorkDays)
@@ -239,6 +295,7 @@ public static class JobSystem
                 c.JobBuildingId = null;
             }
         }
+        Logistics.UpdateHaulerQuota(settlement);
         foreach (var b in settlement.Buildings)
         {
             while (b.WorkerIds.Count > settlement.WantedWorkers(b))
@@ -268,11 +325,18 @@ public static class JobSystem
             .ToList();
 
         var unemployed = settlement.Citizens.Where(c => c.IsAdult && c.JobBuildingId == null).ToList();
+        // Spare hands any other job may take without counting as a reassignment: first workers on standby at
+        // workplaces that reached their stock limit (who may also haul meanwhile), then haulers.
+        var spare = settlement.Citizens
+            .Where(c => c.JobBuildingId is int j && settlement.FindBuilding(j) is { } w && settlement.IsOnStandby(w))
+            .Concat(settlement.Citizens
+                .Where(c => c.JobBuildingId is int j && settlement.FindBuilding(j)?.CurrentJobKind == JobKinds.Hauler))
+            .ToList();
         int reassignments = 0;
         bool canSteal = true;
         foreach (var b in openSlots)
         {
-            if (unemployed.Count == 0 && !canSteal) break;
+            if (unemployed.Count == 0 && spare.Count == 0 && !canSteal) break;
             string kind = b.CurrentJobKind!;
             int priority = Priority(b);
 
@@ -282,6 +346,27 @@ public static class JobSystem
                 if (candidate == null || c.Skill(kind) > candidate.Skill(kind)) candidate = c;
             }
             if (candidate != null) unemployed.Remove(candidate);
+
+            // A workplace on standby only takes people with no job at all; it has nothing for them to do yet.
+            if (candidate == null && settlement.IsOnStandby(b)) continue;
+
+            if (candidate == null)
+            {
+                foreach (var c in spare)
+                {
+                    if (c.JobBuildingId == b.Id) continue;
+                    // Workers waiting on standby may haul meanwhile; haulers don't move between stockpiles.
+                    if (kind == JobKinds.Hauler && settlement.FindBuilding(c.JobBuildingId!.Value)!.CurrentJobKind == JobKinds.Hauler)
+                        continue;
+                    if (candidate == null || c.Skill(kind) > candidate.Skill(kind)) candidate = c;
+                }
+                if (candidate != null)
+                {
+                    spare.Remove(candidate);
+                    settlement.FindBuilding(candidate.JobBuildingId!.Value)!.WorkerIds.Remove(candidate.Id);
+                    candidate.JobBuildingId = null;
+                }
+            }
 
             if (candidate == null && canSteal && reassignments < MaxReassignmentsPerHour)
             {
@@ -309,6 +394,8 @@ public static class JobSystem
             candidate.JobBuildingId = b.Id;
             b.WorkerIds.Add(candidate.Id);
         }
+
+        Logistics.UpdateHaulCoverage(settlement);
     }
 }
 

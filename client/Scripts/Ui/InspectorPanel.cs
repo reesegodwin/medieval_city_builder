@@ -87,7 +87,8 @@ public partial class InspectorPanel : PanelContainer
         }
         sb.AppendLine(b.NoRoute
             ? "[color=#ff8060][b]Hauling:[/b] no walkable route to a stockpile![/color]"
-            : $"[b]Hauling efficiency:[/b] {b.HaulFactor:P0} (walking distance to a stockpile; roads help)");
+            : $"[b]Hauling efficiency:[/b] {Logistics.EffectiveHaulFactor(town, b):P0} " +
+              $"({b.HaulFactor:P0} from walking distance to a stockpile, the rest won back by haulers; roads help)");
 
         if (b.Def.Service is { } service)
         {
@@ -115,6 +116,11 @@ public partial class InspectorPanel : PanelContainer
                     sb.AppendLine($"  {c.FullName} ({(int)c.AgeYears})");
         }
         if (b.Def.Storage > 0) sb.AppendLine($"[b]Town storage:[/b] {town.Stock.Total}/{town.StorageCapacity}");
+        if (b.CurrentJobKind == JobKinds.Hauler)
+            sb.AppendLine($"[b]Hauling:[/b] haulers here carry goods for other workplaces. Across town they cover " +
+                          $"{town.HaulCoverage:P0} of the carrying workers would otherwise do themselves.");
+        else if (b.IsOperational && b.WorkerIds.Count > 0 && town.IsOnStandby(b))
+            sb.AppendLine("[b]Standby:[/b] stock limit reached; workers wait here and help elsewhere when needed.");
         if (b.Def.TownCentre != null) DescribeTownCentre(world, town, b, sb);
 
         SetBody(sb);

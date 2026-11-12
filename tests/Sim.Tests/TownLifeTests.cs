@@ -324,6 +324,7 @@ public class RuleCommandTests
         world.Execute(new SetProductionLimitCommand(town.Id, "wood", 0));
         sim.RunDays(1);
         var woodcutter = town.Buildings.First(b => b.Def.Id == "woodcutter");
-        Assert.Empty(woodcutter.WorkerIds);
+        Assert.True(town.IsOnStandby(woodcutter));
+        Assert.Equal("Stock limit reached", woodcutter.Problem);
     }
 }

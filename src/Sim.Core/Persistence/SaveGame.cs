@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -126,6 +126,7 @@ public static class SaveGame
         Territory = TerritoryRuns(s),
         TerritoryVersion = s.TerritoryVersion,
         TerritoryCap = s.TerritoryCap,
+        HaulCoverage = s.HaulCoverage,
         FailedSiteSearches = new(s.FailedSiteSearches),
     };
 
@@ -225,6 +226,9 @@ public static class SaveGame
         s.RoadVersion = save.RoadVersion;
         foreach (var (key, day) in save.FailedSiteSearches) s.FailedSiteSearches[key] = day;
 
+        // Version 2 and older had no haulers: coverage starts at 0 and is set at the next hour.
+        s.HaulCoverage = save.HaulCoverage;
+
         if (save.Territory is { } runs)
         {
             foreach (var run in runs)
@@ -281,6 +285,7 @@ public static class SaveGame
         public List<int[]>? Territory { get; set; }
         public int TerritoryVersion { get; set; }
         public int TerritoryCap { get; set; }
+        public double HaulCoverage { get; set; }
         public Dictionary<string, long> FailedSiteSearches { get; set; } = new();
     }
 

@@ -1,6 +1,7 @@
 using Godot;
 using Sim.Core.Data;
 using Sim.Core.Events;
+using Sim.Core.Settlements;
 using Sim.Core.Systems;
 
 namespace MedievalClient.Ui;
@@ -237,8 +238,9 @@ public partial class Hud : CanvasLayer
         int adults = town.Citizens.Count(c => c.IsAdult);
         int idle = town.Citizens.Count(c => c.IsAdult && c.JobBuildingId == null);
         int homeless = town.Citizens.Count(c => c.HomeBuildingId == null);
+        int haulers = town.Buildings.Where(b => b.CurrentJobKind == JobKinds.Hauler).Sum(b => b.WorkerIds.Count);
         _stock.Text =
-            $"Pop {town.Citizens.Count} ({adults} adults, {idle} idle{(homeless > 0 ? $", {homeless} homeless" : "")})   " +
+            $"Pop {town.Citizens.Count} ({adults} adults, {haulers} hauling, {idle} idle{(homeless > 0 ? $", {homeless} homeless" : "")})   " +
             $"Food {Needs.FoodDays(world, town):0.0} days (grain {town.Stock.Get("grain")}, bread {town.Stock.Get("bread")}, " +
             $"veg {town.Stock.Get("vegetables")})   Ale {town.Stock.Get("ale")}   " +
             $"Wood {town.Stock.Get("wood")}   Stone {town.Stock.Get("stone")}\n" +

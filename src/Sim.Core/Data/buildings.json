@@ -55,7 +55,9 @@
     "cost": {
       "wood": 5
     },
-    "storage": 500
+    "storage": 500,
+    "jobs": 10,
+    "jobKind": "hauler"
   },
   {
     "id": "hovel",
