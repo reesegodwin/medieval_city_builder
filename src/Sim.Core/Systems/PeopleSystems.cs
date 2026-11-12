@@ -173,7 +173,8 @@ public static class ServiceSystem
                 foreach (var b in open)
                 {
                     int d = b.DistanceTo(home);
-                    if (d > b.Def.Service!.Radius || b.ServedCount >= b.Def.Service.Capacity || d >= bestDistance) continue;
+                    int capacity = (int)(b.Def.Service!.Capacity * EconomySystem.OutputFactor(world, settlement, b));
+                    if (d > b.Def.Service.Radius || b.ServedCount >= capacity || d >= bestDistance) continue;
                     best = b;
                     bestDistance = d;
                 }

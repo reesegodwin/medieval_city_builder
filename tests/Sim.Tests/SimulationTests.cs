@@ -34,6 +34,32 @@ internal static class Scenario
         ConstructionSystem.Complete(world, town, b);
     }
 
+    /// <summary>
+    /// Lays a finished road between two towns' Trading Posts: each town plans the part on its own (or unclaimed)
+    /// land, then the plans are completed at once.
+    /// </summary>
+    public static void ConnectByRoad(GameWorld world, Settlement a, Settlement b)
+    {
+        var from = Sim.Core.Trade.Trading.TradingPost(a)!.DoorTile;
+        var to = Sim.Core.Trade.Trading.TradingPost(b)!.DoorTile;
+        var path = Pathfinder.FindPathTowards(world.Map, from, (x, y) => (x, y) == to, to, Pathfinder.Mode.BuildRoad, 2_000_000)
+                   ?? throw new InvalidOperationException("No way to lay a road");
+        foreach (var town in new[] { a, b })
+        {
+            // B lays the tiles inside its own territory; A lays everything else.
+            var mine = path
+                .Where(t => (world.Map.GetTile(t.X, t.Y).TerritoryId == b.Id) == (town == b))
+                .Where(t => world.Map.GetTile(t.X, t.Y) is { IsRoad: false, RoadPlanned: false }).ToList();
+            town.Stock.Add("wood", Roads.BridgeCost(world, mine));
+            if (mine.Count > 0)
+            {
+                var result = world.Execute(new PlaceRoadCommand(town.Id, mine));
+                if (!result.Ok) throw new InvalidOperationException(result.Error);
+            }
+            Roads.FinishAllPlans(world, town);
+        }
+    }
+
     public static (int X, int Y) FindTile(GameWorld world, Settlement town, Terrain terrain)
     {
         for (int r = 0; r < TerritoryRules.BaseRadius; r++)

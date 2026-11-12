@@ -133,6 +133,8 @@ internal static class Report
         Console.WriteLine($"Births {world.TotalBirths}, deaths {world.TotalDeaths}. Storage {s.Stock.Total}/{s.StorageCapacity}, " +
                           $"housing {s.HousingCapacity - s.FreeHousing}/{s.HousingCapacity}, road tiles {s.Roads.Count}.");
         var trade = world.Trade;
+        Console.WriteLine($"Treasury: taxes {EconomySystem.DailyTax(world, s):0.#}/day, upkeep {EconomySystem.DailyUpkeep(s):0.#}/day" +
+                          (s.UpkeepUnpaid ? " (UNPAID)" : "") + ".");
         Console.WriteLine($"Trade: {trade.CompletedTrades} trades, {trade.MerchantVisits} merchant visits, coin {s.Stock.Get("coin")}, " +
                           $"{trade.Offers.Count(o => o.SettlementId == s.Id)} open offers, {trade.Caravans.Count} caravans on the road.");
         Console.WriteLine($"Territory {s.Territory.Count}/{s.TerritoryAllowance} tiles (cap {s.TerritoryCap}, {s.TownCentre?.Def.Name ?? "no town centre"}).");

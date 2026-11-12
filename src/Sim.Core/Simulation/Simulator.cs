@@ -30,6 +30,7 @@ public sealed class Simulator
         {
             ConstructionSystem.Tick(World, s);
             ProductionSystem.Tick(World, s);
+            RoadSystem.Tick(World, s);
             Needs.Tick(World, s);
         }
 
@@ -53,6 +54,7 @@ public sealed class Simulator
                 LifeSystem.Daily(World, s);
                 ServiceSystem.Daily(World, s);
                 MigrationSystem.Daily(World, s);
+                EconomySystem.Daily(World, s);
                 Commands.TerritorySystem.Daily(World, s);
                 SettlementGovernor.Daily(World, s);
             }
@@ -122,6 +124,7 @@ public static class SettlementFounder
         }
 
         Commands.TerritoryRules.ExpandEvenly(world, settlement);
+        Commands.Roads.FinishAllPlans(world, settlement); // a new town starts with its roads built
         HousingSystem.Tick(world, settlement);
         JobSystem.Tick(world, settlement);
         ServiceSystem.Daily(world, settlement);

@@ -87,11 +87,13 @@ public sealed record AcceptOfferCommand(int SettlementId, int OfferId) : ISettle
         if (offer.SettlementId == buyer.Id) return CommandResult.Fail("That's your own offer");
         var seller = world.FindSettlement(offer.SettlementId);
         if (seller == null) return CommandResult.Fail("That town is gone");
+        var path = Trading.RoadPath(world, seller, buyer);
+        if (path == null) return CommandResult.Fail(Trading.NoRoadMessage(seller, buyer));
         if (!buyer.Stock.TryTakeAll(offer.Want)) return CommandResult.Fail($"You need {Trading.Describe(offer.Want)}");
 
         world.Trade.Offers.Remove(offer);
-        Trading.Send(world, seller, buyer, offer.Give);
-        Trading.Send(world, buyer, seller, offer.Want);
+        Trading.Send(world, seller, buyer, offer.Give, path);
+        Trading.Send(world, buyer, seller, offer.Want, path.AsEnumerable().Reverse().ToList());
         world.Trade.CompletedTrades++;
         world.Log(EventKind.Trade, seller, $"{buyer.Name} accepted your offer of {Trading.Describe(offer.Give)}; caravans are on the way");
         world.Log(EventKind.Trade, buyer, $"Bought {Trading.Describe(offer.Give)} from {seller.Name}; caravans are on the way");

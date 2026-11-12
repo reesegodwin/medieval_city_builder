@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 6;
+    public const int CurrentVersion = 7;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -126,11 +126,15 @@ public static class SaveGame
             History = c.History.ToList(),
         }).ToList(),
         Roads = s.Roads.Select(r => new[] { r.X, r.Y }).ToList(),
+        RoadPlans = s.RoadPlans.Select(p => new RoadPlan { X = p.X, Y = p.Y, Progress = p.Progress }).ToList(),
         RoadVersion = s.RoadVersion,
         Territory = TerritoryRuns(s),
         TerritoryVersion = s.TerritoryVersion,
         TerritoryCap = s.TerritoryCap,
         HaulCoverage = s.HaulCoverage,
+        TaxAccrued = s.TaxAccrued,
+        UpkeepOwed = s.UpkeepOwed,
+        UpkeepUnpaid = s.UpkeepUnpaid,
         ToolWear = new(s.ToolWear),
         GoodsUse = new(s.GoodsUse),
         FailedSiteSearches = new(s.FailedSiteSearches),
@@ -235,10 +239,18 @@ public static class SaveGame
             s.Roads.Add((r[0], r[1]));
         }
         s.RoadVersion = save.RoadVersion;
+        foreach (var plan in save.RoadPlans) // version 6 and older built roads instantly and have none
+        {
+            world.Map.GetTile(plan.X, plan.Y).RoadPlanned = true;
+            s.RoadPlans.Add(plan);
+        }
         foreach (var (key, day) in save.FailedSiteSearches) s.FailedSiteSearches[key] = day;
 
         // Version 2 and older had no haulers: coverage starts at 0 and is set at the next hour.
         s.HaulCoverage = save.HaulCoverage;
+        s.TaxAccrued = save.TaxAccrued;
+        s.UpkeepOwed = save.UpkeepOwed;
+        s.UpkeepUnpaid = save.UpkeepUnpaid;
         // Version 3 and older had no tools or household goods; both start with nothing carried over.
         CopyInto(save.ToolWear, s.ToolWear);
         CopyInto(save.GoodsUse, s.GoodsUse);
@@ -298,12 +310,16 @@ public static class SaveGame
         public List<CitizenSave> Citizens { get; set; } = new();
         public List<int[]> Roads { get; set; } = new();
         public int RoadVersion { get; set; }
+        public List<RoadPlan> RoadPlans { get; set; } = new();
 
         /// <summary>Row runs [y, firstX, lastX]; null in version-1 saves.</summary>
         public List<int[]>? Territory { get; set; }
         public int TerritoryVersion { get; set; }
         public int TerritoryCap { get; set; }
         public double HaulCoverage { get; set; }
+        public double TaxAccrued { get; set; }
+        public double UpkeepOwed { get; set; }
+        public bool UpkeepUnpaid { get; set; }
         public SortedDictionary<string, double> ToolWear { get; set; } = new(StringComparer.Ordinal);
         public SortedDictionary<string, double> GoodsUse { get; set; } = new(StringComparer.Ordinal);
         public Dictionary<string, long> FailedSiteSearches { get; set; } = new();

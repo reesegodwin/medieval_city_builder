@@ -24,6 +24,7 @@ public sealed class SettlementRules
         ["shepherd"] = 2,
         ["weaver"] = 2,
         ["carpenter"] = 2,
+        [JobKinds.Roadworker] = 4,
         [JobKinds.Hauler] = 1, // only people nobody else needs; the first to be pulled into other work
     };
 
@@ -112,6 +113,9 @@ public sealed class Settlement
 
     /// <summary>Governor memory: day a site search last failed, per "building@spot", so it isn't retried daily.</summary>
     public Dictionary<string, long> FailedSiteSearches { get; } = new();
+
+    /// <summary>Road tiles planned but not yet built, in the order they'll be built.</summary>
+    public List<RoadPlan> RoadPlans { get; } = new();
 
     /// <summary>Bumped whenever roads change, so renderers know to rebuild.</summary>
     public int RoadVersion { get; set; }
@@ -212,6 +216,15 @@ public sealed class Settlement
     /// <summary>Wear on tools not yet amounting to a whole tool, per tool resource.</summary>
     public SortedDictionary<string, double> ToolWear { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>Taxes collected but not yet a whole coin.</summary>
+    public double TaxAccrued { get; set; }
+
+    /// <summary>Upkeep owed but not yet paid (fractions, or what the treasury couldn't cover).</summary>
+    public double UpkeepOwed { get; set; }
+
+    /// <summary>The treasury couldn't pay upkeep at the last daily reckoning; buildings with upkeep run at reduced output.</summary>
+    public bool UpkeepUnpaid { get; set; }
+
     /// <summary>Household goods used but not yet amounting to a whole unit, per resource.</summary>
     public SortedDictionary<string, double> GoodsUse { get; } = new(StringComparer.Ordinal);
 
@@ -219,11 +232,24 @@ public sealed class Settlement
     /// Job slots the settlement wants filled. Workplaces that reached their stock limit keep their workers on
     /// standby (they keep the job, and any other job may take them at once); haulers follow the hauling quota.
     /// </summary>
-    public int WantedWorkers(Building b) =>
-        b.CurrentJobKind == JobKinds.Hauler ? Math.Min(b.JobSlots, HaulerQuota.GetValueOrDefault(b.Id)) : b.JobSlots;
+    public int WantedWorkers(Building b) => b.CurrentJobKind switch
+    {
+        JobKinds.Hauler => Math.Min(b.JobSlots, HaulerQuota.GetValueOrDefault(b.Id)),
+        // About one roadworker per ten planned tiles, none when there's nothing to build.
+        JobKinds.Roadworker => RoadPlans.Count == 0 ? 0 : Math.Min(b.JobSlots, 1 + RoadPlans.Count / 10),
+        _ => b.JobSlots,
+    };
 
     /// <summary>Workers here have nothing to do right now and can be moved to other work freely.</summary>
     public bool IsOnStandby(Building b) => IsAtProductionLimit(b) && !b.InputsLoaded;
 
     public override string ToString() => Name;
+}
+
+/// <summary>A road tile waiting to be built, and the roadworker-days spent on it so far.</summary>
+public sealed class RoadPlan
+{
+    public int X { get; set; }
+    public int Y { get; set; }
+    public double Progress { get; set; }
 }

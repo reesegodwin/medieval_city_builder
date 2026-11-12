@@ -121,6 +121,10 @@ public partial class InspectorPanel : PanelContainer
                           $"{town.HaulCoverage:P0} of the carrying workers would otherwise do themselves.");
         else if (b.IsOperational && b.WorkerIds.Count > 0 && town.IsOnStandby(b))
             sb.AppendLine("[b]Standby:[/b] stock limit reached; workers wait here and help elsewhere when needed.");
+        if (b.Def.Upkeep > 0)
+            sb.AppendLine(town.UpkeepUnpaid
+                ? $"[color=#ff8060][b]Upkeep:[/b] {b.Def.Upkeep:0.#} coin a day, unpaid: running at half output[/color]"
+                : $"[b]Upkeep:[/b] {b.Def.Upkeep:0.#} coin a day");
         if (b.Def.TownCentre != null) DescribeTownCentre(world, town, b, sb);
         if (b.Def.Trade)
         {
@@ -143,6 +147,9 @@ public partial class InspectorPanel : PanelContainer
         sb.AppendLine($"[b]Allowance:[/b] {town.TerritoryAllowance} tiles " +
                       $"(population allows {TerritoryRules.PopulationAllowance(town.Citizens.Count)}, cap {town.TerritoryCap})");
         sb.AppendLine("Paint territory with the Territory tool (T), or tick \"Auto land\" to grow it evenly.");
+        sb.AppendLine($"[b]Roads:[/b] {town.RoadPlans.Count} tiles planned; roadworkers here build them (free, but they take time).");
+        sb.AppendLine($"[b]Treasury:[/b] {town.Stock.Get("coin")} coin, taxes {EconomySystem.DailyTax(world, town):0.#} and upkeep " +
+                      $"{EconomySystem.DailyUpkeep(town):0.#} a day.");
 
         if (b.Def.TownCentre!.UpgradeTo is not { } nextId)
         {

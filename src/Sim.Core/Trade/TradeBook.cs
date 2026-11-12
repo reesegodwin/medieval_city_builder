@@ -64,6 +64,9 @@ public sealed class Caravan
     public long DepartTick { get; set; }
     public long ArriveTick { get; set; }
 
+    /// <summary>The way it travels, as x,y pairs: along roads (a merchant's first leg is cross-country).</summary>
+    public List<int> Path { get; set; } = new();
+
     /// <summary>0 at departure, 1 on arrival.</summary>
     public double Progress(long tick) =>
         ArriveTick <= DepartTick ? 1 : Math.Clamp((tick - DepartTick) / (double)(ArriveTick - DepartTick), 0, 1);

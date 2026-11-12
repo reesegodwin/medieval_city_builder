@@ -19,6 +19,9 @@ public static class Pathfinder
 
         /// <summary>Laying roads: buildable ground, existing roads preferred, water crossed by (expensive) bridges.</summary>
         BuildRoad,
+
+        /// <summary>Caravans: only along finished roads (and bridges).</summary>
+        RoadOnly,
     }
 
     private static readonly (int Dx, int Dy)[] Directions = { (0, -1), (1, 0), (0, 1), (-1, 0) };
@@ -28,7 +31,8 @@ public static class Pathfinder
     {
         if (tile.BuildingId != 0) return null;
         if (mode == Mode.BuildRoad)
-            return tile.IsRoad ? 0.5 : tile.IsBuildable ? 1.0 : tile.Terrain == Terrain.Water ? BridgePlanCost : null;
+            return tile.IsRoad || tile.RoadPlanned ? 0.5 : tile.IsBuildable ? 1.0 : tile.Terrain == Terrain.Water ? BridgePlanCost : null;
+        if (mode == Mode.RoadOnly) return tile.IsRoad ? 1.0 : null;
 
         if (tile.IsRoad) return RoadCost; // includes bridges over water
         return tile.Terrain switch
@@ -47,6 +51,18 @@ public static class Pathfinder
         double minStep = mode == Mode.Walk ? RoadCost : 0.5;
         return Search(map, from, (x, y) => x == to.X && y == to.Y, mode, maxExpanded,
             (x, y) => (Math.Abs(x - to.X) + Math.Abs(y - to.Y)) * minStep, allowBlockedGoal: true);
+    }
+
+    /// <summary>
+    /// A* from a tile to any goal tile, guided towards <paramref name="towards"/> (not guaranteed shortest when goals
+    /// lie off that direction, but fast over long distances).
+    /// </summary>
+    public static List<(int X, int Y)>? FindPathTowards(WorldMap map, (int X, int Y) from, Func<int, int, bool> isGoal,
+        (int X, int Y) towards, Mode mode, int maxExpanded, Func<int, int, bool>? blocked = null)
+    {
+        double minStep = mode == Mode.Walk ? RoadCost : 0.5;
+        return Search(map, from, isGoal, mode, maxExpanded,
+            (x, y) => (Math.Abs(x - towards.X) + Math.Abs(y - towards.Y)) * minStep, allowBlockedGoal: false, blocked);
     }
 
     /// <summary>Dijkstra from a tile to the nearest tile matching <paramref name="isGoal"/>.</summary>

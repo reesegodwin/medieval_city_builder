@@ -22,6 +22,9 @@ public struct Tile
     /// <summary>A road runs over this tile. Buildings placed on it replace the road.</summary>
     public bool IsRoad;
 
+    /// <summary>A road is planned here and waiting for roadworkers.</summary>
+    public bool RoadPlanned;
+
     /// <summary>Id of the settlement whose territory this tile is in, or 0 for unclaimed land.</summary>
     public int TerritoryId;
 

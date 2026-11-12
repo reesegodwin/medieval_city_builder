@@ -130,6 +130,7 @@ public static class Placement
             tile.BuildingId = building.Id;
             if (tile.Terrain == Terrain.Fertile) fertile++;
             if (tile.IsRoad) Roads.Remove(world, settlement, x + dx, y + dy);
+            if (tile.RoadPlanned) Roads.Unplan(world, settlement, x + dx, y + dy);
         }
 
         building.TerrainMultiplier = 1.0 + def.FertileBonus * fertile / (def.Width * def.Height);
@@ -145,11 +146,27 @@ public static class Roads
     /// <summary>Wood per tile for a road over water (a bridge).</summary>
     public const int BridgeWoodPerTile = 4;
 
-    /// <summary>Returns null if a road can go on this tile, otherwise why not.</summary>
+    /// <summary>Roadworker-days to lay one tile of dirt road next to the town centre.</summary>
+    public const double RoadWorkDays = 0.05;
+
+    /// <summary>Roadworker-days to build one tile of bridge.</summary>
+    public const double BridgeWorkDays = 0.5;
+
+    /// <summary>Distance from the town centre at which roadworkers lose half their time walking to the site.</summary>
+    public const double WalkHalfDistance = 60;
+
+    /// <summary>Roads can reach this far from the town centre (in either axis), well past the territory.</summary>
+    public const int MaxRoadDistance = 600;
+
+    /// <summary>
+    /// Returns null if a road can go on this tile, otherwise why not. Dirt roads are free and may go on unclaimed
+    /// land outside the territory, but not into another settlement's territory.
+    /// </summary>
     public static string? Check(GameWorld world, Settlement settlement, int x, int y)
     {
         var tile = world.Map.GetTile(x, y);
-        if (tile.TerritoryId != settlement.Id) return "Outside the settlement's territory";
+        if (tile.TerritoryId != settlement.Id && tile.TerritoryId != 0) return "Inside another settlement's territory";
+        if (Math.Max(Math.Abs(x - settlement.CenterX), Math.Abs(y - settlement.CenterY)) > MaxRoadDistance) return "Too far from the town";
         if (tile.BuildingId != 0) return "Blocked by a building";
         if (!tile.IsBuildable && tile.Terrain != Terrain.Water) return $"Cannot build a road on {tile.Terrain}";
         return null;
@@ -157,7 +174,47 @@ public static class Roads
 
     /// <summary>Wood needed to build these tiles (only new bridge tiles cost anything).</summary>
     public static int BridgeCost(GameWorld world, IEnumerable<(int X, int Y)> tiles) =>
-        tiles.Distinct().Count(t => world.Map.GetTile(t.X, t.Y) is { IsRoad: false, Terrain: Terrain.Water }) * BridgeWoodPerTile;
+        tiles.Distinct().Count(t => world.Map.GetTile(t.X, t.Y) is { IsRoad: false, RoadPlanned: false, Terrain: Terrain.Water }) * BridgeWoodPerTile;
+
+    public static double WorkDays(in Tile tile) => tile.Terrain == Terrain.Water ? BridgeWorkDays : RoadWorkDays;
+
+    /// <summary>Marks a tile for roadworkers to build.</summary>
+    internal static void Plan(GameWorld world, Settlement settlement, int x, int y)
+    {
+        ref var tile = ref world.Map.GetTile(x, y);
+        if (tile.IsRoad || tile.RoadPlanned) return;
+        tile.RoadPlanned = true;
+        settlement.RoadPlans.Add(new RoadPlan { X = x, Y = y });
+        settlement.RoadVersion++;
+    }
+
+    /// <summary>Drops a planned tile (a building was placed on it, or the plan was cancelled).</summary>
+    internal static bool Unplan(GameWorld world, Settlement settlement, int x, int y)
+    {
+        ref var tile = ref world.Map.GetTile(x, y);
+        int index = settlement.RoadPlans.FindIndex(p => p.X == x && p.Y == y);
+        if (index < 0) return false;
+        tile.RoadPlanned = false;
+        settlement.RoadPlans.RemoveAt(index);
+        settlement.RoadVersion++;
+        return true;
+    }
+
+    /// <summary>Turns a plan into a finished road.</summary>
+    internal static void Finish(GameWorld world, Settlement settlement, RoadPlan plan)
+    {
+        world.Map.GetTile(plan.X, plan.Y).RoadPlanned = false;
+        settlement.RoadPlans.Remove(plan);
+        Add(world, settlement, plan.X, plan.Y);
+    }
+
+    /// <summary>Builds every planned tile at once (founding a town, or a town with nobody to build roads).</summary>
+    public static void FinishAllPlans(GameWorld world, Settlement settlement)
+    {
+        if (settlement.RoadPlans.Count == 0) return;
+        foreach (var plan in settlement.RoadPlans.ToList()) Finish(world, settlement, plan);
+        Logistics.UpdateHaulFactors(world, settlement);
+    }
 
     internal static void Add(GameWorld world, Settlement settlement, int x, int y)
     {
@@ -189,17 +246,17 @@ public sealed record PlaceRoadCommand(int SettlementId, IReadOnlyList<(int X, in
 
         foreach (var (x, y) in Tiles)
         {
-            if (world.Map.GetTile(x, y).IsRoad) continue;
+            var tile = world.Map.GetTile(x, y);
+            if (tile.IsRoad || tile.RoadPlanned) continue;
             if (Roads.Check(world, settlement, x, y) is { } error) return CommandResult.Fail($"({x},{y}): {error}");
         }
 
+        // Dirt roads are free: roadworkers build them over time. Bridges need their wood up front.
         int wood = Roads.BridgeCost(world, Tiles);
         if (wood > 0 && !settlement.Stock.TryTake("wood", wood))
             return CommandResult.Fail($"Bridge needs {wood} wood");
 
-        int before = settlement.Roads.Count;
-        foreach (var (x, y) in Tiles) Roads.Add(world, settlement, x, y);
-        if (settlement.Roads.Count != before) Logistics.UpdateHaulFactors(world, settlement);
+        foreach (var (x, y) in Tiles) Roads.Plan(world, settlement, x, y);
         return CommandResult.Success();
     }
 }
@@ -211,13 +268,14 @@ public sealed record RemoveRoadCommand(int SettlementId, IReadOnlyList<(int X, i
         var settlement = world.FindSettlement(SettlementId);
         if (settlement == null) return CommandResult.Fail("Unknown settlement");
 
-        int before = settlement.Roads.Count;
+        int before = settlement.Roads.Count, plansBefore = settlement.RoadPlans.Count;
         foreach (var (x, y) in Tiles)
         {
             if (settlement.Roads.Contains((x, y))) Roads.Remove(world, settlement, x, y);
+            else Roads.Unplan(world, settlement, x, y);
         }
-        if (settlement.Roads.Count == before) return CommandResult.Fail("No road there");
-        Logistics.UpdateHaulFactors(world, settlement);
+        if (settlement.Roads.Count == before && settlement.RoadPlans.Count == plansBefore) return CommandResult.Fail("No road there");
+        if (settlement.Roads.Count != before) Logistics.UpdateHaulFactors(world, settlement);
         return CommandResult.Success();
     }
 }

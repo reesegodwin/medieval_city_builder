@@ -73,7 +73,9 @@ public sealed class GameWorld
         h.Add(Time.Tick).Add(TotalBirths).Add(TotalDeaths).Add(Events.Count).Add(Rng.StateFingerprint);
         foreach (var s in Settlements)
         {
-            h.Add(s.Id).Add(s.Territory.Count).Add(s.TerritoryCap).Add(s.HaulCoverage);
+            h.Add(s.Id).Add(s.Territory.Count).Add(s.TerritoryCap).Add(s.HaulCoverage).Add(s.Roads.Count)
+                .Add(s.TaxAccrued).Add(s.UpkeepOwed).Add(s.UpkeepUnpaid);
+            foreach (var plan in s.RoadPlans) h.Add(plan.X).Add(plan.Y).Add(plan.Progress);
             foreach (var (tool, wear) in s.ToolWear) h.Add(tool).Add(wear);
             foreach (var (good, use) in s.GoodsUse) h.Add(good).Add(use);
             foreach (var (resource, amount) in s.Stock.Items) h.Add(resource).Add(amount);
@@ -101,7 +103,7 @@ public sealed class GameWorld
         foreach (var r in trade.Routes) h.Add(r.Id).Add(r.FromId).Add(r.ToId).Add(r.Accepted).Add(r.NextTick).Add(r.Rounds).Add(r.Skipped);
         foreach (var c in trade.Caravans)
         {
-            h.Add(c.Id).Add((int)c.Kind).Add(c.FromId).Add(c.ToId).Add(c.ArriveTick);
+            h.Add(c.Id).Add((int)c.Kind).Add(c.FromId).Add(c.ToId).Add(c.ArriveTick).Add(c.Path.Count);
             foreach (var (r, n) in c.Cargo) h.Add(r).Add(n);
         }
         foreach (var (id, tick) in trade.NextMerchant) h.Add(id).Add(tick);

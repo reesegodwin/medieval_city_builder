@@ -11,7 +11,9 @@
       "territoryCap": 7321,
       "upgradeTo": "town_hall",
       "minPopulation": 0
-    }
+    },
+    "jobs": 4,
+    "jobKind": "roadworker"
   },
   {
     "id": "town_hall",
@@ -21,14 +23,18 @@
     "buildDays": 3,
     "cost": {
       "wood": 100,
-      "stone": 60
+      "stone": 60,
+      "coin": 150
     },
     "builderSlots": 4,
     "townCentre": {
       "territoryCap": 12961,
       "upgradeTo": "castle",
       "minPopulation": 90
-    }
+    },
+    "jobs": 6,
+    "jobKind": "roadworker",
+    "upkeep": 2
   },
   {
     "id": "castle",
@@ -38,13 +44,17 @@
     "buildDays": 6,
     "cost": {
       "wood": 200,
-      "stone": 180
+      "stone": 180,
+      "coin": 600
     },
     "builderSlots": 6,
     "townCentre": {
       "territoryCap": 20201,
       "minPopulation": 240
-    }
+    },
+    "jobs": 8,
+    "jobKind": "roadworker",
+    "upkeep": 4
   },
   {
     "id": "stockpile",
@@ -207,7 +217,8 @@
       "need": "faith",
       "radius": 22,
       "capacity": 80
-    }
+    },
+    "upkeep": 0.3
   },
   {
     "id": "brewery",
@@ -229,7 +240,8 @@
         "ale": 4
       },
       "workDays": 1
-    }
+    },
+    "upkeep": 0.3
   },
   {
     "id": "tavern",
@@ -249,7 +261,8 @@
       "consumesPerPersonDay": {
         "ale": 0.2
       }
-    }
+    },
+    "upkeep": 0.3
   },
   {
     "id": "market",
@@ -267,7 +280,8 @@
       "need": "market",
       "radius": 24,
       "capacity": 120
-    }
+    },
+    "upkeep": 0.4
   },
   {
     "id": "mine",
@@ -295,7 +309,8 @@
       "minPopulation": 60,
       "populationPerBuilding": 200,
       "lowStock": 20
-    }
+    },
+    "upkeep": 0.5
   },
   {
     "id": "smithy",
@@ -305,7 +320,8 @@
     "buildDays": 0.6,
     "cost": {
       "wood": 20,
-      "stone": 15
+      "stone": 15,
+      "coin": 15
     },
     "jobs": 1,
     "jobKind": "smith",
@@ -323,7 +339,8 @@
       "minPopulation": 60,
       "populationPerBuilding": 150,
       "lowStock": 15
-    }
+    },
+    "upkeep": 0.5
   },
   {
     "id": "pasture",
@@ -372,7 +389,8 @@
       "minPopulation": 80,
       "populationPerBuilding": 150,
       "lowStock": 15
-    }
+    },
+    "upkeep": 0.3
   },
   {
     "id": "carpenter",
@@ -382,7 +400,8 @@
     "buildDays": 0.5,
     "cost": {
       "wood": 20,
-      "stone": 5
+      "stone": 5,
+      "coin": 15
     },
     "jobs": 1,
     "jobKind": "carpenter",
@@ -399,7 +418,8 @@
       "minPopulation": 150,
       "populationPerBuilding": 250,
       "lowStock": 10
-    }
+    },
+    "upkeep": 0.3
   },
   {
     "id": "trading_post",
@@ -413,6 +433,7 @@
     },
     "jobs": 1,
     "jobKind": "merchant",
-    "trade": true
+    "trade": true,
+    "upkeep": 1
   }
 ]

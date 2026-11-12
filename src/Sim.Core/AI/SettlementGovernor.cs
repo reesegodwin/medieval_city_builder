@@ -135,16 +135,16 @@ public static class RoadPlanner
 
         bool IsGoal(int x, int y) =>
             (x, y) != start && !building.Covers(x, y) &&
-            (world.Map.GetTile(x, y).IsRoad || stockpileEntrances.Contains((x, y)));
+            (world.Map.GetTile(x, y) is { IsRoad: true } or { RoadPlanned: true } || stockpileEntrances.Contains((x, y)));
 
-        if (IsGoal(start.X, start.Y) || world.Map.GetTile(start.X, start.Y).IsRoad) return new();
+        if (IsGoal(start.X, start.Y) || world.Map.GetTile(start.X, start.Y) is { IsRoad: true } or { RoadPlanned: true }) return new();
 
         // Roads may only be laid inside the territory (see Roads.Check), so plan within it.
         bool Blocked(int x, int y) => building.Covers(x, y) || !CanLayRoad(world, settlement, x, y);
         var path = Pathfinder.FindPathToAny(world.Map, start, IsGoal, Pathfinder.Mode.BuildRoad, MaxSearch, Blocked);
         if (path == null) return null;
 
-        var tiles = path.Where(t => !world.Map.GetTile(t.X, t.Y).IsRoad).ToList();
+        var tiles = path.Where(t => world.Map.GetTile(t.X, t.Y) is { IsRoad: false, RoadPlanned: false }).ToList();
         if (tiles.Count(t => world.Map.GetTile(t.X, t.Y).Terrain == Terrain.Water) > MaxBridgeTiles) return null;
         return tiles;
     }
@@ -172,7 +172,7 @@ public static class RoadPlanner
         for (int i = 0; i < pocket.Count; i++)
         {
             var (x, y) = pocket[i];
-            if (world.Map.GetTile(x, y).IsRoad || stockpileEntrances.Contains((x, y))) return null;
+            if (world.Map.GetTile(x, y) is { IsRoad: true } or { RoadPlanned: true } || stockpileEntrances.Contains((x, y))) return null;
             if (pocket.Count > MaxSearch) return null;
             foreach (var (dx, dy) in Neighbours)
             {
@@ -196,7 +196,7 @@ public static class RoadPlanner
 
     /// <summary>An existing road, or a tile where this settlement may lay one.</summary>
     private static bool CanLayRoad(GameWorld world, Settlement settlement, int x, int y) =>
-        world.Map.GetTile(x, y).IsRoad || Roads.Check(world, settlement, x, y) == null;
+        world.Map.GetTile(x, y) is { IsRoad: true } or { RoadPlanned: true } || Roads.Check(world, settlement, x, y) == null;
 
     private static readonly (int Dx, int Dy)[] Neighbours = { (0, -1), (1, 0), (0, 1), (-1, 0) };
 }
@@ -322,13 +322,19 @@ public static class SettlementGovernor
         }
 
         var site = SiteFinder.Find(world, settlement, def, near, maxRadius, Connectable);
+        if (site == null && def.Service is { } reach && near != null)
+        {
+            // Crowded around that home: anywhere within the service's reach of it still serves it.
+            routeChecks = 0;
+            site = SiteFinder.Find(world, settlement, def, near, reach.Radius - 1, Connectable);
+        }
         if (site is not var (x, y)) return false;
 
         var result = world.Execute(new PlaceBuildingCommand(settlement.Id, def.Id, x, y));
         if (result.CreatedId is not int id || settlement.FindBuilding(id) is not { } placed) return false;
 
-        RoadPlanner.Connect(world, settlement, placed);
-        if (placed.NoRoute && !def.IsStockpile)
+        // The road (and any bridge) is planned and roadworkers will build it, so only a failed plan means cut off.
+        if (!RoadPlanner.Connect(world, settlement, placed) && !def.IsStockpile)
         {
             // Cut off (e.g. across a river with no bridge): take it back.
             world.Execute(new DemolishBuildingCommand(settlement.Id, placed.Id));

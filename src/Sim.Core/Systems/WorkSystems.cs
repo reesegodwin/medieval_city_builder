@@ -249,7 +249,8 @@ public static class ProductionSystem
 
             if (b.CycleProgress < recipe.WorkDays)
             {
-                b.CycleProgress += Work.LabourThisTick(settlement, b, b.Def.JobKind) * tools * Logistics.EffectiveHaulFactor(settlement, b);
+                b.CycleProgress += Work.LabourThisTick(settlement, b, b.Def.JobKind) * tools * Logistics.EffectiveHaulFactor(settlement, b) *
+                                   EconomySystem.OutputFactor(world, settlement, b);
                 workersThisTick += b.WorkerIds.Count;
             }
 
@@ -465,5 +466,88 @@ public static class Tools
             if (used > 0) settlement.Stock.TryTake(tool.Id, used);
             settlement.ToolWear[tool.Id] = wear - (int)wear;
         }
+    }
+}
+
+/// <summary>
+/// Roadworkers at the town centre build planned road tiles in order. Far-off tiles take longer, since the crew
+/// walks there and back. A settlement with no town centre (very old saves) gets its roads at once.
+/// </summary>
+public static class RoadSystem
+{
+    public static void Tick(GameWorld world, Settlement settlement)
+    {
+        if (settlement.RoadPlans.Count == 0) return;
+        var crew = settlement.TownCentre;
+        if (crew == null)
+        {
+            Commands.Roads.FinishAllPlans(world, settlement);
+            return;
+        }
+        if (!crew.IsOperational || crew.CurrentJobKind != JobKinds.Roadworker) return; // being upgraded
+
+        double labour = Work.LabourThisTick(settlement, crew, JobKinds.Roadworker) * Tools.Multiplier(world, settlement);
+        bool built = false;
+        while (labour > 1e-12 && settlement.RoadPlans.Count > 0)
+        {
+            var plan = settlement.RoadPlans[0];
+            double distance = Math.Abs(plan.X - settlement.CenterX) + Math.Abs(plan.Y - settlement.CenterY);
+            double slowdown = 1 + distance / Commands.Roads.WalkHalfDistance;
+            double needed = (Commands.Roads.WorkDays(world.Map.GetTile(plan.X, plan.Y)) - plan.Progress) * slowdown;
+            if (labour < needed)
+            {
+                plan.Progress += labour / slowdown;
+                break;
+            }
+            labour -= needed;
+            Commands.Roads.Finish(world, settlement, plan);
+            built = true;
+        }
+        // Hauling distances are recomputed every few tiles and when the plans are done (derived from saved state,
+        // so a loaded game recomputes at the same moments).
+        if (built && (settlement.Roads.Count % 8 == 0 || settlement.RoadPlans.Count == 0))
+            Logistics.UpdateHaulFactors(world, settlement);
+    }
+}
+
+/// <summary>
+/// The treasury, daily: adults pay taxes, and finished buildings with upkeep cost coin. If the treasury can't pay,
+/// those buildings run at reduced output until it can. Construction costs in coin are taken like any material.
+/// </summary>
+public static class EconomySystem
+{
+    public static double DailyTax(GameWorld world, Settlement s) =>
+        s.Citizens.Count(c => c.IsAdult) * world.Data.Trade.TaxPerAdultDay;
+
+    public static double DailyUpkeep(Settlement s) => s.Buildings.Where(b => b.IsOperational).Sum(b => b.Def.Upkeep);
+
+    /// <summary>Output factor for a building, given the state of the treasury.</summary>
+    public static double OutputFactor(GameWorld world, Settlement s, Building b) =>
+        s.UpkeepUnpaid && b.Def.Upkeep > 0 ? world.Data.Trade.UnpaidOutput : 1;
+
+    public static void Daily(GameWorld world, Settlement s)
+    {
+        const string coin = Economy.Inventory.Coin;
+        s.TaxAccrued += DailyTax(world, s);
+        int taxes = (int)s.TaxAccrued;
+        s.TaxAccrued -= taxes;
+        s.Stock.Add(coin, taxes);
+
+        double upkeep = DailyUpkeep(s);
+        // Debt doesn't pile up beyond a day's upkeep: unpaid buildings simply run at reduced output.
+        s.UpkeepOwed = Math.Min(s.UpkeepOwed + upkeep, upkeep + 1);
+        int due = (int)s.UpkeepOwed;
+        int paid = Math.Min(due, s.Stock.Get(coin));
+        s.Stock.TryTake(coin, paid);
+        s.UpkeepOwed -= paid;
+
+        bool unpaid = paid < due;
+        if (unpaid != s.UpkeepUnpaid)
+        {
+            world.Log(Events.EventKind.Shortage, s, unpaid
+                ? "The treasury can't pay upkeep: markets, taverns, workshops and the like run at half output"
+                : "Upkeep is paid again");
+        }
+        s.UpkeepUnpaid = unpaid;
     }
 }

@@ -233,7 +233,8 @@ public partial class Hud : CanvasLayer
         }
         if (def.FertileBonus > 0) lines.Add($"+{def.FertileBonus:P0} output on fertile soil");
         if (def.NearTerrain is { } near) lines.Add($"Needs {near.Terrain} within {near.Radius} tiles");
-        if (def.TownCentre is { } centre) lines.Add($"Town centre: territory up to {centre.TerritoryCap} tiles");
+        if (def.TownCentre is { } centre) lines.Add($"Town centre: territory up to {centre.TerritoryCap} tiles; its roadworkers build roads");
+        if (def.Upkeep > 0) lines.Add($"Upkeep {def.Upkeep:0.#} coin a day (half output while the treasury can't pay)");
         if (def.Service is { } service)
         {
             lines.Add($"Serves {service.Need} to up to {service.Capacity} people within {service.Radius} tiles of their home");
@@ -265,7 +266,8 @@ public partial class Hud : CanvasLayer
             $"Pop {town.Citizens.Count} ({adults} adults, {haulers} hauling, {idle} idle{(homeless > 0 ? $", {homeless} homeless" : "")})   " +
             $"Food {Needs.FoodDays(world, town):0.0} days (grain {town.Stock.Get("grain")}, bread {town.Stock.Get("bread")}, " +
             $"veg {town.Stock.Get("vegetables")})   Ale {town.Stock.Get("ale")}   " +
-            $"Coin {town.Stock.Get("coin")}   Wood {town.Stock.Get("wood")}   Stone {town.Stock.Get("stone")}   Tools {town.Stock.Get("tools")}   " +
+            $"Coin {town.Stock.Get("coin")} ({EconomySystem.DailyTax(world, town) - EconomySystem.DailyUpkeep(town):+0.#;-0.#}/day" +
+            (town.UpkeepUnpaid ? ", UPKEEP UNPAID" : "") + $")   Wood {town.Stock.Get("wood")}   Stone {town.Stock.Get("stone")}   Tools {town.Stock.Get("tools")}   " +
             $"Cloth {town.Stock.Get("cloth")}   Furniture {town.Stock.Get("furniture")}\n" +
             $"Storage {town.Stock.Total}/{town.StorageCapacity}   Land {town.Territory.Count}/{town.TerritoryAllowance} " +
             $"(cap {town.TerritoryCap})   Needs met: " +

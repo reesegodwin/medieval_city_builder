@@ -107,11 +107,12 @@ public class TerritoryTests
             .SelectMany(t => new[] { (t.X + 1, t.Y), (t.X, t.Y + 1), (t.X - 1, t.Y), (t.X, t.Y - 1) })
             .First(t => !town.OwnsTile(world.Map, t.Item1, t.Item2) && world.Map.GetTile(t.Item1, t.Item2).IsBuildable);
         Assert.Equal("Outside the settlement's territory", Placement.Check(world, town, def, outside.Item1, outside.Item2));
-        Assert.False(world.Execute(new PlaceRoadCommand(town.Id, new[] { outside })).Ok);
+        Assert.True(world.Execute(new PlaceRoadCommand(town.Id, new[] { outside })).Ok); // roads may leave the territory
+        Assert.True(world.Execute(new RemoveRoadCommand(town.Id, new[] { outside })).Ok);
 
         Grow(world, town, 16);
         Assert.True(world.Execute(new ClaimTerritoryCommand(town.Id, new[] { outside })).Ok);
-        Assert.True(world.Execute(new PlaceRoadCommand(town.Id, new[] { outside })).Ok);
+        Assert.Null(Placement.Check(world, town, def, outside.Item1, outside.Item2));
     }
 
     [Fact]

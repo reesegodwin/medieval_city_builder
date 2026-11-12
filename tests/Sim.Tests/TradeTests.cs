@@ -1,3 +1,4 @@
+using Sim.Core.AI;
 using Sim.Core.Commands;
 using Sim.Core.Events;
 using Sim.Core.Persistence;
@@ -7,6 +8,7 @@ using Sim.Core.Systems;
 using Sim.Core.Time;
 using Sim.Core.Trade;
 using Sim.Net;
+using Sim.Core.World;
 
 namespace Sim.Tests;
 
@@ -23,9 +25,13 @@ public class TradeTests
         foreach (var s in world.Settlements)
         {
             s.Rules.AutoBuild = false;
-            Scenario.Finish(world, s, Scenario.Place(world, s, "trading_post"));
+            var post = Scenario.Place(world, s, "trading_post");
+            Scenario.Finish(world, s, post);
+            RoadPlanner.Connect(world, s, post);
+            Roads.FinishAllPlans(world, s);
             JobSystem.Tick(world, s);
         }
+        Scenario.ConnectByRoad(world, world.Settlements[0], world.Settlements[1]);
         return (world, world.Settlements[0], world.Settlements[1], new Simulator(world));
     }
 
@@ -69,6 +75,26 @@ public class TradeTests
     }
 
     [Fact]
+    public void CaravansNeedARoad()
+    {
+        var world = new GameWorld(42);
+        world.Execute(new FoundSettlementCommand("a"));
+        world.Execute(new FoundSettlementCommand("b"));
+        foreach (var s in world.Settlements)
+        {
+            s.Rules.AutoBuild = false;
+            Scenario.Finish(world, s, Scenario.Place(world, s, "trading_post"));
+        }
+        var (a, b) = (world.Settlements[0], world.Settlements[1]);
+        a.Stock.Add("cloth", 10);
+        var offer = world.Execute(new PostOfferCommand(a.Id, Goods("cloth", 10), Goods("coin", 30)));
+        var refused = world.Execute(new AcceptOfferCommand(b.Id, offer.CreatedId!.Value));
+        Assert.False(refused.Ok);
+        Assert.Contains("road", refused.Error);
+        Assert.Single(world.Trade.Offers); // nothing happened
+    }
+
+    [Fact]
     public void AcceptingIsInstantButGoodsTravelByCaravan()
     {
         var (world, a, b, sim) = TwoTowns();
@@ -81,6 +107,7 @@ public class TradeTests
         Assert.Equal(0, b.Stock.Get("cloth"));          // ...but the cloth is on the road
         var caravans = world.Trade.Caravans.Where(c => c.Kind == CaravanKind.Delivery).ToList();
         Assert.Equal(2, caravans.Count);
+        Assert.All(Trading.Points(caravans[0]), t => Assert.True(world.Map.GetTile(t.X, t.Y).IsRoad)); // only on roads
 
         long travel = caravans[0].ArriveTick - world.Time.Tick;
         Assert.True(travel >= TimeScale.TicksPerDay);
@@ -141,9 +168,10 @@ public class TradeTests
         var world = new GameWorld(42);
         world.Execute(new FoundSettlementCommand("a"));
         world.Execute(new FoundSettlementCommand("b"));
-        new Simulator(world).RunDays(130);
+        new Simulator(world).RunDays(220);
 
         Assert.True(world.Settlements.All(s => Trading.TradingPost(s) != null), "Both towns build a Trading Post");
+        Assert.NotNull(Trading.RoadPath(world, world.Settlements[0], world.Settlements[1])); // and a road between them
         Assert.Contains(world.Events, e => e.Message.Contains("accepted your offer"));
         Assert.True(world.Trade.MerchantVisits > 0);
     }
@@ -175,9 +203,13 @@ public class TradeTests
         world.Execute(new FoundSettlementCommand("bob"));
         foreach (var s in world.Settlements)
         {
-            Scenario.Finish(world, s, Scenario.Place(world, s, "trading_post"));
+            var post = Scenario.Place(world, s, "trading_post");
+            Scenario.Finish(world, s, post);
+            RoadPlanner.Connect(world, s, post);
+            Roads.FinishAllPlans(world, s);
             s.Stock.Add("cloth", 20);
         }
+        Scenario.ConnectByRoad(world, world.Settlements[0], world.Settlements[1]);
         world.Settings.SecondsPerGameDay = 10;
         var t0 = DateTimeOffset.UtcNow;
         var host = new WorldHost(world, nowUtc: t0);

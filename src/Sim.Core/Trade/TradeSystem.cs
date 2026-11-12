@@ -3,6 +3,7 @@ using Sim.Core.Events;
 using Sim.Core.Settlements;
 using Sim.Core.Simulation;
 using Sim.Core.Time;
+using Sim.Core.World;
 
 namespace Sim.Core.Trade;
 
@@ -31,18 +32,40 @@ public static class Trading
     /// <summary>Where caravans leave from and arrive at: the Trading Post's door, or the town centre.</summary>
     public static (int X, int Y) Depot(Settlement s) => TradingPost(s) is { } post ? post.DoorTile : (s.CenterX, s.CenterY);
 
-    public static long TravelTicks(GameWorld world, (int X, int Y) from, (int X, int Y) to)
+    /// <summary>Most road tiles searched when finding a caravan's way.</summary>
+    public const int MaxRoadSearch = 200_000;
+
+    public static long TravelTicks(GameWorld world, int tiles) =>
+        TimeScale.DaysToTicks(Math.Max(1, tiles / world.Data.Trade.CaravanTilesPerDay));
+
+    /// <summary>Finished road tiles at the Trading Post's door or around it, where caravans load and unload.</summary>
+    public static List<(int X, int Y)> RoadEnds(GameWorld world, Settlement s)
     {
-        int distance = Math.Abs(from.X - to.X) + Math.Abs(from.Y - to.Y);
-        double days = Math.Max(1, distance / world.Data.Trade.CaravanTilesPerDay);
-        return TimeScale.DaysToTicks(days);
+        if (TradingPost(s) is not { } post) return new();
+        return post.AccessTiles().Prepend(post.DoorTile).Distinct().Where(t => world.Map.GetTile(t.X, t.Y).IsRoad).ToList();
     }
 
-    /// <summary>Starts a caravan from one town to another carrying the cargo (already taken from the sender).</summary>
-    public static Caravan Send(GameWorld world, Settlement from, Settlement to, IReadOnlyDictionary<string, int> cargo)
+    /// <summary>A road-only way between two towns' Trading Posts, or null if no road connects them.</summary>
+    public static List<(int X, int Y)>? RoadPath(GameWorld world, Settlement from, Settlement to)
     {
-        var start = Depot(from);
-        var end = Depot(to);
+        var starts = RoadEnds(world, from);
+        var goals = RoadEnds(world, to).ToHashSet();
+        if (starts.Count == 0 || goals.Count == 0) return null;
+        if (goals.Contains(starts[0])) return new() { starts[0] };
+        var target = goals.First();
+        return Pathfinder.FindPathTowards(world.Map, starts[0], (x, y) => goals.Contains((x, y)), target,
+            Pathfinder.Mode.RoadOnly, MaxRoadSearch);
+    }
+
+    public static string NoRoadMessage(Settlement a, Settlement b) =>
+        $"No road connects {a.Name} and {b.Name}. Caravans need a road between the two Trading Posts.";
+
+    private static List<int> Flatten(IEnumerable<(int X, int Y)> tiles) => tiles.SelectMany(t => new[] { t.X, t.Y }).ToList();
+
+    /// <summary>Starts a caravan along a road path carrying the cargo (already taken from the sender).</summary>
+    public static Caravan Send(GameWorld world, Settlement from, Settlement to, IReadOnlyDictionary<string, int> cargo,
+        IReadOnlyList<(int X, int Y)> path)
+    {
         var caravan = new Caravan
         {
             Id = world.NextId(),
@@ -50,12 +73,71 @@ public static class Trading
             FromId = from.Id,
             ToId = to.Id,
             Cargo = new SortedDictionary<string, int>(cargo.ToDictionary(kv => kv.Key, kv => kv.Value), StringComparer.Ordinal),
-            StartX = start.X, StartY = start.Y, EndX = end.X, EndY = end.Y,
+            StartX = path[0].X, StartY = path[0].Y, EndX = path[^1].X, EndY = path[^1].Y,
             DepartTick = world.Time.Tick,
-            ArriveTick = world.Time.Tick + TravelTicks(world, start, end),
+            ArriveTick = world.Time.Tick + TravelTicks(world, path.Count),
+            Path = Flatten(path),
         };
         world.Trade.Caravans.Add(caravan);
         return caravan;
+    }
+
+    /// <summary>
+    /// The way a merchant comes: cross-country from beyond the town's land to the nearest point of the road network
+    /// joined to its Trading Post, then along the roads. Null if the Trading Post isn't on a road.
+    /// </summary>
+    public static List<(int X, int Y)>? MerchantPath(GameWorld world, Settlement s)
+    {
+        var ends = RoadEnds(world, s);
+        if (ends.Count == 0) return null;
+
+        // The road network joined to the Trading Post, found breadth-first (deterministic order).
+        var origin = MerchantOrigin(world, s);
+        var seen = new HashSet<(int, int)>(ends);
+        var queue = new Queue<(int X, int Y)>(ends);
+        var cameFrom = new Dictionary<(int, int), (int, int)>();
+        (int X, int Y) entry = ends[0];
+        int best = int.MaxValue;
+        while (queue.Count > 0 && seen.Count < MaxRoadSearch)
+        {
+            var t = queue.Dequeue();
+            int d = Math.Abs(t.X - origin.X) + Math.Abs(t.Y - origin.Y);
+            if (d < best)
+            {
+                best = d;
+                entry = t;
+            }
+            foreach (var n in new[] { (t.X, t.Y - 1), (t.X + 1, t.Y), (t.X, t.Y + 1), (t.X - 1, t.Y) })
+            {
+                if (!world.Map.GetTile(n.Item1, n.Item2).IsRoad || !seen.Add(n)) continue;
+                cameFrom[n] = t;
+                queue.Enqueue(n);
+            }
+        }
+        var path = new List<(int X, int Y)> { origin };
+        var back = new List<(int X, int Y)>();
+        for (var t = entry; ; t = cameFrom[t])
+        {
+            back.Add(t);
+            if (!cameFrom.ContainsKey(t)) break;
+        }
+        path.AddRange(back); // entry ... depot
+        return path;
+    }
+
+    /// <summary>Path length for travel time: tiles along the road, plus the cross-country distance of the first leg.</summary>
+    public static int PathLength(IReadOnlyList<(int X, int Y)> path)
+    {
+        int length = 0;
+        for (int i = 1; i < path.Count; i++) length += Math.Abs(path[i].X - path[i - 1].X) + Math.Abs(path[i].Y - path[i - 1].Y);
+        return length;
+    }
+
+    public static IReadOnlyList<(int X, int Y)> Points(Caravan c)
+    {
+        var points = new List<(int X, int Y)>(c.Path.Count / 2);
+        for (int i = 0; i + 1 < c.Path.Count; i += 2) points.Add((c.Path[i], c.Path[i + 1]));
+        return points;
     }
 
     public static void AddAll(Settlement s, IReadOnlyDictionary<string, int> goods)
@@ -140,6 +222,13 @@ public static class TradeSystem
             world.Trade.Routes.Remove(route);
             return;
         }
+        var path = Trading.RoadPath(world, from, to);
+        if (path == null)
+        {
+            route.Skipped++;
+            world.Log(EventKind.Trade, from, $"Trade route with {to.Name} skipped: no road connects the Trading Posts");
+            return;
+        }
         if (!from.Stock.Has(route.Give) || !to.Stock.Has(route.Want))
         {
             route.Skipped++;
@@ -149,8 +238,8 @@ public static class TradeSystem
         }
         from.Stock.TryTakeAll(route.Give);
         to.Stock.TryTakeAll(route.Want);
-        Trading.Send(world, from, to, route.Give);
-        Trading.Send(world, to, from, route.Want);
+        Trading.Send(world, from, to, route.Give, path);
+        Trading.Send(world, to, from, route.Want, path.AsEnumerable().Reverse().ToList());
         route.Rounds++;
         world.Trade.CompletedTrades++;
     }
@@ -171,16 +260,20 @@ public static class TradeSystem
             if (next > now) continue;
             book.NextMerchant[s.Id] = now + TimeScale.DaysToTicks(world.Data.Trade.MerchantVisitDays);
 
-            var origin = Trading.MerchantOrigin(world, s);
-            var door = Trading.Depot(s);
+            if (Trading.MerchantPath(world, s) is not { } path)
+            {
+                world.Log(EventKind.Trade, s, "A merchant couldn't reach the Trading Post: it needs a road");
+                continue;
+            }
             book.Caravans.Add(new Caravan
             {
                 Id = world.NextId(),
                 Kind = CaravanKind.MerchantArriving,
                 ToId = s.Id,
-                StartX = origin.X, StartY = origin.Y, EndX = door.X, EndY = door.Y,
+                StartX = path[0].X, StartY = path[0].Y, EndX = path[^1].X, EndY = path[^1].Y,
                 DepartTick = now,
-                ArriveTick = now + Trading.TravelTicks(world, origin, door),
+                ArriveTick = now + Trading.TravelTicks(world, Trading.PathLength(path)),
+                Path = path.SelectMany(t => new[] { t.X, t.Y }).ToList(),
             });
         }
     }
@@ -228,17 +321,18 @@ public static class TradeSystem
             ? "A merchant visited but found nothing to trade"
             : $"A merchant {string.Join("; ", deals)}");
 
-        // The merchant heads home with what it bought.
-        var home = (merchant.StartX, merchant.StartY);
+        // The merchant heads home the way it came, with what it bought.
+        var back = Trading.Points(merchant).Reverse().ToList();
         world.Trade.Caravans.Add(new Caravan
         {
             Id = world.NextId(),
             Kind = CaravanKind.MerchantLeaving,
             FromId = town.Id,
             Cargo = bought,
-            StartX = merchant.EndX, StartY = merchant.EndY, EndX = home.Item1, EndY = home.Item2,
+            StartX = merchant.EndX, StartY = merchant.EndY, EndX = merchant.StartX, EndY = merchant.StartY,
             DepartTick = world.Time.Tick,
-            ArriveTick = world.Time.Tick + Trading.TravelTicks(world, (merchant.EndX, merchant.EndY), home),
+            ArriveTick = world.Time.Tick + (merchant.ArriveTick - merchant.DepartTick),
+            Path = back.SelectMany(t => new[] { t.X, t.Y }).ToList(),
         });
     }
 }

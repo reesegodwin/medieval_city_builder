@@ -1,4 +1,6 @@
+using Sim.Core.Commands;
 using Sim.Core.Economy;
+using Sim.Core.World;
 using Sim.Core.Settlements;
 using Sim.Core.Simulation;
 using Sim.Core.Trade;
@@ -21,9 +23,69 @@ public static class TradeGovernor
     /// <summary>A surplus is stock at or above this share of the stock limit.</summary>
     public const double SurplusShare = 0.9;
 
+    /// <summary>Days between attempts to plan a road to the same trading partner.</summary>
+    public const int RoadRetryDays = 10;
+
+    /// <summary>Most tiles searched when planning a road to another town.</summary>
+    public const int MaxRoadPlanSearch = 300_000;
+
+    /// <summary>
+    /// Caravans need roads, so a governed town plans a road towards the nearest town with a Trading Post that its
+    /// roads don't reach yet: to that town's roads, or to the edge of its territory (which that town builds on from).
+    /// </summary>
+    private static void ConnectToPartner(GameWorld world, Settlement s)
+    {
+        if (s.RoadPlans.Count > 0) return; // still building the last one
+        var ends = Trading.RoadEnds(world, s);
+        if (ends.Count == 0) return;
+
+        var partner = world.Settlements
+            .Where(o => o != s && Trading.TradingPost(o) != null)
+            .OrderBy(o => Math.Abs(o.CenterX - s.CenterX) + Math.Abs(o.CenterY - s.CenterY)).ThenBy(o => o.Id)
+            .FirstOrDefault(o => Trading.RoadPath(world, s, o) == null);
+        if (partner == null) return;
+
+        string key = $"road@{partner.Id}";
+        long today = world.Time.Day;
+        if (s.FailedSiteSearches.TryGetValue(key, out long tried) && today - tried < RoadRetryDays) return;
+        s.FailedSiteSearches[key] = today;
+
+        var theirRoads = RoadNetwork(world, Trading.RoadEnds(world, partner));
+        bool AtPartner(int x, int y)
+        {
+            if (theirRoads.Contains((x, y))) return true;
+            var map = world.Map;
+            return map.GetTile(x + 1, y).TerritoryId == partner.Id || map.GetTile(x - 1, y).TerritoryId == partner.Id ||
+                   map.GetTile(x, y + 1).TerritoryId == partner.Id || map.GetTile(x, y - 1).TerritoryId == partner.Id;
+        }
+        bool Blocked(int x, int y) =>
+            world.Map.GetTile(x, y) is { IsRoad: false, RoadPlanned: false } && Roads.Check(world, s, x, y) != null;
+
+        var path = Pathfinder.FindPathTowards(world.Map, ends[0], AtPartner, Trading.Depot(partner),
+            Pathfinder.Mode.BuildRoad, MaxRoadPlanSearch, Blocked);
+        if (path == null) return;
+        var tiles = path.Where(t => world.Map.GetTile(t.X, t.Y) is { IsRoad: false, RoadPlanned: false }).ToList();
+        if (tiles.Count > 0) world.Execute(new PlaceRoadCommand(s.Id, tiles));
+    }
+
+    /// <summary>Road tiles joined to the given starting tiles (breadth-first).</summary>
+    private static HashSet<(int X, int Y)> RoadNetwork(GameWorld world, IEnumerable<(int X, int Y)> starts)
+    {
+        var seen = new HashSet<(int X, int Y)>(starts);
+        var queue = new Queue<(int X, int Y)>(seen);
+        while (queue.Count > 0 && seen.Count < Trading.MaxRoadSearch)
+        {
+            var (x, y) = queue.Dequeue();
+            foreach (var n in new[] { (x, y - 1), (x + 1, y), (x, y + 1), (x - 1, y) })
+                if (world.Map.GetTile(n.Item1, n.Item2).IsRoad && seen.Add(n)) queue.Enqueue(n);
+        }
+        return seen;
+    }
+
     public static void Daily(GameWorld world, Settlement s)
     {
         if (Trading.TradingPost(s) == null) return;
+        ConnectToPartner(world, s);
         var rules = world.Data.Trade;
         var offers = world.Trade.Offers;
 

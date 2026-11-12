@@ -59,6 +59,12 @@ public sealed class TradeRules
     public List<string> MerchantGoods { get; set; } = new();
 
     public int StartingCoin { get; set; } = 50;
+
+    /// <summary>Coin each adult pays in taxes per game day.</summary>
+    public double TaxPerAdultDay { get; set; } = 0.08;
+
+    /// <summary>Output of buildings with upkeep while the treasury can't pay it.</summary>
+    public double UnpaidOutput { get; set; } = 0.5;
     public int MaxOpenOffers { get; set; } = 8;
     public int MaxRoutes { get; set; } = 6;
 }
@@ -173,6 +179,9 @@ public sealed class BuildingDef
     public TownCentreDef? TownCentre { get; set; }
 
     public GovernorHint? Governor { get; set; }
+
+    /// <summary>Coin per game day the treasury pays to keep this building running once finished.</summary>
+    public double Upkeep { get; set; }
 
     /// <summary>A Trading Post: needed to post or accept offers and routes; caravans leave from it.</summary>
     public bool Trade { get; set; }

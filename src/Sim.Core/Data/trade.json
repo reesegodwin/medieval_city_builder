@@ -17,5 +17,7 @@
   ],
   "startingCoin": 50,
   "maxOpenOffers": 8,
-  "maxRoutes": 6
+  "maxRoutes": 6,
+  "taxPerAdultDay": 0.06,
+  "unpaidOutput": 0.5
 }

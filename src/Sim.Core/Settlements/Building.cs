@@ -109,4 +109,7 @@ public static class JobKinds
 
     /// <summary>Carries goods between stockpiles and workplaces, so the workers there don't have to.</summary>
     public const string Hauler = "hauler";
+
+    /// <summary>Builds the settlement's planned roads; based at the town centre.</summary>
+    public const string Roadworker = "roadworker";
 }

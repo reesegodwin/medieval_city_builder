@@ -9,6 +9,9 @@ namespace MedievalClient;
 public partial class RoadRenderer : Node3D
 {
     private static readonly Color Dirt = new(0.58f, 0.47f, 0.33f);
+    private static readonly Color Planned = new(0.85f, 0.7f, 0.45f, 0.55f);
+    private static readonly Color PlannedBridge = new(0.55f, 0.38f, 0.22f, 0.7f);
+    private MeshInstance3D _plans = null!;
 
     private Settlement _settlement = null!;
     private WorldMap _map = null!;
@@ -20,6 +23,8 @@ public partial class RoadRenderer : Node3D
         _map = map;
         _settlement = settlement;
         _mesh = new MeshInstance3D { CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        _plans = new MeshInstance3D { CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        AddChild(_plans);
         AddChild(_mesh);
     }
 
@@ -53,6 +58,16 @@ public partial class RoadRenderer : Node3D
                     color, Vector3.Up);
         }
         _mesh.Mesh = mb.Commit();
+
+        // Planned roads: faint pegged-out strips until the roadworkers get to them.
+        var plans = new MeshBuilder();
+        foreach (var plan in _settlement.RoadPlans)
+        {
+            float px = plan.X, pz = plan.Y;
+            var marker = _map.GetTile(plan.X, plan.Y).Terrain == Terrain.Water ? PlannedBridge : Planned;
+            plans.Quad(V(px + 0.3f, pz + 0.3f), V(px + 0.7f, pz + 0.3f), V(px + 0.7f, pz + 0.7f), V(px + 0.3f, pz + 0.7f), marker, Vector3.Up);
+        }
+        _plans.Mesh = plans.Commit(Materials.Overlay);
     }
 
     /// <summary>A plank deck with posts and rails on the sides that face open water.</summary>

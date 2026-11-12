@@ -366,8 +366,8 @@ public partial class Main : Node3D
         if (_session.World.Settlements.Count != _renderedSettlements.Count) AddNewSettlements();
         if (_followCaravan && _session.World.Trade.Caravans.FirstOrDefault() is { } caravan)
         {
-            float t = (float)caravan.Progress(_session.World.Time.Tick);
-            _camera.Position = new Vector3(Mathf.Lerp(caravan.StartX, caravan.EndX, t) + 0.5f, 0, Mathf.Lerp(caravan.StartY, caravan.EndY, t) + 0.5f);
+            var (at, _) = CaravanRenderer.PositionAlongPath(caravan, (float)caravan.Progress(_session.World.Time.Tick));
+            _camera.Position = new Vector3(at.X, 0, at.Y);
         }
         _citizens.Animate = !_session.Paused;
 
