@@ -28,6 +28,12 @@ public sealed class GameWorld
     public int TotalDeaths { get; set; }
     public int TotalBirths { get; set; }
 
+    /// <summary>Speed and offline rules, chosen when the world is created.</summary>
+    public WorldSettings Settings { get; set; } = new();
+
+    /// <summary>Real UTC time the world was last played (or saved); used to catch up on time away.</summary>
+    public DateTimeOffset? LastActiveUtc { get; set; }
+
     public GameWorld(ulong seed, GameData? data = null)
     {
         Seed = seed;

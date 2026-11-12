@@ -3,6 +3,7 @@ using Sim.Core.Data;
 using Sim.Core.Events;
 using Sim.Core.Settlements;
 using Sim.Core.Systems;
+using Sim.Core.Time;
 
 namespace MedievalClient.Ui;
 
@@ -38,7 +39,9 @@ public partial class Hud : CanvasLayer
     /// <summary>Raised whenever any HUD button is pressed (for the click sound).</summary>
     public event Action? ButtonClicked;
 
-    public void Build(GameData data, bool autoBuild, bool autoTerritory)
+    /// <param name="speeds">Speed multipliers to offer (relative to the world's normal speed).</param>
+    /// <param name="canChangeSpeed">False when the world's speed is fixed or someone else controls it.</param>
+    public void Build(GameData data, bool autoBuild, bool autoTerritory, IReadOnlyList<double> speeds, bool canChangeSpeed, bool canPause)
     {
         // --- Top bar ---
         var top = new PanelContainer();
@@ -54,13 +57,23 @@ public partial class Hud : CanvasLayer
         topRow.AddChild(_date);
         topRow.AddChild(_stock);
 
-        _pause = new Button { Text = "Pause", ToggleMode = true, TooltipText = "Space", FocusMode = Control.FocusModeEnum.None };
+        _pause = new Button
+        {
+            Text = "Pause", ToggleMode = true, FocusMode = Control.FocusModeEnum.None, Disabled = !canPause,
+            TooltipText = canPause ? "Space" : "Shared worlds can't be paused",
+        };
         _pause.Pressed += () => PauseToggled?.Invoke();
         topRow.AddChild(_pause);
         int key = 1;
-        foreach (double speed in SimSession.Speeds)
+        foreach (double speed in speeds)
         {
-            var b = new Button { Text = speed >= 1000 ? $"{speed / 1000}kx" : $"{speed}x", ToggleMode = true, TooltipText = $"Key {key++}", FocusMode = Control.FocusModeEnum.None };
+            var b = new Button
+            {
+                Text = $"{speed}x", ToggleMode = true, FocusMode = Control.FocusModeEnum.None, Disabled = !canChangeSpeed,
+                TooltipText = canChangeSpeed
+                    ? $"Key {key++}: {speed}x the world's normal speed"
+                    : "This world's speed is fixed or set by the host",
+            };
             double s = speed;
             b.Pressed += () => SpeedRequested?.Invoke(s);
             _speedButtons[speed] = b;
@@ -233,7 +246,14 @@ public partial class Hud : CanvasLayer
         var world = session.World;
         var town = session.PlayerTown;
         double moodNow = town.Citizens.Count > 0 ? town.Citizens.Average(c => c.Mood) : 0;
-        _date.Text = $"{town.Name}  ·  {world.Time}\nMood {moodNow:0}/100";
+        string where = session.Mode switch
+        {
+            SessionMode.Host => $"  ·  hosting :{session.HostPort}",
+            SessionMode.Join => "  ·  online",
+            _ => "",
+        };
+        string behind = session.TicksBehind > TimeScale.TicksPerDay ? $"  (catching up {session.TicksBehind / TimeScale.TicksPerDay} days)" : "";
+        _date.Text = $"{town.Name}  ·  {world.Time}{where}\nMood {moodNow:0}/100  ·  {session.Speed:0.#}x{behind}";
 
         int adults = town.Citizens.Count(c => c.IsAdult);
         int idle = town.Citizens.Count(c => c.IsAdult && c.JobBuildingId == null);

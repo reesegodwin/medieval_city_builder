@@ -87,6 +87,9 @@ public sealed class Settlement
 {
     public int Id { get; }
     public string Name { get; }
+
+    /// <summary>The player who controls this settlement (their account name), or null for single-player / NPC towns.</summary>
+    public string? OwnerId { get; set; }
     public int CenterX { get; }
     public int CenterY { get; }
 

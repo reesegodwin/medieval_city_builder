@@ -102,9 +102,12 @@ Rough guess for one experienced developer: a playable Phase 3 in 6–12 months, 
 - **The map grows.** New procedural regions are generated at the edges as players arrive or rebirth. This keeps space for new players without a global wipe.
 - Legacy perks must be small and capped, or veterans snowball. Prefer sideways perks (variety) over raw power.
 
-### Time scale: 1 in-game day = 1 real hour, no day/night cycle
-- 24 game days per real day. A 360-day game year is 15 real days.
-- `TimeScale` is a single config constant so it can be tuned later.
+### Time scale: one balance, a per-world clock
+- **Every world has the same balance; only its clock differs.** Real seconds per game day is a world setting chosen at creation (`WorldSettings`, stored in the save): *persistent* 1 day per hour (24/7 servers), *weekend* 1 per 10 min, *evening* 1 per minute (village to castle in an evening or two), *sprint* 1 per 20 s.
+- At the persistent speed: 24 game days per real day, and a 360-day game year is 15 real days. The examples below use that speed.
+- **Speed control** (a world setting): *Fixed* (dedicated servers), *Host decides* (host-and-play), or *Everyone agrees* (the world goes faster only if every connected player asks; the slowest request wins, like Total War battles). Players can't speed-run a shared world on their own. Single-player worlds can pause and go up to 64×.
+- **When nobody plays** (a world setting): *Pause* (Minecraft-style), *Catch up* (time stops, then the world simulates the missed time, capped at 7 game days by default, when someone returns), or *Run* (24/7; a restarted server also catches up on its downtime). Catch-up uses UTC wall-clock time saved with the world. A clock that went backwards owes nothing, and on a server only the server's clock counts.
+- Future war features need a minimum warning time in *real* minutes on top of their game-day durations, so fast worlds can't overrun a player who stepped away.
 - Write all durations in **game days** (a farm cycle, building times, aging, siege engines), so tuning the time scale rescales everything consistently.
 - Examples: a starter hut takes 0.1 day (6 min). A refinery takes 48 days (2 real days). A battering ram takes 12 days (12 h). A full siege takes 50–100 days (2–4 real days).
 - Aging: a general aged 25→60 lives about 1.5 real years, so generals and lineage succession actually matter.
@@ -121,6 +124,17 @@ Rough guess for one experienced developer: a playable Phase 3 in 6–12 months, 
 - **Player rules hook into this** (the existing settlement rule system): muster %, which units to keep working, whether to sally out, and surrender terms.
 - **Stand down:** when the threat leaves the radius for N hours, townsfolk return to work.
 - Siege engines take game-days to build, and a Discord/email alert goes out at the *Watch* level. Together these give an offline player real hours to react.
+
+## Hosting and multiplayer (Phase 2 started)
+Grows the way Minecraft does, from single-player up to a 24/7 server, with the same world file throughout:
+1. **Single-player:** the simulation runs inside the game (`SimSession` local mode).
+2. **Host and play:** the game runs a `WorldHost` and TCP listener in the background and joins it. Friends connect with the host's address and port. The world is saved to the host's user folder and can be continued later. Planned: Steam's free relay networking so nobody needs to forward ports.
+3. **Dedicated server:** `src/Sim.Server` (`medieval-server`) is a headless Linux/Windows program that loads or creates a world file, autosaves, and saves on SIGINT/SIGTERM. A single-player or hosted world file can be moved onto it.
+4. *Later, maybe:* official or "Realms"-style hosted worlds, paid for by subscription or through a hosting partner.
+
+**Protocol (`src/Sim.Net`, engine-free):** JSON lines over TCP. The server is the authority. A joining player gets a snapshot (the save format), then a stream of "advance to tick T" and "apply command C at tick T" messages. Every client runs the same deterministic simulation, so they stay identical with very little traffic; a daily state hash detects drift and triggers a fresh snapshot. Commands carry a settlement id, and the server only accepts them from that settlement's owner (`Settlement.OwnerId`, the player name). New players get a settlement founded on a ring of spots 260 tiles apart (`FoundSettlementCommand`); the first player into a single-player world takes over its town.
+
+**Not yet:** accounts and authentication (names are trusted, so this suits friends' servers, not public ones), Steam relay, interaction between towns, and PostgreSQL persistence. For public servers, run on a separate rented machine, never a home network.
 
 ## Colony Simulation (Dwarf Fortress / Songs of Syx-inspired depth, Stronghold look)
 

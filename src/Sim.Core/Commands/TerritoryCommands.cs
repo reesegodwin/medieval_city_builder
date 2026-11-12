@@ -176,7 +176,7 @@ public static class TerritorySystem
 }
 
 /// <summary>Claims painted tiles. Only tiles connected to existing territory count, up to the allowance.</summary>
-public sealed record ClaimTerritoryCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles) : ICommand
+public sealed record ClaimTerritoryCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -197,7 +197,7 @@ public sealed record ClaimTerritoryCommand(int SettlementId, IReadOnlyList<(int 
 }
 
 /// <summary>Gives up territory tiles that have no buildings or roads on them, freeing allowance.</summary>
-public sealed record ReleaseTerritoryCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles) : ICommand
+public sealed record ReleaseTerritoryCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -210,7 +210,7 @@ public sealed record ReleaseTerritoryCommand(int SettlementId, IReadOnlyList<(in
 }
 
 /// <summary>Spends all spare allowance evenly around the town centre.</summary>
-public sealed record ExpandTerritoryCommand(int SettlementId) : ICommand
+public sealed record ExpandTerritoryCommand(int SettlementId) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -224,7 +224,7 @@ public sealed record ExpandTerritoryCommand(int SettlementId) : ICommand
     }
 }
 
-public sealed record SetAutoExpandTerritoryCommand(int SettlementId, bool Enabled) : ICommand
+public sealed record SetAutoExpandTerritoryCommand(int SettlementId, bool Enabled) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -239,7 +239,7 @@ public sealed record SetAutoExpandTerritoryCommand(int SettlementId, bool Enable
 /// Rebuilds the town centre as its next tier, in place. The new tier is a normal construction site (materials,
 /// then builders); the territory cap rises when it's finished, and doesn't drop in the meantime.
 /// </summary>
-public sealed record UpgradeTownCentreCommand(int SettlementId) : ICommand
+public sealed record UpgradeTownCentreCommand(int SettlementId) : ISettlementCommand
 {
     /// <summary>Why the settlement can't upgrade its centre now, or null if it can.</summary>
     public static string? Check(GameWorld world, Settlement s, out Data.BuildingDef? next)

@@ -12,7 +12,18 @@ namespace MedievalClient;
 /// </summary>
 public partial class TerritoryRenderer : Node3D
 {
-    private static readonly Color Border = new(0.95f, 0.78f, 0.25f);
+    private static readonly Color OwnBorder = new(0.95f, 0.78f, 0.25f);
+
+    /// <summary>Line colour: gold for the player's own land, a distinct colour for each other settlement.</summary>
+    public Color BorderColor { get; set; } = OwnBorder;
+
+    private static readonly Color[] OtherColors =
+    {
+        new(0.85f, 0.25f, 0.25f), new(0.3f, 0.5f, 0.95f), new(0.65f, 0.35f, 0.85f),
+        new(0.25f, 0.8f, 0.8f), new(0.95f, 0.5f, 0.2f), new(0.9f, 0.9f, 0.9f),
+    };
+
+    public static Color OtherPlayerColor(int settlementId) => OtherColors[settlementId % OtherColors.Length];
     private static readonly Color Fill = new(0.95f, 0.78f, 0.25f, 0.16f);
     private const float MinWidth = 0.12f;
     private const float MaxWidth = 0.7f;
@@ -156,13 +167,13 @@ public partial class TerritoryRenderer : Node3D
     }
 
     /// <summary>A flat band centred on a border segment, extended by half its width so joints overlap cleanly.</summary>
-    private static void Segment(MeshBuilder mb, Vector2 a, Vector2 b, float width, float lift, Func<Vector2, float, Vector3> at)
+    private void Segment(MeshBuilder mb, Vector2 a, Vector2 b, float width, float lift, Func<Vector2, float, Vector3> at)
     {
         var dir = (b - a).Normalized();
         var side = new Vector2(-dir.Y, dir.X) * (width / 2);
         a -= dir * (width / 2);
         b += dir * (width / 2);
-        mb.Quad(at(a + side, lift), at(b + side, lift), at(b - side, lift), at(a - side, lift), Border, Vector3.Up);
+        mb.Quad(at(a + side, lift), at(b + side, lift), at(b - side, lift), at(a - side, lift), BorderColor, Vector3.Up);
     }
 
     private void BuildFill()

@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 4;
+    public const int CurrentVersion = 5;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -59,6 +59,8 @@ public static class SaveGame
         Random = world.Rng.GetState(),
         TotalBirths = world.TotalBirths,
         TotalDeaths = world.TotalDeaths,
+        Settings = world.Settings.Clone(),
+        LastActiveUtc = world.LastActiveUtc,
         Settlements = world.Settlements.Select(CaptureSettlement).ToList(),
         Events = world.Events.Select(e => new EventSave(e.Time.Tick, e.Kind, e.SettlementId, e.Message)).ToList(),
     };
@@ -67,6 +69,7 @@ public static class SaveGame
     {
         Id = s.Id,
         Name = s.Name,
+        OwnerId = s.OwnerId,
         CenterX = s.CenterX,
         CenterY = s.CenterY,
         Stock = s.Stock.Items.ToDictionary(kv => kv.Key, kv => kv.Value),
@@ -154,6 +157,9 @@ public static class SaveGame
         world.Rng.SetState(file.Random);
         world.TotalBirths = file.TotalBirths;
         world.TotalDeaths = file.TotalDeaths;
+        // Version 4 and older had no world settings: they keep the defaults (1 day per hour, paused while away).
+        world.Settings = file.Settings ?? new WorldSettings();
+        world.LastActiveUtc = file.LastActiveUtc;
 
         foreach (var save in file.Settlements) world.Settlements.Add(RestoreSettlement(world, save));
         foreach (var e in file.Events)
@@ -163,7 +169,7 @@ public static class SaveGame
 
     private static Settlement RestoreSettlement(GameWorld world, SettlementSave save)
     {
-        var s = new Settlement(save.Id, save.Name, save.CenterX, save.CenterY);
+        var s = new Settlement(save.Id, save.Name, save.CenterX, save.CenterY) { OwnerId = save.OwnerId };
         foreach (var (resource, amount) in save.Stock) s.Stock.Add(resource, amount);
 
         CopyInto(save.Rules.JobPriority, s.Rules.JobPriority);
@@ -267,6 +273,8 @@ public static class SaveGame
         public ulong[] Random { get; set; } = Array.Empty<ulong>();
         public int TotalBirths { get; set; }
         public int TotalDeaths { get; set; }
+        public WorldSettings? Settings { get; set; }
+        public DateTimeOffset? LastActiveUtc { get; set; }
         public List<SettlementSave> Settlements { get; set; } = new();
         public List<EventSave> Events { get; set; } = new();
     }
@@ -277,6 +285,7 @@ public static class SaveGame
     {
         public int Id { get; set; }
         public string Name { get; set; } = "";
+        public string? OwnerId { get; set; }
         public int CenterX { get; set; }
         public int CenterY { get; set; }
         public Dictionary<string, int> Stock { get; set; } = new();

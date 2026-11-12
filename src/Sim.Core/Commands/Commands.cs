@@ -21,7 +21,13 @@ public interface ICommand
     CommandResult Execute(GameWorld world);
 }
 
-public sealed record PlaceBuildingCommand(int SettlementId, string BuildingDefId, int X, int Y) : ICommand
+/// <summary>A command acting on one settlement; servers only accept it from that settlement's owner.</summary>
+public interface ISettlementCommand : ICommand
+{
+    int SettlementId { get; }
+}
+
+public sealed record PlaceBuildingCommand(int SettlementId, string BuildingDefId, int X, int Y) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -39,7 +45,7 @@ public sealed record PlaceBuildingCommand(int SettlementId, string BuildingDefId
     }
 }
 
-public sealed record SetJobPriorityCommand(int SettlementId, string JobKind, int Priority) : ICommand
+public sealed record SetJobPriorityCommand(int SettlementId, string JobKind, int Priority) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -50,7 +56,7 @@ public sealed record SetJobPriorityCommand(int SettlementId, string JobKind, int
     }
 }
 
-public sealed record SetReserveCommand(int SettlementId, string Resource, int Amount) : ICommand
+public sealed record SetReserveCommand(int SettlementId, string Resource, int Amount) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -64,7 +70,7 @@ public sealed record SetReserveCommand(int SettlementId, string Resource, int Am
 }
 
 /// <summary>Sets the flat stock limit for a resource; producers stop once stock reaches it.</summary>
-public sealed record SetProductionLimitCommand(int SettlementId, string Resource, int Amount) : ICommand
+public sealed record SetProductionLimitCommand(int SettlementId, string Resource, int Amount) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -77,7 +83,7 @@ public sealed record SetProductionLimitCommand(int SettlementId, string Resource
     }
 }
 
-public sealed record SetAutoBuildCommand(int SettlementId, bool Enabled) : ICommand
+public sealed record SetAutoBuildCommand(int SettlementId, bool Enabled) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -173,7 +179,7 @@ public static class Roads
 }
 
 /// <summary>Lays road on every listed tile. All tiles must be valid, or nothing is built.</summary>
-public sealed record PlaceRoadCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles) : ICommand
+public sealed record PlaceRoadCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -198,7 +204,7 @@ public sealed record PlaceRoadCommand(int SettlementId, IReadOnlyList<(int X, in
     }
 }
 
-public sealed record RemoveRoadCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles) : ICommand
+public sealed record RemoveRoadCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -220,7 +226,7 @@ public sealed record RemoveRoadCommand(int SettlementId, IReadOnlyList<(int X, i
 /// Tears a building down. Workers and residents are released, and part of the cost comes back:
 /// nothing was spent yet while awaiting materials, half while under construction, a quarter once finished.
 /// </summary>
-public sealed record DemolishBuildingCommand(int SettlementId, int BuildingId) : ICommand
+public sealed record DemolishBuildingCommand(int SettlementId, int BuildingId) : ISettlementCommand
 {
     public const double ConstructionRefund = 0.5;
     public const double OperationalRefund = 0.25;
@@ -266,5 +272,41 @@ public sealed record DemolishBuildingCommand(int SettlementId, int BuildingId) :
         world.Log(EventKind.BuildingDemolished, settlement,
             $"{b.Def.Name} demolished" + (returned.Count > 0 ? $" ({string.Join(", ", returned)} recovered)" : ""));
         return CommandResult.Success();
+    }
+}
+
+/// <summary>
+/// Founds a settlement for a player joining a shared world, well away from existing ones. Applied in the same
+/// order on the server and every client, so they all get the same town.
+/// </summary>
+public sealed record FoundSettlementCommand(string OwnerId) : ICommand
+{
+    /// <summary>Distance between neighbouring founding spots, comfortably more than two maximum territories.</summary>
+    public const int Spacing = 260;
+
+    public CommandResult Execute(GameWorld world)
+    {
+        if (string.IsNullOrWhiteSpace(OwnerId)) return CommandResult.Fail("A player name is needed");
+        if (world.Settlements.Any(s => s.OwnerId == OwnerId)) return CommandResult.Fail($"{OwnerId} already has a settlement");
+
+        // The n-th new settlement goes to the n-th spot on square rings around the first one.
+        var origin = world.Settlements.FirstOrDefault() is { } first ? (first.CenterX, first.CenterY) : (0, 0);
+        var (dx, dy) = SpotOffset(world.Settlements.Count);
+        var town = Simulation.SettlementFounder.Found(world, nearX: origin.Item1 + dx * Spacing, nearY: origin.Item2 + dy * Spacing);
+        town.OwnerId = OwnerId;
+        return CommandResult.Success(town.Id);
+    }
+
+    /// <summary>Offsets (in spacings) in ring order: (0,0), then the 8 around it, then the 16 around those...</summary>
+    public static (int Dx, int Dy) SpotOffset(int n)
+    {
+        int index = 0;
+        for (int r = 0; ; r++)
+        for (int dy = -r; dy <= r; dy++)
+        for (int dx = -r; dx <= r; dx++)
+        {
+            if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != r) continue;
+            if (index++ == n) return (dx, dy);
+        }
     }
 }
