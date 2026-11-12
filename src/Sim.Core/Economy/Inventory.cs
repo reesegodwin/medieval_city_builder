@@ -21,7 +21,7 @@ public sealed class Inventory
     public bool TryTake(string resource, int amount)
     {
         if (Get(resource) < amount) return false;
-        _amounts[resource] = Get(resource) - amount;
+        Set(resource, Get(resource) - amount);
         return true;
     }
 
@@ -30,7 +30,14 @@ public sealed class Inventory
     public bool TryTakeAll(IReadOnlyDictionary<string, int> cost)
     {
         if (!Has(cost)) return false;
-        foreach (var (resource, amount) in cost) _amounts[resource] = Get(resource) - amount;
+        foreach (var (resource, amount) in cost) Set(resource, Get(resource) - amount);
         return true;
+    }
+
+    /// <summary>Keeps the inventory canonical: resources that run out are removed, not kept at zero.</summary>
+    private void Set(string resource, int amount)
+    {
+        if (amount == 0) _amounts.Remove(resource);
+        else _amounts[resource] = amount;
     }
 }

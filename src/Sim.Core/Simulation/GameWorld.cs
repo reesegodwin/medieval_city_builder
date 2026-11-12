@@ -38,6 +38,16 @@ public sealed class GameWorld
 
     public int NextId() => ++_nextId;
 
+    /// <summary>The last id handed out (saved so loaded worlds keep numbering where they left off).</summary>
+    public int LastId => _nextId;
+
+    /// <summary>Used by the save system to restore the clock and id counter.</summary>
+    internal void Restore(long tick, int lastId)
+    {
+        Time = new GameTime(tick);
+        _nextId = lastId;
+    }
+
     internal void AdvanceTime() => Time = Time.Next();
 
     public CommandResult Execute(ICommand command) => command.Execute(this);

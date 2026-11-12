@@ -62,6 +62,20 @@ public sealed record SetReserveCommand(int SettlementId, string Resource, int Am
     }
 }
 
+/// <summary>Sets the flat stock limit for a resource; producers stop once stock reaches it.</summary>
+public sealed record SetProductionLimitCommand(int SettlementId, string Resource, int Amount) : ICommand
+{
+    public CommandResult Execute(GameWorld world)
+    {
+        var settlement = world.FindSettlement(SettlementId);
+        if (settlement == null) return CommandResult.Fail("Unknown settlement");
+        if (!world.Data.Resources.ContainsKey(Resource)) return CommandResult.Fail("Unknown resource");
+        if (Amount < 0) return CommandResult.Fail("Limit cannot be negative");
+        settlement.Rules.ProductionLimits[Resource] = Amount;
+        return CommandResult.Success();
+    }
+}
+
 public sealed record SetAutoBuildCommand(int SettlementId, bool Enabled) : ICommand
 {
     public CommandResult Execute(GameWorld world)

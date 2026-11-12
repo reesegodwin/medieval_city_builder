@@ -25,6 +25,9 @@ public partial class Hud : CanvasLayer
     public event Action<double>? SpeedRequested;
     public event Action? PauseToggled;
     public event Action<bool>? AutoBuildToggled;
+    public event Action? RulesRequested;
+    public event Action? SaveRequested;
+    public event Action? LoadRequested;
 
     public void Build(GameData data, bool autoBuild)
     {
@@ -48,7 +51,7 @@ public partial class Hud : CanvasLayer
         int key = 1;
         foreach (double speed in SimSession.Speeds)
         {
-            var b = new Button { Text = $"{speed}x", ToggleMode = true, TooltipText = $"Key {key++}", FocusMode = Control.FocusModeEnum.None };
+            var b = new Button { Text = speed >= 1000 ? $"{speed / 1000}kx" : $"{speed}x", ToggleMode = true, TooltipText = $"Key {key++}", FocusMode = Control.FocusModeEnum.None };
             double s = speed;
             b.Pressed += () => SpeedRequested?.Invoke(s);
             _speedButtons[speed] = b;
@@ -57,13 +60,25 @@ public partial class Hud : CanvasLayer
 
         _autoBuild = new CheckBox
         {
-            Text = "Auto-build",
+            Text = "Auto",
             ButtonPressed = autoBuild,
             TooltipText = "Let the settlement place buildings on its own",
             FocusMode = Control.FocusModeEnum.None,
         };
         _autoBuild.Toggled += on => AutoBuildToggled?.Invoke(on);
         topRow.AddChild(_autoBuild);
+
+        foreach (var (text, tip, action) in new (string, string, Action)[]
+                 {
+                     ("Rules", "Job priorities, stock limits and reserves (P)", () => RulesRequested?.Invoke()),
+                     ("Save", "Quick-save (F5)", () => SaveRequested?.Invoke()),
+                     ("Load", "Load the quick-save (F9)", () => LoadRequested?.Invoke()),
+                 })
+        {
+            var b = new Button { Text = text, TooltipText = tip, FocusMode = Control.FocusModeEnum.None };
+            b.Pressed += action;
+            topRow.AddChild(b);
+        }
 
         // --- Build menu (bottom) ---
         var bottom = new PanelContainer();
@@ -139,7 +154,7 @@ public partial class Hud : CanvasLayer
         // --- Controls help (top-right, under the bar) ---
         var help = new Label
         {
-            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   X: demolish\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed",
+            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   X: demolish   P: rules\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
             HorizontalAlignment = HorizontalAlignment.Right,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
@@ -214,4 +229,10 @@ public partial class Hud : CanvasLayer
     }
 
     public void SetStatus(string? text) => _status.Text = text ?? "";
+
+    /// <summary>The event feed shares the left side of the screen with the rules panel.</summary>
+    public bool FeedVisible
+    {
+        set => _feedLabel.Visible = value;
+    }
 }

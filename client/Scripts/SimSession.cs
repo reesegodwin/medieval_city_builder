@@ -30,12 +30,42 @@ public sealed class SimSession
     public double Speed { get; set; } = 60;
     public bool Paused { get; set; }
 
-    public SimSession(ulong seed)
+    /// <summary>Where quick-saves go (Godot's per-user data folder).</summary>
+    public const string SavePath = "user://savegame.json";
+
+    /// <summary>A world loaded from disk, handed to the next scene instance (the scene reloads to switch worlds).</summary>
+    public static GameWorld? PendingWorld { get; set; }
+
+    public SimSession(ulong seed) : this(CreateWorld(seed))
     {
-        World = new GameWorld(seed);
-        PlayerTown = SettlementFounder.Found(World);
-        _simulator = new Simulator(World);
     }
+
+    public SimSession(GameWorld world)
+    {
+        World = world;
+        PlayerTown = world.Settlements[0];
+        _simulator = new Simulator(World);
+        _eventCursor = 0;
+    }
+
+    private static GameWorld CreateWorld(ulong seed)
+    {
+        var world = new GameWorld(seed);
+        SettlementFounder.Found(world);
+        return world;
+    }
+
+    /// <summary>Saves the world. Returns the full file path, or throws on failure.</summary>
+    public string Save()
+    {
+        string path = ProjectSettings.GlobalizePath(SavePath);
+        Sim.Core.Persistence.SaveGame.Save(World, path);
+        return path;
+    }
+
+    public static bool HasSave => File.Exists(ProjectSettings.GlobalizePath(SavePath));
+
+    public static GameWorld LoadSaved() => Sim.Core.Persistence.SaveGame.Load(ProjectSettings.GlobalizePath(SavePath));
 
     /// <summary>Runs as many ticks as the elapsed real time (times speed) calls for.</summary>
     public void Advance(double realDeltaSeconds)

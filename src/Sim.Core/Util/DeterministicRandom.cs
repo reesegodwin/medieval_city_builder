@@ -17,6 +17,16 @@ public sealed class DeterministicRandom
         _s3 = Hashing.SplitMix(ref x);
     }
 
+    /// <summary>The full internal state, for saving.</summary>
+    public ulong[] GetState() => new[] { _s0, _s1, _s2, _s3 };
+
+    /// <summary>Restores a state captured with <see cref="GetState"/>.</summary>
+    public void SetState(IReadOnlyList<ulong> state)
+    {
+        if (state.Count != 4) throw new ArgumentException("Random state must have 4 values", nameof(state));
+        (_s0, _s1, _s2, _s3) = (state[0], state[1], state[2], state[3]);
+    }
+
     /// <summary>Summary of the internal state, for determinism checks. Does not advance the generator.</summary>
     public ulong StateFingerprint => _s0 ^ RotL(_s1, 16) ^ RotL(_s2, 32) ^ RotL(_s3, 48);
 

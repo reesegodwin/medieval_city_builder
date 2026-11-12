@@ -11,6 +11,8 @@ namespace MedievalClient;
 ///   --warmup-days N       fast-forward the simulation before showing it
 ///   --screenshot file.png save a screenshot after a few frames and quit (automated checks)
 ///   --inspect             select a citizen on start (shows the inspector panel)
+///   --rules               open the rules panel on start
+///   --save-load-test      save, reload the scene from the save, then continue (automated check)
 /// </summary>
 public partial class Main : Node3D
 {
@@ -25,6 +27,7 @@ public partial class Main : Node3D
     private DemolishTool _demolishTool = null!;
     private Hud _hud = null!;
     private InspectorPanel _inspector = null!;
+    private RulesPanel _rules = null!;
     private MeshInstance3D _marker = null!;
 
     private int? _selectedBuilding;
@@ -35,10 +38,16 @@ public partial class Main : Node3D
     private double _flashTimer;
     private string? _screenshotPath;
     private int _frames;
+    private static bool _saveLoadTestDone;
 
     public override void _Ready()
     {
-        _session = new SimSession(SimSession.SeedFromCommandLine(42));
+        // A world loaded from a save is handed over through SimSession.PendingWorld (the scene reloads).
+        _session = SimSession.PendingWorld is { } loaded
+            ? new SimSession(loaded)
+            : new SimSession(SimSession.SeedFromCommandLine(42));
+        bool wasLoaded = SimSession.PendingWorld != null;
+        SimSession.PendingWorld = null;
         var town = _session.PlayerTown;
 
         SetupLighting();
@@ -102,9 +111,22 @@ public partial class Main : Node3D
         _hud.AddChild(_inspector);
         _inspector.Closed += ClearSelection;
 
-        if (int.TryParse(SimSession.UserArg("--warmup-days"), out int warmup) && warmup > 0)
+        _rules = new RulesPanel { Name = "Rules" };
+        _rules.Initialize(_session);
+        _hud.AddChild(_rules);
+        _hud.RulesRequested += _rules.Toggle;
+        _hud.SaveRequested += SaveGame;
+        _hud.LoadRequested += LoadGame;
+        if (wasLoaded)
+        {
+            Flash($"Loaded {town.Name}, {_session.World.Time}");
+            GD.Print($"Loaded save: {_session.World.Time}, hash {_session.World.ComputeStateHash():X16}");
+        }
+
+        if (!wasLoaded && int.TryParse(SimSession.UserArg("--warmup-days"), out int warmup) && warmup > 0)
             _session.RunDays(warmup);
         _screenshotPath = SimSession.UserArg("--screenshot");
+        if (SimSession.UserArg("--rules") != null) _rules.Toggle();
         if (SimSession.UserArg("--inspect") != null)
             _selectedCitizen = town.Citizens.FirstOrDefault(c => c.IsAdult && c.JobBuildingId != null)?.Id;
 
@@ -162,6 +184,8 @@ public partial class Main : Node3D
             _hud.Refresh(_session);
             _hud.AddEvents(_session.TakeNewEvents());
             RefreshInspector();
+            if (_rules.Visible) _rules.Refresh();
+            _hud.FeedVisible = !_rules.Visible;
         }
 
         if (_flashTimer > 0)
@@ -177,7 +201,17 @@ public partial class Main : Node3D
 
         UpdateMarker((float)delta);
 
-        if (_screenshotPath != null && ++_frames == 90) // let chunks stream in first
+        _frames++;
+        if (_frames == 20 && !_saveLoadTestDone && SimSession.UserArg("--save-load-test") != null)
+        {
+            _saveLoadTestDone = true;
+            GD.Print($"Save/load test: saving at {_session.World.Time}, hash {_session.World.ComputeStateHash():X16}");
+            SaveGame();
+            LoadGame();
+            return;
+        }
+
+        if (_screenshotPath != null && _frames == 90) // let chunks stream in first
         {
             var image = GetViewport().GetTexture().GetImage();
             var error = image.SavePng(_screenshotPath);
@@ -209,6 +243,18 @@ public partial class Main : Node3D
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.X }:
                 StartDemolishTool();
+                break;
+
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.P }:
+                _rules.Toggle();
+                break;
+
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.F5 }:
+                SaveGame();
+                break;
+
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.F9 }:
+                LoadGame();
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.Space }:
@@ -244,6 +290,38 @@ public partial class Main : Node3D
         CancelTools();
         ClearSelection();
         _demolishTool.Begin();
+    }
+
+    private void SaveGame()
+    {
+        try
+        {
+            string path = _session.Save();
+            Flash($"Saved to {path}");
+        }
+        catch (Exception e)
+        {
+            Flash($"Save failed: {e.Message}");
+        }
+    }
+
+    private void LoadGame()
+    {
+        if (!SimSession.HasSave)
+        {
+            Flash("No save yet (press F5 to save)");
+            return;
+        }
+        try
+        {
+            SimSession.PendingWorld = SimSession.LoadSaved();
+            GetTree().ReloadCurrentScene();
+        }
+        catch (Exception e)
+        {
+            SimSession.PendingWorld = null;
+            Flash($"Load failed: {e.Message}");
+        }
     }
 
     private void Report(CommandResult? result, string failurePrefix)

@@ -295,3 +295,33 @@ public class GovernorServiceTests
         Assert.True(town.Buildings.Count(b => b.Def.Id == "well") < town.Citizens.Count / 8);
     }
 }
+
+public class RuleCommandTests
+{
+    [Fact]
+    public void RulesCanBeChangedByCommand()
+    {
+        var (world, town, _) = Scenario.NewTown();
+
+        Assert.True(world.Execute(new SetProductionLimitCommand(town.Id, "wood", 20)).Ok);
+        Assert.True(world.Execute(new SetReserveCommand(town.Id, "grain", 55)).Ok);
+        Assert.True(world.Execute(new SetJobPriorityCommand(town.Id, "quarrier", 9)).Ok);
+
+        Assert.Equal(20, town.Rules.ProductionLimits["wood"]);
+        Assert.Equal(55, town.Rules.ReserveOf("grain"));
+        Assert.Equal(9, town.Rules.PriorityOf("quarrier"));
+
+        Assert.False(world.Execute(new SetProductionLimitCommand(town.Id, "gold", 5)).Ok);
+        Assert.False(world.Execute(new SetProductionLimitCommand(town.Id, "wood", -1)).Ok);
+    }
+
+    [Fact]
+    public void LoweringAStockLimitStopsProduction()
+    {
+        var (world, town, sim) = Scenario.NewTown();
+        world.Execute(new SetProductionLimitCommand(town.Id, "wood", 0));
+        sim.RunDays(1);
+        var woodcutter = town.Buildings.First(b => b.Def.Id == "woodcutter");
+        Assert.Empty(woodcutter.WorkerIds);
+    }
+}
