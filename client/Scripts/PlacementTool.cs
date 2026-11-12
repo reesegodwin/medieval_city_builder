@@ -16,6 +16,7 @@ public partial class PlacementTool : Node3D
     private SimSession _session = null!;
     private CameraRig _camera = null!;
     private MeshInstance3D _ghost = null!;
+    private MeshInstance3D _radius = null!;
     private StandardMaterial3D _material = null!;
     private (int X, int Y)? _site;
 
@@ -31,6 +32,8 @@ public partial class PlacementTool : Node3D
         _material = Materials.Transparent(Valid);
         _ghost = new MeshInstance3D { Visible = false, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         AddChild(_ghost);
+        _radius = new MeshInstance3D { Visible = false, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        AddChild(_radius);
     }
 
     public void Begin(BuildingDef def)
@@ -38,6 +41,9 @@ public partial class PlacementTool : Node3D
         Active = def;
         _ghost.Mesh = new BoxMesh { Size = new Vector3(def.Width, 0.5f, def.Height), Material = _material };
         _ghost.Visible = true;
+        _radius.Mesh = def.Service is { } service
+            ? LowPolyMeshes.RadiusOutline(service.Radius, new Color(1f, 0.9f, 0.3f, 0.6f))
+            : null;
     }
 
     public void Cancel()
@@ -46,6 +52,7 @@ public partial class PlacementTool : Node3D
         Problem = null;
         _site = null;
         _ghost.Visible = false;
+        _radius.Visible = false;
     }
 
     public override void _Process(double delta)
@@ -55,6 +62,7 @@ public partial class PlacementTool : Node3D
         if (ground is not Vector3 point)
         {
             _ghost.Visible = false;
+            _radius.Visible = false;
             return;
         }
 
@@ -67,6 +75,8 @@ public partial class PlacementTool : Node3D
         _material.AlbedoColor = Problem == null ? Valid : Invalid;
         _ghost.Visible = true;
         _ghost.Position = new Vector3(left + Active.Width / 2f, 0.25f, top + Active.Height / 2f);
+        _radius.Visible = _radius.Mesh != null;
+        _radius.Position = new Vector3(left + Active.Width / 2 + 0.5f, 0, top + Active.Height / 2 + 0.5f);
     }
 
     /// <summary>Tries to place the active building at the current spot.</summary>

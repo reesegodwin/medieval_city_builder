@@ -122,14 +122,16 @@ internal static class Report
         Console.WriteLine(
             $"{world.Time,-20} Pop {s.Citizens.Count,3} ({adults} adults) | " +
             $"grain {s.Stock.Get("grain"),4} bread {s.Stock.Get("bread"),4} ({Needs.FoodDays(world, s),5:0.0}d) | " +
-            $"wood {s.Stock.Get("wood"),4} stone {s.Stock.Get("stone"),4} | mood {mood,3:0} | idle {idle} homeless {homeless}");
+            $"wood {s.Stock.Get("wood"),4} stone {s.Stock.Get("stone"),4} | mood {mood,3:0} | idle {idle} homeless {homeless} | " +
+            string.Join(" ", world.Data.Needs.Select(n => $"{n.Id} {ServiceSystem.Coverage(s, n.Id):P0}")));
     }
 
     public static void PrintSummary(GameWorld world, Settlement s)
     {
         PrintDay(world, s);
         Console.WriteLine($"Births {world.TotalBirths}, deaths {world.TotalDeaths}. Storage {s.Stock.Total}/{s.StorageCapacity}, " +
-                          $"housing {s.HousingCapacity - s.FreeHousing}/{s.HousingCapacity}.");
+                          $"housing {s.HousingCapacity - s.FreeHousing}/{s.HousingCapacity}, road tiles {s.Roads.Count}.");
+        Console.WriteLine("Stock: " + string.Join(", ", s.Stock.Items.Select(kv => $"{kv.Key} {kv.Value}")));
         Console.WriteLine("Buildings:");
         foreach (var group in s.Buildings.GroupBy(b => b.Def.Name))
         {
@@ -158,7 +160,7 @@ internal static class Report
 
     public static void PrintMap(GameWorld world, Settlement s, int radius = 30)
     {
-        Console.WriteLine("Map ('.' grass, ',' fertile, 'T' forest, '^' rock, '*' iron, '~' water; letters = buildings, lowercase = under construction)");
+        Console.WriteLine("Map ('.' grass, ',' fertile, 'T' forest, '^' rock, '*' iron, '~' water; = road; letters = buildings, lowercase = under construction)");
         for (int y = s.CenterY - radius / 2; y <= s.CenterY + radius / 2; y++)
         {
             var line = new System.Text.StringBuilder();
@@ -175,9 +177,20 @@ internal static class Report
                         "woodcutter" => 'W',
                         "quarry" => 'Q',
                         "bakery" => 'B',
+                        "well" => 'O',
+                        "garden" => 'G',
+                        "chapel" => 'C',
+                        "brewery" => 'R',
+                        "tavern" => 'V',
+                        "market" => 'M',
                         _ => '#',
                     };
                     line.Append(b.IsOperational ? ch : char.ToLowerInvariant(ch));
+                    continue;
+                }
+                if (tile.IsRoad)
+                {
+                    line.Append('=');
                     continue;
                 }
                 line.Append(tile.Terrain switch

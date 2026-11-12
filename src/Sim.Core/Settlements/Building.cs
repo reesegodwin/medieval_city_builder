@@ -34,6 +34,12 @@ public sealed class Building
     /// <summary>Efficiency lost to carrying goods to and from the nearest stockpile (0..1, 1 = none lost).</summary>
     public double HaulFactor { get; set; } = 1.0;
 
+    /// <summary>True when no walkable route leads from this building to a stockpile.</summary>
+    public bool NoRoute { get; set; }
+
+    /// <summary>People this service building served at the last daily check.</summary>
+    public int ServedCount { get; set; }
+
     /// <summary>Human-readable reason the building is idle, if any.</summary>
     public string? Problem { get; set; }
 
@@ -73,6 +79,26 @@ public sealed class Building
     public int FreeHousing => IsOperational ? Def.Housing - ResidentIds.Count : 0;
 
     public int DistanceTo(Building other) => Math.Abs(CenterX - other.CenterX) + Math.Abs(CenterY - other.CenterY);
+
+    public bool Covers(int x, int y) => x >= X && x < X + Def.Width && y >= Y && y < Y + Def.Height;
+
+    /// <summary>Walkable tiles directly beside the footprint (4-neighbours), where goods are carried in and out.</summary>
+    public IEnumerable<(int X, int Y)> AccessTiles()
+    {
+        for (int x = X; x < X + Def.Width; x++)
+        {
+            yield return (x, Y - 1);
+            yield return (x, Y + Def.Height);
+        }
+        for (int y = Y; y < Y + Def.Height; y++)
+        {
+            yield return (X - 1, y);
+            yield return (X + Def.Width, y);
+        }
+    }
+
+    /// <summary>The tile in front of the door (middle of the south side).</summary>
+    public (int X, int Y) DoorTile => (X + Def.Width / 2, Y + Def.Height);
 
     public override string ToString() => $"{Def.Name} #{Id}";
 }

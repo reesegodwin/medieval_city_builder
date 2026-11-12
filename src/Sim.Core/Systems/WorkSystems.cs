@@ -3,30 +3,54 @@ using Sim.Core.Events;
 using Sim.Core.Settlements;
 using Sim.Core.Simulation;
 using Sim.Core.Time;
+using Sim.Core.World;
 
 namespace Sim.Core.Systems;
 
 /// <summary>
-/// Hauling isn't simulated step by step. Instead each workplace loses efficiency based on the real
-/// distance to the nearest stockpile, so town layout matters without per-citizen pathing.
+/// Hauling isn't simulated step by step. Instead each workplace loses efficiency based on the
+/// walking cost from the nearest stockpile (roads make it cheaper, rivers and buildings make
+/// people go around), so town layout matters without simulating every trip.
 /// </summary>
 public static class Logistics
 {
-    /// <summary>Distance (in tiles) at which half of a worker's time goes to carrying goods.</summary>
+    /// <summary>Travel cost (≈ tiles of open ground) at which half of a worker's time goes to carrying goods.</summary>
     public const double HalfEfficiencyDistance = 40;
 
-    public static void UpdateHaulFactors(Settlement settlement)
+    public const double UnreachableHaulFactor = 0.3;
+    public const string NoRouteProblem = "No route to a stockpile";
+
+    /// <summary>Walking cost from the nearest operational stockpile to every tile around the settlement, or null if there are no stockpiles.</summary>
+    public static CostGrid? StockpileField(GameWorld world, Settlement settlement)
     {
         var stockpiles = settlement.Buildings.Where(b => b.IsOperational && b.Def.IsStockpile).ToList();
-        foreach (var b in settlement.Buildings)
+        if (stockpiles.Count == 0) return null;
+        int r = Commands.Placement.SettlementRadius + 6;
+        return Pathfinder.CostField(world.Map, stockpiles.SelectMany(s => s.AccessTiles()),
+            settlement.CenterX - r, settlement.CenterY - r, settlement.CenterX + r, settlement.CenterY + r);
+    }
+
+    /// <summary>Recomputes every building's hauling efficiency. Call after buildings or roads change.</summary>
+    public static void UpdateHaulFactors(GameWorld world, Settlement settlement)
+    {
+        var field = StockpileField(world, settlement);
+        if (field == null)
         {
-            if (stockpiles.Count == 0)
+            foreach (var b in settlement.Buildings)
             {
                 b.HaulFactor = 0.5;
-                continue;
+                b.NoRoute = false;
             }
-            int distance = stockpiles.Min(s => s.DistanceTo(b));
-            b.HaulFactor = 1.0 / (1.0 + distance / HalfEfficiencyDistance);
+            return;
+        }
+
+        foreach (var b in settlement.Buildings)
+        {
+            double cost = b.Def.IsStockpile && b.IsOperational
+                ? 0
+                : b.AccessTiles().Select(t => field[t.X, t.Y]).DefaultIfEmpty(double.PositiveInfinity).Min();
+            b.NoRoute = double.IsPositiveInfinity(cost);
+            b.HaulFactor = b.NoRoute ? UnreachableHaulFactor : 1.0 / (1.0 + cost / HalfEfficiencyDistance);
         }
     }
 
@@ -104,7 +128,7 @@ public static class ConstructionSystem
             if (b.State != BuildingState.UnderConstruction) continue;
 
             b.ConstructionProgress += Work.LabourThisTick(settlement, b, JobKinds.Builder) * b.HaulFactor;
-            b.Problem = b.WorkerIds.Count == 0 ? "No builders" : null;
+            b.Problem = b.WorkerIds.Count == 0 ? "No builders" : b.NoRoute ? Logistics.NoRouteProblem : null;
 
             if (b.ConstructionProgress >= b.Def.BuildDays)
             {
@@ -119,7 +143,7 @@ public static class ConstructionSystem
         b.State = BuildingState.Operational;
         b.ConstructionProgress = b.Def.BuildDays;
         b.Problem = null;
-        if (b.Def.IsStockpile) Logistics.UpdateHaulFactors(settlement);
+        if (b.Def.IsStockpile) Logistics.UpdateHaulFactors(world, settlement);
         world.Log(EventKind.BuildingCompleted, settlement, $"{b.Def.Name} completed");
     }
 }
@@ -128,6 +152,7 @@ public static class ProductionSystem
 {
     public static void Tick(GameWorld world, Settlement settlement)
     {
+        int freeStorage = settlement.FreeStorage; // computed once per tick; updated as goods are stored
         foreach (var b in settlement.Buildings)
         {
             var recipe = b.Def.Recipe;
@@ -166,19 +191,21 @@ public static class ProductionSystem
 
             if (b.CycleProgress < recipe.WorkDays)
             {
-                b.Problem = null;
+                b.Problem = b.NoRoute ? Logistics.NoRouteProblem : null;
                 continue;
             }
 
-            var outputs = recipe.Outputs.ToDictionary(kv => kv.Key,
-                kv => (int)Math.Round(kv.Value * b.TerrainMultiplier));
-            if (outputs.Values.Sum() > settlement.FreeStorage)
+            int total = 0;
+            foreach (int amount in recipe.Outputs.Values) total += (int)Math.Round(amount * b.TerrainMultiplier);
+            if (total > freeStorage)
             {
                 b.Problem = "Storage full";
                 continue;
             }
 
-            foreach (var (resource, amount) in outputs) settlement.Stock.Add(resource, amount);
+            foreach (var (resource, amount) in recipe.Outputs)
+                settlement.Stock.Add(resource, (int)Math.Round(amount * b.TerrainMultiplier));
+            freeStorage -= total;
             b.CycleProgress -= recipe.WorkDays;
             b.InputsLoaded = false;
             b.Problem = null;

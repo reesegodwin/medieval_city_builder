@@ -21,6 +21,8 @@ public partial class Main : Node3D
     private CameraRig _camera = null!;
     private CitizenRenderer _citizens = null!;
     private PlacementTool _placement = null!;
+    private RoadTool _roadTool = null!;
+    private DemolishTool _demolishTool = null!;
     private Hud _hud = null!;
     private InspectorPanel _inspector = null!;
     private MeshInstance3D _marker = null!;
@@ -56,11 +58,23 @@ public partial class Main : Node3D
 
         _citizens = new CitizenRenderer { Name = "Citizens" };
         AddChild(_citizens);
-        _citizens.Initialize(town);
+        _citizens.Initialize(_session.World, town);
+
+        var roads = new RoadRenderer { Name = "Roads" };
+        AddChild(roads);
+        roads.Initialize(town);
 
         _placement = new PlacementTool { Name = "Placement" };
         AddChild(_placement);
         _placement.Initialize(_session, _camera);
+
+        _roadTool = new RoadTool { Name = "RoadTool" };
+        AddChild(_roadTool);
+        _roadTool.Initialize(_session, _camera);
+
+        _demolishTool = new DemolishTool { Name = "DemolishTool" };
+        AddChild(_demolishTool);
+        _demolishTool.Initialize(_session, _camera);
 
         _marker = new MeshInstance3D { Mesh = LowPolyMeshes.SelectionMarker, Visible = false };
         AddChild(_marker);
@@ -70,9 +84,12 @@ public partial class Main : Node3D
         _hud.Build(_session.World.Data, town.Rules.AutoBuild);
         _hud.BuildRequested += id =>
         {
+            CancelTools();
             ClearSelection();
             _placement.Begin(_session.World.Data.Building(id));
         };
+        _hud.RoadRequested += StartRoadTool;
+        _hud.DemolishRequested += StartDemolishTool;
         _hud.SpeedRequested += speed =>
         {
             _session.Speed = speed;
@@ -98,14 +115,22 @@ public partial class Main : Node3D
 
     private void SetupLighting()
     {
-        var sky = new Color(0.64f, 0.77f, 0.90f);
+        var sky = new Color(0.66f, 0.78f, 0.90f);
+        var skyMaterial = new ProceduralSkyMaterial
+        {
+            SkyTopColor = new Color(0.32f, 0.52f, 0.82f),
+            SkyHorizonColor = sky,
+            GroundHorizonColor = sky,
+            GroundBottomColor = new Color(0.35f, 0.42f, 0.30f),
+            SunAngleMax = 30f,
+        };
         var env = new Godot.Environment
         {
-            BackgroundMode = Godot.Environment.BGMode.Color,
-            BackgroundColor = sky,
-            AmbientLightSource = Godot.Environment.AmbientSource.Color,
-            AmbientLightColor = new Color(0.78f, 0.80f, 0.88f),
-            AmbientLightEnergy = 0.35f,
+            BackgroundMode = Godot.Environment.BGMode.Sky,
+            Sky = new Sky { SkyMaterial = skyMaterial },
+            AmbientLightSource = Godot.Environment.AmbientSource.Sky,
+            AmbientLightSkyContribution = 1f,
+            AmbientLightEnergy = 0.45f,
             TonemapMode = Godot.Environment.ToneMapper.Filmic,
             FogEnabled = true,
             FogLightColor = sky,
@@ -146,6 +171,8 @@ public partial class Main : Node3D
         }
         _hud.SetStatus(_flash ?? (_placement.Active is { } def
             ? _placement.Problem is { } p ? $"{def.Name}: {p}" : $"Place {def.Name} (right-click to stop)"
+            : _roadTool.Active ? _roadTool.Status
+            : _demolishTool.Active ? _demolishTool.Status
             : null));
 
         UpdateMarker((float)delta);
@@ -165,13 +192,23 @@ public partial class Main : Node3D
         {
             case InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true }:
                 if (_placement.Active != null) PlaceBuilding();
+                else if (_roadTool.Active) Report(_roadTool.Click(), "Can't build road");
+                else if (_demolishTool.Active) Report(_demolishTool.Click(), "Can't demolish");
                 else Select();
                 break;
 
             case InputEventMouseButton { ButtonIndex: MouseButton.Right, Pressed: true }:
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.Escape }:
-                if (_placement.Active != null) _placement.Cancel();
+                if (AnyToolActive) CancelTools();
                 else ClearSelection();
+                break;
+
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.R }:
+                StartRoadTool();
+                break;
+
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.X }:
+                StartDemolishTool();
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.Space }:
@@ -184,6 +221,34 @@ public partial class Main : Node3D
                 _session.Paused = false;
                 break;
         }
+    }
+
+    private bool AnyToolActive => _placement.Active != null || _roadTool.Active || _demolishTool.Active;
+
+    private void CancelTools()
+    {
+        _placement.Cancel();
+        _roadTool.Cancel();
+        _demolishTool.Cancel();
+    }
+
+    private void StartRoadTool()
+    {
+        CancelTools();
+        ClearSelection();
+        _roadTool.Begin();
+    }
+
+    private void StartDemolishTool()
+    {
+        CancelTools();
+        ClearSelection();
+        _demolishTool.Begin();
+    }
+
+    private void Report(CommandResult? result, string failurePrefix)
+    {
+        if (result is { Ok: false, Error: { } error }) Flash($"{failurePrefix}: {error}");
     }
 
     private void PlaceBuilding()
@@ -240,7 +305,7 @@ public partial class Main : Node3D
         var town = _session.PlayerTown;
         if (_selectedCitizen is int cid)
         {
-            if (town.FindCitizen(cid) is { } c) _inspector.ShowCitizen(town, c);
+            if (town.FindCitizen(cid) is { } c) _inspector.ShowCitizen(_session.World, town, c);
             else ClearSelection(); // died or left
         }
         else if (_selectedBuilding is int bid && town.FindBuilding(bid) is { } b)

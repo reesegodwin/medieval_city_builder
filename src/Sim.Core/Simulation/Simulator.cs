@@ -41,7 +41,7 @@ public sealed class Simulator
             {
                 HousingSystem.Tick(World, s);
                 JobSystem.Tick(World, s);
-                Needs.UpdateMood(s);
+                Needs.UpdateMood(World, s);
             }
         }
 
@@ -50,6 +50,7 @@ public sealed class Simulator
             foreach (var s in World.Settlements)
             {
                 LifeSystem.Daily(World, s);
+                ServiceSystem.Daily(World, s);
                 MigrationSystem.Daily(World, s);
                 SettlementGovernor.Daily(World, s);
             }
@@ -82,7 +83,7 @@ public static class SettlementFounder
         settlement.Stock.Add("grain", 120);
         settlement.Stock.Add("bread", 20);
 
-        foreach (string id in new[] { "stockpile", "hovel", "hovel", "hovel", "hovel", "farm", "farm", "woodcutter" })
+        foreach (string id in new[] { "stockpile", "well", "hovel", "hovel", "hovel", "hovel", "farm", "farm", "woodcutter" })
         {
             var def = world.Data.Building(id);
             if (SiteFinder.Find(world, settlement, def) is not var (x, y)) continue;
@@ -93,6 +94,7 @@ public static class SettlementFounder
                 var b = settlement.FindBuilding(bid)!;
                 b.State = BuildingState.UnderConstruction;
                 ConstructionSystem.Complete(world, settlement, b);
+                RoadPlanner.Connect(world, settlement, b);
             }
         }
 
@@ -107,6 +109,7 @@ public static class SettlementFounder
 
         HousingSystem.Tick(world, settlement);
         JobSystem.Tick(world, settlement);
+        ServiceSystem.Daily(world, settlement);
         world.Log(EventKind.SettlementFounded, settlement,
             $"{settlement.Name} was founded at ({cx},{cy}) by {settlement.Citizens.Count} settlers");
         return settlement;

@@ -27,20 +27,27 @@ public static class Needs
         return need <= 0 ? double.PositiveInfinity : stock / need;
     }
 
+    /// <summary>Foods eaten within this many days count toward the variety bonus.</summary>
+    public const int VarietyWindowDays = 3;
+    public const double VarietyMoodPerFood = 3;
+    public const double MaxVarietyMood = 6;
+
     public static void Tick(GameWorld world, Settlement settlement)
     {
+        long today = world.Time.Day;
         foreach (var c in settlement.Citizens)
         {
             c.Satiation = Math.Max(0, c.Satiation - DailyFoodNeed(c) / TimeScale.TicksPerDay);
 
             if (c.Satiation < EatBelow)
             {
-                foreach (var food in world.Data.FoodsByPreference)
+                foreach (var food in MealOrder(world, c))
                 {
                     while (c.Satiation < EatUntil && settlement.Stock.TryTake(food.Id, 1))
                     {
                         c.Satiation += food.Nutrition;
                         c.LastMealMood = food.MealMood;
+                        c.RecentFoods[food.Id] = today;
                     }
                     if (c.Satiation >= EatUntil) break;
                 }
@@ -51,22 +58,145 @@ public static class Needs
         }
     }
 
+    /// <summary>
+    /// Which foods a citizen reaches for first. Without a market they take the tastiest food in the
+    /// stockpile; with a market nearby they can shop around and pick what they haven't had lately.
+    /// </summary>
+    private static IEnumerable<Data.ResourceDef> MealOrder(GameWorld world, Citizen c)
+    {
+        if (!c.CoveredNeeds.Contains("market")) return world.Data.FoodsByPreference;
+        return world.Data.FoodsByPreference
+            .OrderBy(f => c.RecentFoods.TryGetValue(f.Id, out long day) ? day : long.MinValue)
+            .ThenByDescending(f => f.MealMood);
+    }
+
+    public static int RecentFoodCount(GameWorld world, Citizen c)
+    {
+        int count = 0;
+        foreach (long day in c.RecentFoods.Values)
+        {
+            if (world.Time.Day - day <= VarietyWindowDays) count++;
+        }
+        return count;
+    }
+
+    /// <summary>Everything pushing a citizen's mood up or down, with labels (for the inspector).</summary>
+    public static List<(string Label, double Mood)> MoodFactors(GameWorld world, Settlement settlement, Citizen c)
+    {
+        var factors = new List<(string, double)>();
+        MoodSum(world, settlement, c, factors);
+        return factors;
+    }
+
+    /// <summary>
+    /// Sum of all mood effects. Labels are only built when <paramref name="labels"/> is given, since
+    /// this runs for every citizen every game hour.
+    /// </summary>
+    public static double MoodSum(GameWorld world, Settlement settlement, Citizen c, List<(string, double)>? labels = null)
+    {
+        double sum = 0;
+        void Add(string label, double mood)
+        {
+            if (mood == 0) return;
+            sum += mood;
+            labels?.Add((label, mood));
+        }
+
+        Add(c.LastMealMood > 0 ? "Tasty meals" : "Plain meals", c.LastMealMood);
+        int foods = RecentFoodCount(world, c);
+        double variety = Math.Min(MaxVarietyMood, Math.Max(0, foods - 1) * VarietyMoodPerFood);
+        if (variety > 0) Add(labels != null ? $"Food variety ({foods} kinds)" : "", variety);
+        Add(c.HomeBuildingId != null ? "Has a home" : "Homeless", c.HomeBuildingId != null ? 5 : -20);
+        if (c.IsAdult) Add(c.JobBuildingId != null ? "Has work" : "Idle", c.JobBuildingId != null ? 3 : -3);
+
+        int population = settlement.Citizens.Count;
+        foreach (var need in world.Data.Needs)
+        {
+            if (c.CoveredNeeds.Contains(need.Id)) Add(need.Name, need.CoveredMood);
+            else if (population >= need.MinPopulation) Add(labels != null ? $"No {need.Name.ToLowerInvariant()}" : "", need.MissingMood);
+        }
+
+        if (c.Has(Trait.Cheerful)) Add("Cheerful", 8);
+        if (c.Has(Trait.Gloomy)) Add("Gloomy", -8);
+        if (c.IsStarving) Add("Starving", -35);
+        else if (c.Satiation < 0.25) Add("Hungry", -10);
+        return sum;
+    }
+
     /// <summary>Hourly: mood drifts toward a target set by how well the citizen's needs are met.</summary>
-    public static void UpdateMood(Settlement settlement)
+    public static void UpdateMood(GameWorld world, Settlement settlement)
     {
         foreach (var c in settlement.Citizens)
         {
-            double target = 50 + c.LastMealMood;
-            target += c.HomeBuildingId != null ? 5 : -20;
-            if (c.IsAdult) target += c.JobBuildingId != null ? 3 : -3;
-            if (c.Has(Trait.Cheerful)) target += 8;
-            if (c.Has(Trait.Gloomy)) target -= 8;
-            if (c.IsStarving) target -= 35;
-            else if (c.Satiation < 0.25) target -= 10;
-
+            double target = 50 + MoodSum(world, settlement, c);
             c.Mood += (Math.Clamp(target, 0, 100) - c.Mood) * 0.1;
         }
     }
+}
+
+/// <summary>
+/// Daily: decides which homes each service building reaches (Songs of Syx-style coverage).
+/// Each citizen uses the nearest staffed building of each kind that has room for them.
+/// </summary>
+public static class ServiceSystem
+{
+    public static void Daily(GameWorld world, Settlement settlement)
+    {
+        foreach (var c in settlement.Citizens) c.CoveredNeeds.Clear();
+
+        foreach (var need in world.Data.Needs)
+        {
+            var providers = settlement.Buildings
+                .Where(b => b.Def.Service?.Need == need.Id)
+                .ToList();
+            foreach (var b in providers) b.ServedCount = 0;
+
+            var open = providers.Where(b => b.IsOperational && (b.Def.Jobs == 0 || b.WorkerIds.Count > 0)).ToList();
+            foreach (var b in providers.Where(b => b.IsOperational && !open.Contains(b))) b.Problem = "No staff";
+            if (open.Count == 0) continue;
+
+            // Goods a service uses up (e.g. ale): how many people the stock can serve today.
+            var consumes = open[0].Def.Service!.ConsumesPerPersonDay;
+            int canServe = consumes.Count == 0
+                ? int.MaxValue
+                : consumes.Min(kv => (int)(settlement.Stock.Get(kv.Key) / kv.Value));
+
+            int served = 0;
+            foreach (var c in settlement.Citizens)
+            {
+                if (served >= canServe) break;
+                if (c.HomeBuildingId is not int homeId || settlement.FindBuilding(homeId) is not { } home) continue;
+
+                Building? best = null;
+                int bestDistance = int.MaxValue;
+                foreach (var b in open)
+                {
+                    int d = b.DistanceTo(home);
+                    if (d > b.Def.Service!.Radius || b.ServedCount >= b.Def.Service.Capacity || d >= bestDistance) continue;
+                    best = b;
+                    bestDistance = d;
+                }
+                if (best == null) continue;
+
+                best.ServedCount++;
+                served++;
+                c.CoveredNeeds.Add(need.Id);
+            }
+
+            foreach (var (resource, perPerson) in consumes)
+                settlement.Stock.TryTake(resource, Math.Min(settlement.Stock.Get(resource), (int)Math.Ceiling(served * perPerson)));
+
+            foreach (var b in open)
+            {
+                string? missing = consumes.Keys.FirstOrDefault(r => settlement.Stock.Get(r) < consumes[r]);
+                b.Problem = canServe == 0 && missing != null ? $"Needs {missing}" : null;
+            }
+        }
+    }
+
+    /// <summary>Share of citizens whose need is covered (0..1).</summary>
+    public static double Coverage(Settlement settlement, string need) =>
+        settlement.Citizens.Count == 0 ? 0 : settlement.Citizens.Count(c => c.CoveredNeeds.Contains(need)) / (double)settlement.Citizens.Count;
 }
 
 /// <summary>Daily life events: ageing, marriage, births and deaths.</summary>

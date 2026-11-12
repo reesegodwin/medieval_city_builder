@@ -12,8 +12,13 @@ public sealed class SettlementRules
         [JobKinds.Builder] = 6,
         ["farmer"] = 5,
         ["baker"] = 4,
+        ["gardener"] = 4,
+        ["priest"] = 4,
         ["woodcutter"] = 3,
+        ["barkeep"] = 3,
+        ["trader"] = 3,
         ["quarrier"] = 2,
+        ["brewer"] = 2,
     };
 
     /// <summary>Production may not consume a resource below this stock (e.g. keep grain for eating).</summary>
@@ -30,6 +35,8 @@ public sealed class SettlementRules
     {
         ["grain"] = 500,
         ["bread"] = 300,
+        ["vegetables"] = 200,
+        ["ale"] = 150,
         ["wood"] = 250,
         ["stone"] = 200,
     };
@@ -37,8 +44,10 @@ public sealed class SettlementRules
     /// <summary>Per-citizen stock targets; the effective limit is the larger of this and the flat limit.</summary>
     public SortedDictionary<string, int> PerCitizenLimits { get; } = new(StringComparer.Ordinal)
     {
-        ["grain"] = 5,
-        ["bread"] = 4,
+        ["grain"] = 3,
+        ["bread"] = 3,
+        ["vegetables"] = 2,
+        ["ale"] = 1,
     };
 
     /// <summary>Below this stock a resource counts as scarce and its producers get extra job priority.</summary>
@@ -78,6 +87,15 @@ public sealed class Settlement
     /// <summary>Living citizens in arrival order.</summary>
     public IReadOnlyList<Citizen> Citizens => _citizens;
 
+    /// <summary>Road tiles belonging to this settlement, in sorted order.</summary>
+    public SortedSet<(int X, int Y)> Roads { get; } = new();
+
+    /// <summary>Governor memory: day a site search last failed, per "building@spot", so it isn't retried daily.</summary>
+    public Dictionary<string, long> FailedSiteSearches { get; } = new();
+
+    /// <summary>Bumped whenever roads change, so renderers know to rebuild.</summary>
+    public int RoadVersion { get; set; }
+
     public Settlement(int id, string name, int centerX, int centerY)
     {
         Id = id;
@@ -101,6 +119,12 @@ public sealed class Settlement
         _buildingsById.Add(b.Id, b);
     }
 
+    public bool RemoveBuilding(Building b)
+    {
+        _buildingsById.Remove(b.Id);
+        return _buildings.Remove(b);
+    }
+
     public void AddCitizen(Citizen c)
     {
         _citizens.Add(c);
@@ -121,9 +145,15 @@ public sealed class Settlement
     public int CountIncludingPlanned(string defId) => Buildings.Count(b => b.Def.Id == defId);
 
     /// <summary>True if every output of this workplace has reached its production limit.</summary>
-    public bool IsAtProductionLimit(Building b) =>
-        b.IsOperational && b.Def.Recipe is { } recipe && recipe.Outputs.Count > 0 &&
-        recipe.Outputs.Keys.All(r => Stock.Get(r) >= LimitOf(r));
+    public bool IsAtProductionLimit(Building b)
+    {
+        if (!b.IsOperational || b.Def.Recipe is not { } recipe || recipe.Outputs.Count == 0) return false;
+        foreach (var resource in recipe.Outputs.Keys)
+        {
+            if (Stock.Get(resource) < LimitOf(resource)) return false;
+        }
+        return true;
+    }
 
     public int LimitOf(string resource) => Rules.LimitOf(resource, Citizens.Count);
 

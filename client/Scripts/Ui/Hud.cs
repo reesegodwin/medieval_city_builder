@@ -20,6 +20,8 @@ public partial class Hud : CanvasLayer
     private CheckBox _autoBuild = null!;
 
     public event Action<string>? BuildRequested;
+    public event Action? RoadRequested;
+    public event Action? DemolishRequested;
     public event Action<double>? SpeedRequested;
     public event Action? PauseToggled;
     public event Action<bool>? AutoBuildToggled;
@@ -34,8 +36,9 @@ public partial class Hud : CanvasLayer
         topRow.AddThemeConstantOverride("separation", 18);
         top.AddChild(topRow);
 
-        _date = new Label { CustomMinimumSize = new Vector2(230, 0) };
-        _stock = new Label { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _date = new Label { CustomMinimumSize = new Vector2(220, 0) };
+        _stock = new Label { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, ClipText = true };
+        _stock.AddThemeFontSizeOverride("font_size", 14);
         topRow.AddChild(_date);
         topRow.AddChild(_stock);
 
@@ -67,9 +70,28 @@ public partial class Hud : CanvasLayer
         bottom.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomWide);
         bottom.GrowVertical = Control.GrowDirection.Begin;
         AddChild(bottom);
-        var buildRow = new HBoxContainer();
+        var buildRow = new HFlowContainer();
+        buildRow.AddThemeConstantOverride("h_separation", 4);
+        buildRow.AddThemeConstantOverride("v_separation", 4);
         bottom.AddChild(buildRow);
-        buildRow.AddChild(new Label { Text = " Build: " });
+
+        Button ToolButton(string text, string tooltip, Action pressed)
+        {
+            var b = new Button
+            {
+                Text = text,
+                TooltipText = tooltip,
+                CustomMinimumSize = new Vector2(96, 44),
+                FocusMode = Control.FocusModeEnum.None,
+            };
+            b.AddThemeColorOverride("font_color", new Color(1f, 0.9f, 0.6f));
+            b.Pressed += pressed;
+            buildRow.AddChild(b);
+            return b;
+        }
+        ToolButton("Roads\nfree", "Lay roads (R). Roads make hauling faster; people walk along them.", () => RoadRequested?.Invoke());
+        ToolButton("Demolish\nrefund", "Tear down buildings or roads (X). Refunds part of the cost.", () => DemolishRequested?.Invoke());
+
         foreach (var def in data.Buildings.Values)
         {
             string cost = def.Cost.Count == 0 ? "free" : string.Join(", ", def.Cost.Select(kv => $"{kv.Value} {kv.Key}"));
@@ -77,7 +99,7 @@ public partial class Hud : CanvasLayer
             {
                 Text = $"{def.Name}\n{cost}",
                 TooltipText = Describe(def),
-                CustomMinimumSize = new Vector2(120, 48),
+                CustomMinimumSize = new Vector2(104, 44),
                 FocusMode = Control.FocusModeEnum.None,
             };
             string id = def.Id;
@@ -88,8 +110,8 @@ public partial class Hud : CanvasLayer
         // --- Event feed and status (bottom-left, above the build menu) ---
         var feedBox = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         feedBox.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomLeft);
-        feedBox.OffsetTop = -290;
-        feedBox.OffsetBottom = -72;
+        feedBox.OffsetTop = -330;
+        feedBox.OffsetBottom = -112;
         feedBox.OffsetLeft = 12;
         feedBox.OffsetRight = 560;
         feedBox.GrowVertical = Control.GrowDirection.Begin;
@@ -117,7 +139,7 @@ public partial class Hud : CanvasLayer
         // --- Controls help (top-right, under the bar) ---
         var help = new Label
         {
-            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed",
+            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   X: demolish\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed",
             HorizontalAlignment = HorizontalAlignment.Right,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
@@ -126,7 +148,7 @@ public partial class Hud : CanvasLayer
         help.AddThemeConstantOverride("shadow_offset_x", 1);
         help.AddThemeConstantOverride("shadow_offset_y", 1);
         help.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopRight);
-        help.OffsetTop = 44;
+        help.OffsetTop = 64;
         help.OffsetLeft = -560;
         help.OffsetRight = -12;
         AddChild(help);
@@ -145,6 +167,12 @@ public partial class Hud : CanvasLayer
         }
         if (def.FertileBonus > 0) lines.Add($"+{def.FertileBonus:P0} output on fertile soil");
         if (def.NearTerrain is { } near) lines.Add($"Needs {near.Terrain} within {near.Radius} tiles");
+        if (def.Service is { } service)
+        {
+            lines.Add($"Serves {service.Need} to up to {service.Capacity} people within {service.Radius} tiles of their home");
+            foreach (var (resource, perPerson) in service.ConsumesPerPersonDay)
+                lines.Add($"Uses {perPerson:0.##} {resource} per person per day");
+        }
         return string.Join("\n", lines);
     }
 
@@ -152,16 +180,19 @@ public partial class Hud : CanvasLayer
     {
         var world = session.World;
         var town = session.PlayerTown;
-        _date.Text = $"{town.Name}  ·  {world.Time}";
+        double moodNow = town.Citizens.Count > 0 ? town.Citizens.Average(c => c.Mood) : 0;
+        _date.Text = $"{town.Name}  ·  {world.Time}\nMood {moodNow:0}/100";
 
         int adults = town.Citizens.Count(c => c.IsAdult);
-        double mood = town.Citizens.Count > 0 ? town.Citizens.Average(c => c.Mood) : 0;
         int idle = town.Citizens.Count(c => c.IsAdult && c.JobBuildingId == null);
+        int homeless = town.Citizens.Count(c => c.HomeBuildingId == null);
         _stock.Text =
-            $"Pop {town.Citizens.Count} ({adults} adults, {idle} idle)   " +
-            $"Grain {town.Stock.Get("grain")}  Bread {town.Stock.Get("bread")}  ({Needs.FoodDays(world, town):0.0} days)   " +
-            $"Wood {town.Stock.Get("wood")}  Stone {town.Stock.Get("stone")}   " +
-            $"Storage {town.Stock.Total}/{town.StorageCapacity}   Mood {mood:0}";
+            $"Pop {town.Citizens.Count} ({adults} adults, {idle} idle{(homeless > 0 ? $", {homeless} homeless" : "")})   " +
+            $"Food {Needs.FoodDays(world, town):0.0} days (grain {town.Stock.Get("grain")}, bread {town.Stock.Get("bread")}, " +
+            $"veg {town.Stock.Get("vegetables")})   Ale {town.Stock.Get("ale")}   " +
+            $"Wood {town.Stock.Get("wood")}   Stone {town.Stock.Get("stone")}\n" +
+            $"Storage {town.Stock.Total}/{town.StorageCapacity}   Needs met: " +
+            string.Join("   ", world.Data.Needs.Select(n => $"{n.Name} {ServiceSystem.Coverage(town, n.Id):P0}"));
 
         _pause.SetPressedNoSignal(session.Paused);
         foreach (var (speed, button) in _speedButtons)

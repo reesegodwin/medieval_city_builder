@@ -27,6 +27,32 @@ public sealed class RecipeDef
     public double WorkDays { get; set; } = 1;
 }
 
+/// <summary>A citizen need met by service buildings (water, faith, drink, market...).</summary>
+public sealed class NeedDef
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+
+    /// <summary>Mood effect while the need is covered.</summary>
+    public double CoveredMood { get; set; }
+
+    /// <summary>Mood effect while it isn't (only once the settlement reaches <see cref="MinPopulation"/>).</summary>
+    public double MissingMood { get; set; }
+
+    public int MinPopulation { get; set; }
+}
+
+/// <summary>Makes a building serve a need to homes within a radius.</summary>
+public sealed class ServiceDef
+{
+    public string Need { get; set; } = "";
+    public int Radius { get; set; }
+    public int Capacity { get; set; }
+
+    /// <summary>Goods used up per person served per day (e.g. ale at a tavern).</summary>
+    public Dictionary<string, double> ConsumesPerPersonDay { get; set; } = new();
+}
+
 public sealed class NearTerrainRequirement
 {
     public Terrain Terrain { get; set; }
@@ -57,6 +83,8 @@ public sealed class BuildingDef
 
     public NearTerrainRequirement? NearTerrain { get; set; }
 
+    public ServiceDef? Service { get; set; }
+
     public bool IsStockpile => Storage > 0;
     public bool IsWorkplace => Jobs > 0 && JobKind != null;
 }
@@ -67,13 +95,17 @@ public sealed class GameData
     public IReadOnlyDictionary<string, ResourceDef> Resources { get; }
     public IReadOnlyDictionary<string, BuildingDef> Buildings { get; }
 
+    /// <summary>Needs in id order (deterministic iteration).</summary>
+    public IReadOnlyList<NeedDef> Needs { get; }
+
     /// <summary>Food resources ordered best meal first.</summary>
     public IReadOnlyList<ResourceDef> FoodsByPreference { get; }
 
-    public GameData(IEnumerable<ResourceDef> resources, IEnumerable<BuildingDef> buildings)
+    public GameData(IEnumerable<ResourceDef> resources, IEnumerable<BuildingDef> buildings, IEnumerable<NeedDef>? needs = null)
     {
         Resources = resources.ToDictionary(r => r.Id);
         Buildings = buildings.ToDictionary(b => b.Id);
+        Needs = (needs ?? Enumerable.Empty<NeedDef>()).OrderBy(n => n.Id, StringComparer.Ordinal).ToList();
         FoodsByPreference = Resources.Values.Where(r => r.IsFood)
             .OrderByDescending(r => r.MealMood).ThenBy(r => r.Id, StringComparer.Ordinal).ToList();
         Validate();
@@ -92,7 +124,8 @@ public sealed class GameData
     {
         var resources = LoadEmbedded<List<ResourceDef>>("resources.json");
         var buildings = LoadEmbedded<List<BuildingDef>>("buildings.json");
-        return new GameData(resources, buildings);
+        var needs = LoadEmbedded<List<NeedDef>>("needs.json");
+        return new GameData(resources, buildings, needs);
     }
 
     private static T LoadEmbedded<T>(string fileName)
@@ -118,6 +151,14 @@ public sealed class GameData
             }
             if (b.Jobs > 0 && b.JobKind == null)
                 throw new InvalidDataException($"Building '{b.Id}' has jobs but no jobKind");
+            if (b.Service is { } service)
+            {
+                if (Needs.All(n => n.Id != service.Need))
+                    throw new InvalidDataException($"Building '{b.Id}' serves unknown need '{service.Need}'");
+                foreach (var id in service.ConsumesPerPersonDay.Keys)
+                    if (!Resources.ContainsKey(id))
+                        throw new InvalidDataException($"Building '{b.Id}' consumes unknown resource '{id}'");
+            }
         }
     }
 }

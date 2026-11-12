@@ -84,7 +84,7 @@ Not recommended: Unreal (too heavy for stylized low-poly, and C++ slows iteratio
 Each phase ends with something you can play.
 
 1. **Phase 0, Prototype the simulation (no graphics):** `Sim.Core` with one settlement, 4 resources, 5 buildings, the economy tick, and a console printout. Unit tests for production chains. *(Done.)*
-2. **Phase 1, Visual settlement:** Godot client that renders a procedural map chunk, lets you place buildings and shows animated workers. *(In progress: first client done in `client/`.)* Decision: the simulation runs in-process inside the client through `SimSession` until Phase 2, which swaps it for a connection to the dedicated server without changing the renderers.
+2. **Phase 1, Visual settlement:** Godot client that renders a procedural map chunk, lets you place buildings and shows animated workers. *(In progress: client done; roads, demolition, services and food variety added in Phase 1b.)* Decision: the simulation runs in-process inside the client through `SimSession` until Phase 2, which swaps it for a connection to the dedicated server without changing the renderers.
 3. **Phase 2, Persistence & multiplayer:** PostgreSQL saves, accounts, several players, interest management, running on a cheap Linux VPS.
 4. **Phase 3, War:** armies from population, the formation battle resolver, generals, fog of war and scouting.
 5. **Phase 4, Sieges & walls:** walls and towers, siege engines, multi-day sieges, Discord/email alerts.
@@ -149,6 +149,15 @@ Rough guess for one experienced developer: a playable Phase 3 in 6–12 months, 
 **Client view:** the Stronghold-style isometric town shows citizens walking between home, workplace and stockpile with carried goods. Click anyone to see their name, mood, needs, skills and history (DF-style inspection). A town ledger shows needs coverage, production chains and complaints.
 
 **Roadmap change:** the colony sim *is* the core game, so Phase 0–1 expands into needs, jobs, hauling, services and an inspection UI for one settlement. This is the "is it fun?" milestone, before multiplayer.
+
+## Phase 1b decisions (roads, demolition, services)
+- **Roads are free and instant**, and only go on grass or fertile land. Placing a building over a road replaces it. People walking pay 0.4 per road tile, 1 on open ground, 1.6 in forest and 2 on rock; water and buildings block them.
+- **Logistics use real walking cost.** A multi-source Dijkstra from stockpile entrances sets each building's hauling efficiency (`1/(1+cost/40)`). Buildings with no route get 30% and a warning. The governor only builds where people can walk, so there are no farms across rivers until bridges exist.
+- **Demolition refunds** nothing while awaiting materials (nothing was spent), half while under construction, and a quarter once finished.
+- **Service coverage model:** each need (water, faith, drink, market) is met by the nearest staffed service building within its radius (Manhattan distance from the home) that has spare capacity. It's recalculated daily. Taverns use ale per person served. A need's "missing" penalty only applies from a minimum population, so small villages aren't punished.
+- **Food variety:** +3 mood per distinct food eaten in the last 3 days beyond the first (max +6). Without a market people always eat the tastiest food; with a market they shop around.
+- **Walking stays cosmetic:** the client draws townsfolk following roads using the same pathfinder, but the simulation never depends on their drawn position.
+- **Sound is deferred:** it has no simulation impact and needs audio assets.
 
 ## Battles: individual units + destructible structures (hybrid LOD simulation)
 

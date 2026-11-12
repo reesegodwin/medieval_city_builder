@@ -1,0 +1,6 @@
+[
+  { "id": "water", "name": "Water", "coveredMood": 4, "missingMood": -8, "minPopulation": 0 },
+  { "id": "faith", "name": "Faith", "coveredMood": 5, "missingMood": -4, "minPopulation": 30 },
+  { "id": "drink", "name": "Tavern", "coveredMood": 5, "missingMood": 0, "minPopulation": 0 },
+  { "id": "market", "name": "Market", "coveredMood": 3, "missingMood": -2, "minPopulation": 40 }
+]

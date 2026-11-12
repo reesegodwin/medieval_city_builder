@@ -101,7 +101,7 @@ public sealed class MeshBuilder
         Center = saved;
     }
 
-    public ArrayMesh Commit()
+    public ArrayMesh Commit(Material? material = null)
     {
         var mesh = new ArrayMesh();
         if (_vertices.Count == 0) return mesh;
@@ -112,7 +112,7 @@ public sealed class MeshBuilder
         arrays[(int)Mesh.ArrayType.Normal] = _normals.ToArray();
         arrays[(int)Mesh.ArrayType.Color] = _colors.ToArray();
         mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
-        mesh.SurfaceSetMaterial(0, Materials.VertexColored);
+        mesh.SurfaceSetMaterial(0, material ?? Materials.VertexColored);
         return mesh;
     }
 
@@ -132,6 +132,35 @@ public static class Materials
         VertexColorIsSrgb = true,
         CullMode = BaseMaterial3D.CullModeEnum.Disabled,
         Roughness = 1.0f,
+    };
+
+    /// <summary>Vertex-coloured material tinted by a multiplier (subtle per-building colour variation).</summary>
+    public static StandardMaterial3D Tinted(Color tint) => new()
+    {
+        VertexColorUseAsAlbedo = true,
+        VertexColorIsSrgb = true,
+        AlbedoColor = tint,
+        CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+        Roughness = 1.0f,
+    };
+
+    /// <summary>Translucent, unshaded, coloured by vertex/instance colour (tool previews).</summary>
+    public static readonly StandardMaterial3D Overlay = new()
+    {
+        VertexColorUseAsAlbedo = true,
+        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+        CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+    };
+
+    public static readonly StandardMaterial3D Water = new()
+    {
+        AlbedoColor = new Color(0.28f, 0.52f, 0.78f, 0.72f),
+        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+        Roughness = 0.08f,
+        Metallic = 0.25f,
+        MetallicSpecular = 0.8f,
+        CullMode = BaseMaterial3D.CullModeEnum.Disabled,
     };
 
     public static StandardMaterial3D Transparent(Color color) => new()

@@ -13,12 +13,14 @@ What works today:
 - **Time.** One game day is one real hour (240 ticks of 6 game minutes each), with seasons and years. Every duration is written in game days, so the time scale is one constant.
 - **Citizens.** Each person is a real record: name, age, sex, family, traits, skills that improve with work, job, home, hunger, mood and a life history.
 - **Jobs.** People are assigned by settlement rules (job priorities). The rules give priority to food during shortages, to producers of scarce goods, and to builders.
-- **Production chains** defined in JSON: farm → grain, then mill & bakery → bread; woodcutter → wood; quarry → stone. They respect stock reserves and stock limits (like Dwarf Fortress work orders), and workers are freed once stores are full.
+- **Production chains** defined in JSON: farm → grain, then mill & bakery → bread; vegetable garden → vegetables; brewery: grain → ale; woodcutter → wood; quarry → stone. They respect stock reserves and stock limits (like Dwarf Fortress work orders), and workers are freed once stores are full.
 - **Construction.** Buildings wait for materials, then builders put them up. Placement rules check terrain and nearby forest or rock.
-- **Logistics.** Distance to the nearest stockpile slows workers down, so town layout matters.
-- **Needs and mood.** Bread makes people happier than raw grain. Homelessness and hunger hurt. Starvation kills.
+- **Roads and logistics.** Each workplace loses time to hauling, based on the real walking cost to the nearest stockpile. Roads make that cheaper; rivers and buildings make people go around. Buildings with no walkable route are flagged.
+- **Demolition.** Buildings and roads can be torn down for a partial refund (half while under construction, a quarter once finished).
+- **Services** (Songs of Syx-style): wells (water), chapels (faith), taverns (drink, which uses ale) and markets each serve homes within a radius, up to a capacity, and most need staff.
+- **Needs and mood.** Mood comes from meals (bread beats raw grain), food variety (a market lets people shop around), each service need, housing, work, traits and hunger. The inspector lists every factor. Starvation kills.
 - **Life events.** Ageing, marriage, births, deaths, newcomers arriving when the town thrives, and unhappy people leaving.
-- **A governor AI** grows the town automatically, using the same commands a player would. This is the seed of the NPC faction AI.
+- **A governor AI** grows the town automatically, using the same commands a player would: housing, food, materials, and services where homes aren't covered. It lays roads to each new building and avoids sites people can't reach. This is the seed of the NPC faction AI.
 - **Deterministic.** The same seed always produces the same world. A state hash proves it, and the tests check it.
 
 ## Running it
@@ -51,7 +53,7 @@ dotnet test
 
 ## Running the game client (Phase 1)
 
-![Phase 1 client](docs/screenshots/phase1-town.png)
+![Phase 1 client](docs/screenshots/phase1b-town.png)
 
 ### What to download
 
@@ -77,11 +79,13 @@ dotnet test
 | Mouse wheel | Zoom |
 | Q / E | Rotate the view 90° |
 | Left-click | Select a building or citizen, or place a building |
-| Right-click / Esc | Cancel placement or close the inspector |
+| R | Road tool: click the start, then click the end (lays an L-shaped road) |
+| X | Demolish tool: click a building or road tile |
+| Right-click / Esc | Cancel the current tool or close the inspector |
 | Space | Pause |
 | 1–4 | Speed: 1× (real time, 1 game day per hour), 60×, 600×, 3600× |
 
-The bottom bar places buildings: a green ghost means the spot is valid, and red shows the reason it isn't. Placed buildings wait for materials, go up inside a scaffold, then start working. **Auto-build** lets the town's governor keep building on its own.
+The bottom bar places buildings and starts the Roads and Demolish tools: a green ghost means the spot is valid, and red shows the reason it isn't. Service buildings show their reach as a yellow diamond. Placed buildings wait for materials, go up inside a scaffold, then start working. **Auto-build** lets the town's governor keep building on its own.
 
 ### Command-line options
 
@@ -111,20 +115,20 @@ dotnet build client/MedievalClient.csproj
 | Path | Contents |
 |---|---|
 | `src/Sim.Core/` | The simulation. No engine code; it will be shared by the server and the Godot client. |
-| `src/Sim.Core/Data/*.json` | Data-driven definitions for resources and buildings. |
-| `src/Sim.Core/World/` | Seeded chunk-based world generation. |
+| `src/Sim.Core/Data/*.json` | Data-driven definitions for resources, buildings (including services) and needs. |
+| `src/Sim.Core/World/` | Seeded chunk-based world generation, and the pathfinder. |
 | `src/Sim.Core/Citizens/` | Citizen records and names. |
 | `src/Sim.Core/Settlements/` | Settlements, buildings, settlement rules. |
-| `src/Sim.Core/Systems/` | Systems that run each tick, hour or day: construction, production, jobs, housing, needs, life events, migration. |
-| `src/Sim.Core/AI/` | Site finder and settlement governor. |
+| `src/Sim.Core/Systems/` | Systems that run each tick, hour or day: logistics, construction, production, jobs, housing, needs and mood, services, life events, migration. |
+| `src/Sim.Core/AI/` | Site finder, road planner and settlement governor. |
 | `src/Sim.Core/Commands/` | The commands players and AI use to change the world. |
 | `src/Sim.Core/Simulation/` | The world state root, the simulator loop, and settlement founding. |
 | `src/Sim.Console/` | Headless runner with text reports and an ASCII map. |
 | `tests/Sim.Tests/` | xUnit tests. |
-| `client/` | Godot 4 (C#) game client: procedural low-poly terrain, buildings and townsfolk, camera, HUD, placement and inspector. |
+| `client/` | Godot 4 (C#) game client: procedural low-poly terrain, water, roads, buildings and townsfolk who walk along roads, camera, HUD, building/road/demolish tools and inspector. |
 | `client/Scripts/SimSession.cs` | The client's only door into the simulation (in-process now, network in Phase 2). |
 
 ## Next steps
 
-1. **Phase 1, continued:** roads, building demolition, a better art pass, sound, and services (well, market, chapel, tavern) with food variety.
+1. **Phase 1, continued:** bridges, and a larger or expandable town area (towns currently fill the reachable land within their radius after about two game years), sound (free CC0 audio: https://kenney.nl/assets/category:Audio), a settlement rules panel (job priorities, stock limits), and saving/loading.
 2. **Phase 2:** a dedicated server with PostgreSQL persistence and multiplayer. `SimSession` becomes a network client.

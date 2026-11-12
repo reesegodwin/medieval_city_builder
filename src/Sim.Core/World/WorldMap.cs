@@ -19,6 +19,9 @@ public struct Tile
     /// <summary>Id of the building covering this tile, or 0 for none.</summary>
     public int BuildingId;
 
+    /// <summary>A road runs over this tile. Buildings placed on it replace the road.</summary>
+    public bool IsRoad;
+
     public readonly bool IsBuildable => BuildingId == 0 && (Terrain == Terrain.Grass || Terrain == Terrain.Fertile);
 }
 

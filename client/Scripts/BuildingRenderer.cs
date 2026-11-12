@@ -17,7 +17,16 @@ public partial class BuildingRenderer : Node3D
         public required MeshInstance3D Plot;
     }
 
+    private static readonly StandardMaterial3D[] Tints =
+    {
+        Materials.Tinted(new Color(1f, 1f, 1f)),
+        Materials.Tinted(new Color(0.94f, 0.92f, 0.88f)),
+        Materials.Tinted(new Color(1f, 0.97f, 0.9f)),
+        Materials.Tinted(new Color(0.9f, 0.9f, 0.92f)),
+    };
+
     private readonly Dictionary<int, View> _views = new();
+    private readonly HashSet<int> _seen = new();
     private Settlement _settlement = null!;
 
     public void Initialize(Settlement settlement) => _settlement = settlement;
@@ -25,6 +34,7 @@ public partial class BuildingRenderer : Node3D
     public override void _Process(double delta)
     {
         if (_settlement == null) return;
+        _seen.Clear();
         foreach (var b in _settlement.Buildings)
         {
             if (!_views.TryGetValue(b.Id, out var view))
@@ -33,6 +43,17 @@ public partial class BuildingRenderer : Node3D
                 _views[b.Id] = view;
             }
             Sync(b, view);
+            _seen.Add(b.Id);
+        }
+
+        // Demolished buildings.
+        if (_views.Count != _seen.Count)
+        {
+            foreach (int id in _views.Keys.Where(id => !_seen.Contains(id)).ToList())
+            {
+                _views[id].Root.QueueFree();
+                _views.Remove(id);
+            }
         }
     }
 
@@ -42,7 +63,7 @@ public partial class BuildingRenderer : Node3D
         var view = new View
         {
             Root = root,
-            Model = new MeshInstance3D { Mesh = LowPolyMeshes.Building(b.Def) },
+            Model = new MeshInstance3D { Mesh = LowPolyMeshes.Building(b.Def), MaterialOverride = Tints[b.Id % Tints.Length] },
             Scaffold = new MeshInstance3D { Mesh = LowPolyMeshes.Scaffold(b.Def.Width, b.Def.Height) },
             Plot = new MeshInstance3D { Mesh = LowPolyMeshes.Plot(b.Def.Width, b.Def.Height) },
         };

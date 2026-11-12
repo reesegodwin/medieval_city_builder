@@ -7,6 +7,7 @@ public enum EventKind
     SettlementFounded,
     BuildingPlaced,
     BuildingCompleted,
+    BuildingDemolished,
     Birth,
     Death,
     Marriage,

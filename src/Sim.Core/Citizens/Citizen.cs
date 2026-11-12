@@ -50,6 +50,12 @@ public sealed class Citizen
     /// <summary>0..100. 50 is content; drives work speed, and later crime, emigration and rebellion.</summary>
     public double Mood { get; set; } = 55;
 
+    /// <summary>Needs met by a service building near the citizen's home (updated daily).</summary>
+    public SortedSet<string> CoveredNeeds { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Last day each food was eaten, for the food variety bonus.</summary>
+    public SortedDictionary<string, long> RecentFoods { get; } = new(StringComparer.Ordinal);
+
     /// <summary>Mood effect of the most recent meal.</summary>
     public double LastMealMood { get; set; }
 

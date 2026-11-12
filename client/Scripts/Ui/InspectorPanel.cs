@@ -2,6 +2,8 @@ using System.Text;
 using Godot;
 using Sim.Core.Citizens;
 using Sim.Core.Settlements;
+using Sim.Core.Simulation;
+using Sim.Core.Systems;
 
 namespace MedievalClient.Ui;
 
@@ -21,7 +23,7 @@ public partial class InspectorPanel : PanelContainer
         AnchorBottom = 1;
         OffsetLeft = -380;
         OffsetRight = -10;
-        OffsetTop = 84;
+        OffsetTop = 108;
         OffsetBottom = -80;
         Visible = false;
 
@@ -73,7 +75,18 @@ public partial class InspectorPanel : PanelContainer
             sb.AppendLine($"[b]Current batch:[/b] {Math.Min(1, b.CycleProgress / recipe.WorkDays):P0}");
             if (b.TerrainMultiplier > 1.001) sb.AppendLine($"[b]Soil bonus:[/b] +{b.TerrainMultiplier - 1:P0}");
         }
-        sb.AppendLine($"[b]Hauling efficiency:[/b] {b.HaulFactor:P0} (distance to stockpile)");
+        sb.AppendLine(b.NoRoute
+            ? "[color=#ff8060][b]Hauling:[/b] no walkable route to a stockpile![/color]"
+            : $"[b]Hauling efficiency:[/b] {b.HaulFactor:P0} (walking distance to a stockpile; roads help)");
+
+        if (b.Def.Service is { } service)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"[b]Serves:[/b] {service.Need}, {b.ServedCount}/{service.Capacity} people");
+            sb.AppendLine($"[b]Reach:[/b] homes within {service.Radius} tiles");
+            foreach (var (resource, perPerson) in service.ConsumesPerPersonDay)
+                sb.AppendLine($"[b]Uses:[/b] {perPerson:0.##} {resource} per person per day (in stock: {town.Stock.Get(resource)})");
+        }
 
         if (b.JobSlots > 0 || b.WorkerIds.Count > 0)
         {
@@ -96,7 +109,7 @@ public partial class InspectorPanel : PanelContainer
         SetBody(sb);
     }
 
-    public void ShowCitizen(Settlement town, Citizen c)
+    public void ShowCitizen(GameWorld world, Settlement town, Citizen c)
     {
         Visible = true;
         _title.Text = c.FullName;
@@ -114,6 +127,14 @@ public partial class InspectorPanel : PanelContainer
         sb.AppendLine($"[b]Job:[/b] {job}");
         string home = c.HomeBuildingId is int h && town.FindBuilding(h) is { } hb ? $"{hb.Def.Name} at ({hb.X}, {hb.Y})" : "[color=#ff6060]homeless[/color]";
         sb.AppendLine($"[b]Home:[/b] {home}");
+
+        sb.AppendLine();
+        sb.AppendLine("[b]What affects their mood[/b]");
+        foreach (var (label, mood) in Needs.MoodFactors(world, town, c).OrderByDescending(f => f.Mood))
+        {
+            string color = mood > 0 ? "#90e090" : "#ff9070";
+            sb.AppendLine($"  [color={color}]{(mood > 0 ? "+" : "")}{mood:0}[/color] {label}");
+        }
 
         sb.AppendLine();
         if (c.SpouseId is int s) sb.AppendLine($"[b]Spouse:[/b] {CitizenName(town, s)}");

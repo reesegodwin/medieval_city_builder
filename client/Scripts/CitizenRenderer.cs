@@ -3,6 +3,7 @@ using Sim.Core.Citizens;
 using Sim.Core.Settlements;
 using Sim.Core.Systems;
 using Sim.Core.Util;
+using Sim.Core.World;
 
 namespace MedievalClient;
 
@@ -21,7 +22,8 @@ public partial class CitizenRenderer : Node3D
         public required Vector3[] Points;
         public required float[] Dwell;
         public required float Phase;
-        public int JobId, HomeId;
+        public int JobId, HomeId, RoadVersion;
+        public bool Pathed;
         public float Length;
     }
 
@@ -32,6 +34,7 @@ public partial class CitizenRenderer : Node3D
 
     private readonly Dictionary<int, Route> _routes = new();
     private Settlement _settlement = null!;
+    private Sim.Core.Simulation.GameWorld _world = null!;
     private MultiMesh _bodies = null!;
     private MultiMesh _heads = null!;
     private float _clock;
@@ -41,8 +44,9 @@ public partial class CitizenRenderer : Node3D
 
     public bool Animate { get; set; } = true;
 
-    public void Initialize(Settlement settlement)
+    public void Initialize(Sim.Core.Simulation.GameWorld world, Settlement settlement)
     {
+        _world = world;
         _settlement = settlement;
         _bodies = TerrainRenderer.NewMultiMesh(LowPolyMeshes.CitizenBody, 64, colors: true);
         _heads = TerrainRenderer.NewMultiMesh(LowPolyMeshes.CitizenHead, 64, colors: true);
@@ -70,6 +74,7 @@ public partial class CitizenRenderer : Node3D
     {
         if (_settlement == null) return;
         if (Animate) _clock += (float)delta;
+        _pathBudget = MaxPathedRoutesPerFrame;
 
         var citizens = _settlement.Citizens;
         EnsureCapacity(citizens.Count);
@@ -105,53 +110,97 @@ public partial class CitizenRenderer : Node3D
         _heads.InstanceCount = capacity;
     }
 
+    /// <summary>Pathfinding is spread over frames: at most this many routes are (re)built per frame.</summary>
+    public const int MaxPathedRoutesPerFrame = 20;
+    private const int MaxPathSearch = 3000;
+    private int _pathBudget;
+
     private Route GetRoute(Citizen c)
     {
         int jobId = c.JobBuildingId ?? 0, homeId = c.HomeBuildingId ?? 0;
-        if (_routes.TryGetValue(c.Id, out var route) && route.JobId == jobId && route.HomeId == homeId)
+        bool cached = _routes.TryGetValue(c.Id, out var route);
+        if (cached && route!.JobId == jobId && route.HomeId == homeId &&
+            (route.Pathed && route.RoadVersion == _settlement.RoadVersion || _pathBudget <= 0))
             return route;
 
-        route = BuildRoute(c, jobId, homeId);
+        bool usePaths = _pathBudget-- > 0;
+        if (!usePaths && cached && route!.JobId == jobId && route.HomeId == homeId) return route;
+
+        route = BuildRoute(c, jobId, homeId, usePaths);
         _routes[c.Id] = route;
         return route;
     }
 
-    private Route BuildRoute(Citizen c, int jobId, int homeId)
+    private readonly record struct Waypoint(Vector3 Point, (int X, int Y) WalkTile, float Dwell);
+
+    private Route BuildRoute(Citizen c, int jobId, int homeId, bool usePaths)
     {
         ulong seed = (ulong)c.Id * 2654435761UL;
         float Rand(int salt) => (float)Hashing.Hash01(seed, salt, c.Id);
+        Vector3 Near(Vector3 p, float spread, int salt) =>
+            p + new Vector3((Rand(salt) - 0.5f) * spread, 0, (Rand(salt + 1) - 0.5f) * spread);
+        (int, int) TileOf(Vector3 p) => Coords.WorldToTile(p);
 
         var home = homeId != 0 ? _settlement.FindBuilding(homeId) : null;
         var job = jobId != 0 ? _settlement.FindBuilding(jobId) : null;
-        Vector3 homePoint = home != null
-            ? Coords.BuildingDoor(home)
-            : new Vector3(_settlement.CenterX + Rand(1) * 6 - 3, 0, _settlement.CenterY + Rand(2) * 6 - 3);
-        Vector3 Near(Vector3 p, float spread, int salt) =>
-            p + new Vector3((Rand(salt) - 0.5f) * spread, 0, (Rand(salt + 1) - 0.5f) * spread);
 
-        Vector3[] points;
-        float[] dwell;
+        Waypoint homeStop = home != null
+            ? new Waypoint(Coords.BuildingDoor(home), home.DoorTile, 2f)
+            : At(new Vector3(_settlement.CenterX + Rand(1) * 6 - 3, 0, _settlement.CenterY + Rand(2) * 6 - 3), 2f);
+        Waypoint At(Vector3 p, float dwell) => new(p, TileOf(p), dwell);
+
+        Waypoint[] stops;
         if (job != null)
         {
-            // Farmers work out in the field; everyone else around the workplace.
-            Vector3 work = job.Def.Id == "farm" && job.IsOperational
+            // Farmers and gardeners work out in the field; everyone else around the workplace door.
+            bool field = job.IsOperational && (job.Def.Id == "farm" || job.Def.Id == "garden");
+            Vector3 workPoint = field
                 ? Coords.TileCorner(job.X, job.Y) + new Vector3(0.3f + Rand(3) * (job.Def.Width - 0.6f), 0, 0.3f + Rand(4) * (job.Def.Height - 0.6f))
                 : Near(Coords.BuildingDoor(job), 0.8f, 5);
+            var work = new Waypoint(workPoint, job.DoorTile, 7f);
             var stock = Logistics.NearestStockpile(_settlement, job);
-            Vector3 stockPoint = stock != null ? Near(Coords.BuildingDoor(stock), 1.2f, 7) : work;
-            points = new[] { homePoint, work, stockPoint, Near(work, 0.6f, 9), stockPoint };
-            dwell = new[] { 2f, 7f, 1.5f, 7f, 1.5f };
+            var stockStop = stock != null ? new Waypoint(Near(Coords.BuildingDoor(stock), 1.2f, 7), stock.DoorTile, 1.5f) : work;
+            stops = new[] { homeStop, work, stockStop, work with { Point = Near(workPoint, 0.6f, 9) }, stockStop };
         }
         else
         {
             // Children and idle adults potter about near home.
-            points = new[] { homePoint, Near(homePoint, 5f, 11), Near(homePoint, 5f, 13) };
-            dwell = new[] { 3f, 4f, 4f };
+            stops = new[] { homeStop with { Dwell = 3f }, At(Near(homeStop.Point, 5f, 11), 4f), At(Near(homeStop.Point, 5f, 13), 4f) };
         }
 
-        var route = new Route { Points = points, Dwell = dwell, Phase = Rand(17) * 60f, JobId = jobId, HomeId = homeId };
-        for (int i = 0; i < points.Length; i++)
-            route.Length += points[i].DistanceTo(points[(i + 1) % points.Length]) / WalkSpeed + dwell[i];
+        // Expand the stops into a walkable polyline that follows roads and avoids buildings and water.
+        var points = new List<Vector3>();
+        var dwell = new List<float>();
+        for (int i = 0; i < stops.Length; i++)
+        {
+            var from = stops[i];
+            var to = stops[(i + 1) % stops.Length];
+            points.Add(from.Point);
+            dwell.Add(from.Dwell);
+            if (!usePaths || from.WalkTile == to.WalkTile) continue;
+
+            var path = Pathfinder.FindPath(_world.Map, from.WalkTile, to.WalkTile,
+                Pathfinder.Mode.Walk, MaxPathSearch);
+            if (path == null) continue;
+            foreach (var (x, y) in path)
+            {
+                points.Add(Coords.TileCenter(x, y) + new Vector3((Rand(x + y) - 0.5f) * 0.3f, 0, (Rand(x - y) - 0.5f) * 0.3f));
+                dwell.Add(0f);
+            }
+        }
+
+        var route = new Route
+        {
+            Points = points.ToArray(),
+            Dwell = dwell.ToArray(),
+            Phase = Rand(17) * 60f,
+            JobId = jobId,
+            HomeId = homeId,
+            Pathed = usePaths,
+            RoadVersion = _settlement.RoadVersion,
+        };
+        for (int i = 0; i < route.Points.Length; i++)
+            route.Length += route.Points[i].DistanceTo(route.Points[(i + 1) % route.Points.Length]) / WalkSpeed + route.Dwell[i];
         return route;
     }
 

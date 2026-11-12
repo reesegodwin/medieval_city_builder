@@ -107,5 +107,117 @@
       },
       "workDays": 1
     }
+  },
+  {
+    "id": "well",
+    "name": "Well",
+    "width": 1,
+    "height": 1,
+    "buildDays": 0.1,
+    "cost": {
+      "stone": 8
+    },
+    "service": {
+      "need": "water",
+      "radius": 10,
+      "capacity": 40
+    }
+  },
+  {
+    "id": "garden",
+    "name": "Vegetable Garden",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.25,
+    "cost": {
+      "wood": 10
+    },
+    "jobs": 2,
+    "jobKind": "gardener",
+    "recipe": {
+      "outputs": {
+        "vegetables": 4
+      },
+      "workDays": 1
+    },
+    "fertileBonus": 0.5
+  },
+  {
+    "id": "chapel",
+    "name": "Chapel",
+    "width": 3,
+    "height": 3,
+    "buildDays": 1.0,
+    "cost": {
+      "wood": 15,
+      "stone": 30
+    },
+    "jobs": 1,
+    "jobKind": "priest",
+    "service": {
+      "need": "faith",
+      "radius": 22,
+      "capacity": 80
+    }
+  },
+  {
+    "id": "brewery",
+    "name": "Brewery",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.5,
+    "cost": {
+      "wood": 25,
+      "stone": 5
+    },
+    "jobs": 2,
+    "jobKind": "brewer",
+    "recipe": {
+      "inputs": {
+        "grain": 3
+      },
+      "outputs": {
+        "ale": 4
+      },
+      "workDays": 1
+    }
+  },
+  {
+    "id": "tavern",
+    "name": "Tavern",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.6,
+    "cost": {
+      "wood": 30
+    },
+    "jobs": 1,
+    "jobKind": "barkeep",
+    "service": {
+      "need": "drink",
+      "radius": 16,
+      "capacity": 50,
+      "consumesPerPersonDay": {
+        "ale": 0.2
+      }
+    }
+  },
+  {
+    "id": "market",
+    "name": "Market",
+    "width": 4,
+    "height": 4,
+    "buildDays": 0.6,
+    "cost": {
+      "wood": 30,
+      "stone": 10
+    },
+    "jobs": 1,
+    "jobKind": "trader",
+    "service": {
+      "need": "market",
+      "radius": 24,
+      "capacity": 120
+    }
   }
 ]

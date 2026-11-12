@@ -113,11 +113,137 @@ public static class Placement
             ref var tile = ref world.Map.GetTile(x + dx, y + dy);
             tile.BuildingId = building.Id;
             if (tile.Terrain == Terrain.Fertile) fertile++;
+            if (tile.IsRoad) Roads.Remove(world, settlement, x + dx, y + dy);
         }
 
         building.TerrainMultiplier = 1.0 + def.FertileBonus * fertile / (def.Width * def.Height);
         settlement.AddBuilding(building);
-        Logistics.UpdateHaulFactors(settlement);
+        Logistics.UpdateHaulFactors(world, settlement);
         return building;
+    }
+}
+
+/// <summary>Low-level road tile changes. Callers go through the road commands.</summary>
+public static class Roads
+{
+    /// <summary>Returns null if a road can go on this tile, otherwise why not.</summary>
+    public static string? Check(GameWorld world, Settlement settlement, int x, int y)
+    {
+        if (Math.Abs(x - settlement.CenterX) + Math.Abs(y - settlement.CenterY) > Placement.SettlementRadius)
+            return "Too far from the settlement";
+        var tile = world.Map.GetTile(x, y);
+        if (tile.BuildingId != 0) return "Blocked by a building";
+        if (!tile.IsBuildable) return $"Cannot build a road on {tile.Terrain}";
+        return null;
+    }
+
+    internal static void Add(GameWorld world, Settlement settlement, int x, int y)
+    {
+        ref var tile = ref world.Map.GetTile(x, y);
+        if (tile.IsRoad) return;
+        tile.IsRoad = true;
+        settlement.Roads.Add((x, y));
+        settlement.RoadVersion++;
+    }
+
+    internal static void Remove(GameWorld world, Settlement settlement, int x, int y)
+    {
+        ref var tile = ref world.Map.GetTile(x, y);
+        if (!tile.IsRoad) return;
+        tile.IsRoad = false;
+        settlement.Roads.Remove((x, y));
+        settlement.RoadVersion++;
+    }
+}
+
+/// <summary>Lays road on every listed tile. All tiles must be valid, or nothing is built.</summary>
+public sealed record PlaceRoadCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles) : ICommand
+{
+    public CommandResult Execute(GameWorld world)
+    {
+        var settlement = world.FindSettlement(SettlementId);
+        if (settlement == null) return CommandResult.Fail("Unknown settlement");
+        if (Tiles.Count == 0) return CommandResult.Fail("No tiles");
+
+        foreach (var (x, y) in Tiles)
+        {
+            if (world.Map.GetTile(x, y).IsRoad) continue;
+            if (Roads.Check(world, settlement, x, y) is { } error) return CommandResult.Fail($"({x},{y}): {error}");
+        }
+
+        int before = settlement.Roads.Count;
+        foreach (var (x, y) in Tiles) Roads.Add(world, settlement, x, y);
+        if (settlement.Roads.Count != before) Logistics.UpdateHaulFactors(world, settlement);
+        return CommandResult.Success();
+    }
+}
+
+public sealed record RemoveRoadCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles) : ICommand
+{
+    public CommandResult Execute(GameWorld world)
+    {
+        var settlement = world.FindSettlement(SettlementId);
+        if (settlement == null) return CommandResult.Fail("Unknown settlement");
+
+        int before = settlement.Roads.Count;
+        foreach (var (x, y) in Tiles)
+        {
+            if (settlement.Roads.Contains((x, y))) Roads.Remove(world, settlement, x, y);
+        }
+        if (settlement.Roads.Count == before) return CommandResult.Fail("No road there");
+        Logistics.UpdateHaulFactors(world, settlement);
+        return CommandResult.Success();
+    }
+}
+
+/// <summary>
+/// Tears a building down. Workers and residents are released, and part of the cost comes back:
+/// nothing was spent yet while awaiting materials, half while under construction, a quarter once finished.
+/// </summary>
+public sealed record DemolishBuildingCommand(int SettlementId, int BuildingId) : ICommand
+{
+    public const double ConstructionRefund = 0.5;
+    public const double OperationalRefund = 0.25;
+
+    public CommandResult Execute(GameWorld world)
+    {
+        var settlement = world.FindSettlement(SettlementId);
+        if (settlement == null) return CommandResult.Fail("Unknown settlement");
+        var b = settlement.FindBuilding(BuildingId);
+        if (b == null) return CommandResult.Fail("Unknown building");
+
+        Work.ReleaseWorkers(settlement, b);
+        foreach (int id in b.ResidentIds)
+        {
+            if (settlement.FindCitizen(id) is { } resident) resident.HomeBuildingId = null;
+        }
+        b.ResidentIds.Clear();
+
+        for (int y = b.Y; y < b.Y + b.Def.Height; y++)
+        for (int x = b.X; x < b.X + b.Def.Width; x++)
+        {
+            world.Map.GetTile(x, y).BuildingId = 0;
+        }
+        settlement.RemoveBuilding(b);
+
+        double refund = b.State switch
+        {
+            BuildingState.UnderConstruction => ConstructionRefund,
+            BuildingState.Operational => OperationalRefund,
+            _ => 0,
+        };
+        var returned = new List<string>();
+        foreach (var (resource, amount) in b.Def.Cost)
+        {
+            int back = Math.Min((int)(amount * refund), settlement.FreeStorage);
+            if (back <= 0) continue;
+            settlement.Stock.Add(resource, back);
+            returned.Add($"{back} {resource}");
+        }
+
+        Logistics.UpdateHaulFactors(world, settlement);
+        world.Log(EventKind.BuildingDemolished, settlement,
+            $"{b.Def.Name} demolished" + (returned.Count > 0 ? $" ({string.Join(", ", returned)} recovered)" : ""));
+        return CommandResult.Success();
     }
 }

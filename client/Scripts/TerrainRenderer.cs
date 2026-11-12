@@ -28,6 +28,8 @@ public partial class TerrainRenderer : Node3D
         _seed = map.Seed;
     }
 
+    public const float WaterLevel = -0.1f;
+
     public static float HeightOf(Terrain t) => t switch
     {
         Terrain.Water => -0.25f,
@@ -43,7 +45,7 @@ public partial class TerrainRenderer : Node3D
         Terrain.Forest => new Color(0.27f, 0.43f, 0.18f),
         Terrain.Rock => new Color(0.56f, 0.54f, 0.50f),
         Terrain.IronDeposit => new Color(0.56f, 0.40f, 0.31f),
-        Terrain.Water => new Color(0.22f, 0.42f, 0.62f),
+        Terrain.Water => new Color(0.16f, 0.30f, 0.40f), // lake/river bed under the water surface
         _ => Colors.Magenta,
     };
 
@@ -83,6 +85,7 @@ public partial class TerrainRenderer : Node3D
     {
         var root = new Node3D { Name = $"Chunk_{cx}_{cy}" };
         var ground = new MeshBuilder();
+        var water = new MeshBuilder();
         var treeTransforms = new List<Transform3D>();
         var rockTransforms = new List<(Transform3D, Color)>();
 
@@ -97,6 +100,8 @@ public partial class TerrainRenderer : Node3D
             var color = ColorOf(terrain).Lightened(jitter);
 
             ground.Quad(new(x, h, y), new(x + 1, h, y), new(x + 1, h, y + 1), new(x, h, y + 1), color, Vector3.Up);
+            if (terrain == Terrain.Water)
+                water.Quad(new(x, WaterLevel, y), new(x + 1, WaterLevel, y), new(x + 1, WaterLevel, y + 1), new(x, WaterLevel, y + 1), Colors.White, Vector3.Up);
 
             // Cliff walls down to lower neighbours.
             AddWall(ground, x, y, h, x + 1, y, color, Vector3.Right);
@@ -117,11 +122,19 @@ public partial class TerrainRenderer : Node3D
         }
 
         root.AddChild(new MeshInstance3D { Mesh = ground.Commit() });
+        if (!water.IsEmpty)
+            root.AddChild(new MeshInstance3D { Mesh = water.Commit(Materials.Water), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
 
         if (treeTransforms.Count > 0)
         {
-            var mm = NewMultiMesh(LowPolyMeshes.Tree, treeTransforms.Count);
-            for (int i = 0; i < treeTransforms.Count; i++) mm.SetInstanceTransform(i, treeTransforms[i]);
+            var mm = NewMultiMesh(LowPolyMeshes.Tree, treeTransforms.Count, colors: true);
+            for (int i = 0; i < treeTransforms.Count; i++)
+            {
+                mm.SetInstanceTransform(i, treeTransforms[i]);
+                var origin = treeTransforms[i].Origin;
+                float v = (float)Hashing.Hash01(_seed ^ 0x7C0, (int)origin.X, (int)origin.Z);
+                mm.SetInstanceColor(i, new Color(0.85f + v * 0.2f, 0.9f + v * 0.15f, 0.8f + (1 - v) * 0.2f));
+            }
             root.AddChild(new MultiMeshInstance3D { Multimesh = mm });
         }
         if (rockTransforms.Count > 0)
