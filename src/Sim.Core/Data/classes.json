@@ -1,0 +1,5 @@
+[
+  {"id": "peasant", "name": "Peasants", "taxPerAdultDay": 0.05},
+  {"id": "craftsman", "name": "Craftsmen", "taxPerAdultDay": 0.07},
+  {"id": "burgher", "name": "Burghers", "taxPerAdultDay": 0.1}
+]

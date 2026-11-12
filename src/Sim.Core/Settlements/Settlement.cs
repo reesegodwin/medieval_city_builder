@@ -68,6 +68,9 @@ public sealed class SettlementRules
     /// <summary>Whether the settlement's governor AI may place new buildings on its own.</summary>
     public bool AutoBuild { get; set; } = true;
 
+    /// <summary>Whether homes upgrade on their own once their residents' needs are met (paying the upgrade cost).</summary>
+    public bool AutoUpgradeHomes { get; set; } = true;
+
     /// <summary>
     /// Whether spare territory allowance is claimed automatically, evenly around the centre. Turn it off to
     /// paint territory by hand (e.g. only along one bank of a river).
@@ -252,4 +255,7 @@ public sealed class RoadPlan
     public int X { get; set; }
     public int Y { get; set; }
     public double Progress { get; set; }
+
+    /// <summary>Surface to build: a new road at this tier, or an upgrade of the existing one.</summary>
+    public byte Tier { get; set; }
 }

@@ -35,6 +35,7 @@ public sealed record PlaceBuildingCommand(int SettlementId, string BuildingDefId
         if (settlement == null) return CommandResult.Fail("Unknown settlement");
         if (!world.Data.Buildings.TryGetValue(BuildingDefId, out var def)) return CommandResult.Fail("Unknown building type");
         if (def.IsTownCentre) return CommandResult.Fail("Each settlement has one town centre; upgrade it instead");
+        if (def.Home is { Level: > 0 }) return CommandResult.Fail($"Build hovels; they become {def.Name}s when their people's needs are met");
 
         string? error = Placement.Check(world, settlement, def, X, Y);
         if (error != null) return CommandResult.Fail(error);
@@ -176,15 +177,47 @@ public static class Roads
     public static int BridgeCost(GameWorld world, IEnumerable<(int X, int Y)> tiles) =>
         tiles.Distinct().Count(t => world.Map.GetTile(t.X, t.Y) is { IsRoad: false, RoadPlanned: false, Terrain: Terrain.Water }) * BridgeWoodPerTile;
 
-    public static double WorkDays(in Tile tile) => tile.Terrain == Terrain.Water ? BridgeWorkDays : RoadWorkDays;
+    public static double WorkDays(GameWorld world, in Tile tile, byte tier) =>
+        tile.Terrain == Terrain.Water ? BridgeWorkDays : world.Data.RoadTiers[Math.Min(tier, world.Data.RoadTiers.Count - 1)].WorkDays;
 
-    /// <summary>Marks a tile for roadworkers to build.</summary>
-    internal static void Plan(GameWorld world, Settlement settlement, int x, int y)
+    /// <summary>The tier a tile would get: bridges are always plain, land roads as requested.</summary>
+    public static byte TierFor(in Tile tile, byte tier) => tile.Terrain == Terrain.Water ? (byte)0 : tier;
+
+    /// <summary>Whether planning this tier here would do anything (a new road, or a better surface on our own road).</summary>
+    public static bool NeedsWork(GameWorld world, Settlement settlement, int x, int y, byte tier)
     {
+        var tile = world.Map.GetTile(x, y);
+        if (tile.RoadPlanned) return false;
+        if (!tile.IsRoad) return true;
+        return settlement.Roads.Contains((x, y)) && TierFor(tile, tier) > tile.RoadTier;
+    }
+
+    /// <summary>Materials to plan these tiles at a tier: surface costs plus wood for new bridges.</summary>
+    public static Dictionary<string, int> PlanCost(GameWorld world, Settlement settlement, IEnumerable<(int X, int Y)> tiles, byte tier)
+    {
+        var cost = new Dictionary<string, int>();
+        foreach (var (x, y) in tiles.Distinct())
+        {
+            if (!NeedsWork(world, settlement, x, y, tier)) continue;
+            var tile = world.Map.GetTile(x, y);
+            if (tile.Terrain == Terrain.Water)
+            {
+                cost["wood"] = cost.GetValueOrDefault("wood") + BridgeWoodPerTile;
+                continue;
+            }
+            foreach (var (r, n) in world.Data.RoadTiers[Math.Min(tier, world.Data.RoadTiers.Count - 1)].Cost)
+                cost[r] = cost.GetValueOrDefault(r) + n;
+        }
+        return cost;
+    }
+
+    /// <summary>Marks a tile for roadworkers to build (or resurface).</summary>
+    internal static void Plan(GameWorld world, Settlement settlement, int x, int y, byte tier = 0)
+    {
+        if (!NeedsWork(world, settlement, x, y, tier)) return;
         ref var tile = ref world.Map.GetTile(x, y);
-        if (tile.IsRoad || tile.RoadPlanned) return;
         tile.RoadPlanned = true;
-        settlement.RoadPlans.Add(new RoadPlan { X = x, Y = y });
+        settlement.RoadPlans.Add(new RoadPlan { X = x, Y = y, Tier = TierFor(tile, tier) });
         settlement.RoadVersion++;
     }
 
@@ -194,18 +227,26 @@ public static class Roads
         ref var tile = ref world.Map.GetTile(x, y);
         int index = settlement.RoadPlans.FindIndex(p => p.X == x && p.Y == y);
         if (index < 0) return false;
+        var plan = settlement.RoadPlans[index];
         tile.RoadPlanned = false;
         settlement.RoadPlans.RemoveAt(index);
         settlement.RoadVersion++;
+        // Materials paid for the surface come back; bridge wood was already used for the pilings.
+        if (tile.Terrain != Terrain.Water)
+            foreach (var (r, n) in world.Data.RoadTiers[Math.Min(plan.Tier, world.Data.RoadTiers.Count - 1)].Cost)
+                settlement.Stock.Add(r, n);
         return true;
     }
 
     /// <summary>Turns a plan into a finished road.</summary>
     internal static void Finish(GameWorld world, Settlement settlement, RoadPlan plan)
     {
-        world.Map.GetTile(plan.X, plan.Y).RoadPlanned = false;
+        ref var tile = ref world.Map.GetTile(plan.X, plan.Y);
+        tile.RoadPlanned = false;
         settlement.RoadPlans.Remove(plan);
         Add(world, settlement, plan.X, plan.Y);
+        tile.RoadTier = plan.Tier;
+        settlement.RoadVersion++;
     }
 
     /// <summary>Builds every planned tile at once (founding a town, or a town with nobody to build roads).</summary>
@@ -230,13 +271,18 @@ public static class Roads
         ref var tile = ref world.Map.GetTile(x, y);
         if (!tile.IsRoad) return;
         tile.IsRoad = false;
+        tile.RoadTier = 0;
         settlement.Roads.Remove((x, y));
         settlement.RoadVersion++;
     }
 }
 
 /// <summary>Lays road on every listed tile. All tiles must be valid, or nothing is built.</summary>
-public sealed record PlaceRoadCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles) : ISettlementCommand
+/// <summary>
+/// Plans a road (tier 0, dirt: free) or a better surface (gravel, stone: stone per tile) along the tiles. Existing
+/// roads of ours are resurfaced; roadworkers do the work over time. Bridges need wood up front.
+/// </summary>
+public sealed record PlaceRoadCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles, byte Tier = 0) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)
     {
@@ -244,19 +290,22 @@ public sealed record PlaceRoadCommand(int SettlementId, IReadOnlyList<(int X, in
         if (settlement == null) return CommandResult.Fail("Unknown settlement");
         if (Tiles.Count == 0) return CommandResult.Fail("No tiles");
 
+        if (Tier >= world.Data.RoadTiers.Count) return CommandResult.Fail("Unknown road surface");
         foreach (var (x, y) in Tiles)
         {
             var tile = world.Map.GetTile(x, y);
             if (tile.IsRoad || tile.RoadPlanned) continue;
             if (Roads.Check(world, settlement, x, y) is { } error) return CommandResult.Fail($"({x},{y}): {error}");
         }
+        if (!Tiles.Any(t => Roads.NeedsWork(world, settlement, t.X, t.Y, Tier)))
+            return CommandResult.Fail("Nothing to build: the road is already there (or planned)");
 
-        // Dirt roads are free: roadworkers build them over time. Bridges need their wood up front.
-        int wood = Roads.BridgeCost(world, Tiles);
-        if (wood > 0 && !settlement.Stock.TryTake("wood", wood))
-            return CommandResult.Fail($"Bridge needs {wood} wood");
+        // Dirt roads are free: roadworkers build them over time. Better surfaces and bridges are paid up front.
+        var cost = Roads.PlanCost(world, settlement, Tiles, Tier);
+        if (!settlement.Stock.TryTakeAll(cost))
+            return CommandResult.Fail($"Needs {string.Join(", ", cost.Select(kv => $"{kv.Value} {kv.Key}"))}");
 
-        foreach (var (x, y) in Tiles) Roads.Plan(world, settlement, x, y);
+        foreach (var (x, y) in Tiles) Roads.Plan(world, settlement, x, y, Tier);
         return CommandResult.Success();
     }
 }
@@ -271,8 +320,8 @@ public sealed record RemoveRoadCommand(int SettlementId, IReadOnlyList<(int X, i
         int before = settlement.Roads.Count, plansBefore = settlement.RoadPlans.Count;
         foreach (var (x, y) in Tiles)
         {
+            Roads.Unplan(world, settlement, x, y); // a pending road or resurfacing goes too, with its materials refunded
             if (settlement.Roads.Contains((x, y))) Roads.Remove(world, settlement, x, y);
-            else Roads.Unplan(world, settlement, x, y);
         }
         if (settlement.Roads.Count == before && settlement.RoadPlans.Count == plansBefore) return CommandResult.Fail("No road there");
         if (settlement.Roads.Count != before) Logistics.UpdateHaulFactors(world, settlement);
@@ -366,5 +415,16 @@ public sealed record FoundSettlementCommand(string OwnerId) : ICommand
             if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != r) continue;
             if (index++ == n) return (dx, dy);
         }
+    }
+}
+
+public sealed record SetAutoUpgradeHomesCommand(int SettlementId, bool Enabled) : ISettlementCommand
+{
+    public CommandResult Execute(GameWorld world)
+    {
+        var settlement = world.FindSettlement(SettlementId);
+        if (settlement == null) return CommandResult.Fail("Unknown settlement");
+        settlement.Rules.AutoUpgradeHomes = Enabled;
+        return CommandResult.Success();
     }
 }

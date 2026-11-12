@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 7;
+    public const int CurrentVersion = 9;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -62,11 +62,17 @@ public static class SaveGame
         Settings = world.Settings.Clone(),
         LastActiveUtc = world.LastActiveUtc,
         Trade = world.Trade,
-        Settlements = world.Settlements.Select(CaptureSettlement).ToList(),
+        Settlements = world.Settlements.Select(s => CaptureSettlement(world, s)).ToList(),
         Events = world.Events.Select(e => new EventSave(e.Time.Tick, e.Kind, e.SettlementId, e.Message)).ToList(),
     };
 
-    private static SettlementSave CaptureSettlement(Settlement s) => new()
+    private static SettlementSave CaptureSettlement(GameWorld world, Settlement s)
+    {
+        byte tierOf((int X, int Y) r) => world.Map.GetTile(r.X, r.Y).RoadTier;
+        return CaptureSettlementCore(s, tierOf);
+    }
+
+    private static SettlementSave CaptureSettlementCore(Settlement s, Func<(int X, int Y), byte> tierOf) => new()
     {
         Id = s.Id,
         Name = s.Name,
@@ -82,6 +88,7 @@ public static class SaveGame
             PerCitizenLimits = new(s.Rules.PerCitizenLimits),
             LowStockThreshold = s.Rules.LowStockThreshold,
             AutoBuild = s.Rules.AutoBuild,
+            AutoUpgradeHomes = s.Rules.AutoUpgradeHomes,
             AutoExpandTerritory = s.Rules.AutoExpandTerritory,
         },
         Buildings = s.Buildings.Select(b => new BuildingSave
@@ -97,6 +104,8 @@ public static class SaveGame
             TerrainMultiplier = b.TerrainMultiplier,
             HaulFactor = b.HaulFactor,
             NoRoute = b.NoRoute,
+            UpgradeReadyDays = b.UpgradeReadyDays,
+            NeedsUnmetDays = b.NeedsUnmetDays,
             ServedCount = b.ServedCount,
             Problem = b.Problem,
             WorkerIds = b.WorkerIds.ToList(),
@@ -125,8 +134,8 @@ public static class SaveGame
             UnhappyDays = c.UnhappyDays,
             History = c.History.ToList(),
         }).ToList(),
-        Roads = s.Roads.Select(r => new[] { r.X, r.Y }).ToList(),
-        RoadPlans = s.RoadPlans.Select(p => new RoadPlan { X = p.X, Y = p.Y, Progress = p.Progress }).ToList(),
+        Roads = s.Roads.Select(r => new[] { r.X, r.Y, (int)tierOf(r) }).ToList(),
+        RoadPlans = s.RoadPlans.Select(p => new RoadPlan { X = p.X, Y = p.Y, Progress = p.Progress, Tier = p.Tier }).ToList(),
         RoadVersion = s.RoadVersion,
         Territory = TerritoryRuns(s),
         TerritoryVersion = s.TerritoryVersion,
@@ -185,6 +194,7 @@ public static class SaveGame
         CopyInto(save.Rules.PerCitizenLimits, s.Rules.PerCitizenLimits);
         s.Rules.LowStockThreshold = save.Rules.LowStockThreshold;
         s.Rules.AutoBuild = save.Rules.AutoBuild;
+        s.Rules.AutoUpgradeHomes = save.Rules.AutoUpgradeHomes ?? true;
         s.Rules.AutoExpandTerritory = save.Rules.AutoExpandTerritory ?? true;
 
         foreach (var b in save.Buildings)
@@ -198,6 +208,8 @@ public static class SaveGame
                 TerrainMultiplier = b.TerrainMultiplier,
                 HaulFactor = b.HaulFactor,
                 NoRoute = b.NoRoute,
+                UpgradeReadyDays = b.UpgradeReadyDays,
+                NeedsUnmetDays = b.NeedsUnmetDays,
                 ServedCount = b.ServedCount,
                 Problem = b.Problem,
             };
@@ -236,6 +248,7 @@ public static class SaveGame
         foreach (var r in save.Roads)
         {
             world.Map.GetTile(r[0], r[1]).IsRoad = true;
+            world.Map.GetTile(r[0], r[1]).RoadTier = (byte)(r.Length > 2 ? r[2] : 0); // version 7 and older: all dirt
             s.Roads.Add((r[0], r[1]));
         }
         s.RoadVersion = save.RoadVersion;
@@ -333,6 +346,7 @@ public static class SaveGame
         public SortedDictionary<string, int> PerCitizenLimits { get; set; } = new(StringComparer.Ordinal);
         public int LowStockThreshold { get; set; }
         public bool AutoBuild { get; set; }
+        public bool? AutoUpgradeHomes { get; set; }
         public bool? AutoExpandTerritory { get; set; }
     }
 
@@ -349,6 +363,8 @@ public static class SaveGame
         public double TerrainMultiplier { get; set; }
         public double HaulFactor { get; set; }
         public bool NoRoute { get; set; }
+        public int UpgradeReadyDays { get; set; }
+        public int NeedsUnmetDays { get; set; }
         public int ServedCount { get; set; }
         public string? Problem { get; set; }
         public List<int> WorkerIds { get; set; } = new();

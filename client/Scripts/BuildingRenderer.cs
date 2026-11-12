@@ -15,6 +15,7 @@ public partial class BuildingRenderer : Node3D
         public required MeshInstance3D Model;
         public required MeshInstance3D Scaffold;
         public required MeshInstance3D Plot;
+        public Sim.Core.Data.BuildingDef? ShownDef;
     }
 
     private static readonly StandardMaterial3D[] Tints =
@@ -42,6 +43,12 @@ public partial class BuildingRenderer : Node3D
                 view = CreateView(b);
                 _views[b.Id] = view;
             }
+            if (view.ShownDef != b.Def)
+            {
+                // A home upgraded or slipped back in place: show its new tier.
+                view.Model.Mesh = LowPolyMeshes.Building(b.Def);
+                view.ShownDef = b.Def;
+            }
             Sync(b, view);
             _seen.Add(b.Id);
         }
@@ -66,6 +73,7 @@ public partial class BuildingRenderer : Node3D
             Model = new MeshInstance3D { Mesh = LowPolyMeshes.Building(b.Def), MaterialOverride = Tints[b.Id % Tints.Length] },
             Scaffold = new MeshInstance3D { Mesh = LowPolyMeshes.Scaffold(b.Def.Width, b.Def.Height) },
             Plot = new MeshInstance3D { Mesh = LowPolyMeshes.Plot(b.Def.Width, b.Def.Height) },
+            ShownDef = b.Def,
         };
         // An earthen footing under every building, so it never floats where the ground slopes towards water.
         root.AddChild(new MeshInstance3D { Mesh = LowPolyMeshes.Foundation(b.Def.Width, b.Def.Height) });

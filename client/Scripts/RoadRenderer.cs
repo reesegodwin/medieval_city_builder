@@ -9,6 +9,17 @@ namespace MedievalClient;
 public partial class RoadRenderer : Node3D
 {
     private static readonly Color Dirt = new(0.58f, 0.47f, 0.33f);
+    private static readonly Color Gravel = new(0.6f, 0.57f, 0.5f);
+    private static readonly Color Paving = new(0.44f, 0.43f, 0.42f);
+
+    /// <summary>Dirt, gravel, or stone paving (alternating setts so it reads as cobbles).</summary>
+    private static Color Surface(byte tier, int x, int z) => tier switch
+    {
+        0 => Dirt,
+        1 => Gravel,
+        _ => (x + z) % 2 == 0 ? Paving : Paving.Darkened(0.08f),
+    };
+
     private static readonly Color Planned = new(0.85f, 0.7f, 0.45f, 0.55f);
     private static readonly Color PlannedBridge = new(0.55f, 0.38f, 0.22f, 0.7f);
     private MeshInstance3D _plans = null!;
@@ -45,7 +56,7 @@ public partial class RoadRenderer : Node3D
                 continue;
             }
             float jitter = (float)(Hashing.Hash01(0x40AD, x, z) - 0.5) * 0.08f;
-            var color = Dirt.Lightened(jitter);
+            var color = Surface(_map.GetTile(x, z).RoadTier, x, z).Lightened(jitter);
             mb.Quad(V(x + inset, z + inset), V(x + 1 - inset, z + inset), V(x + 1 - inset, z + 1 - inset), V(x + inset, z + 1 - inset),
                 color, Vector3.Up);
 

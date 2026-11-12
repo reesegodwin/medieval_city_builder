@@ -59,6 +59,12 @@ public partial class RulesPanel : PanelContainer
                 v => new SetJobPriorityCommand(town.Id, k, v));
         }
 
+        Section(body, "Homes", "Hovels become cottages, then townhouses, when their people's needs are met. Better homes hold more " +
+                               "people, who pay more tax. Each step costs materials.");
+        var upgrades = new CheckBox { Text = "Upgrade homes automatically", ButtonPressed = town.Rules.AutoUpgradeHomes, FocusMode = FocusModeEnum.None };
+        upgrades.Toggled += on => _session.Execute(new SetAutoUpgradeHomesCommand(town.Id, on));
+        body.AddChild(upgrades);
+
         Section(body, "Stock limits", "Workplaces stop (and free their workers) once stock reaches the limit. " +
                                        "Food limits also grow with population.");
         foreach (var resource in world.Data.Resources.Values)

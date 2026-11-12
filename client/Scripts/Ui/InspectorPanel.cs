@@ -121,6 +121,7 @@ public partial class InspectorPanel : PanelContainer
                           $"{town.HaulCoverage:P0} of the carrying workers would otherwise do themselves.");
         else if (b.IsOperational && b.WorkerIds.Count > 0 && town.IsOnStandby(b))
             sb.AppendLine("[b]Standby:[/b] stock limit reached; workers wait here and help elsewhere when needed.");
+        if (b.Def.Home is { } home && b.IsOperational) DescribeHome(world, town, b, home, sb);
         if (b.Def.Upkeep > 0)
             sb.AppendLine(town.UpkeepUnpaid
                 ? $"[color=#ff8060][b]Upkeep:[/b] {b.Def.Upkeep:0.#} coin a day, unpaid: running at half output[/color]"
@@ -138,6 +139,27 @@ public partial class InspectorPanel : PanelContainer
         }
 
         SetBody(sb);
+    }
+
+    private static void DescribeHome(GameWorld world, Settlement town, Building b, Sim.Core.Data.HomeDef home, StringBuilder sb)
+    {
+        var cls = world.Data.ClassOf(home.Class);
+        sb.AppendLine($"[b]Home of {cls.Name.ToLowerInvariant()}[/b] (tax {cls.TaxPerAdultDay:0.##} coin per adult a day)");
+        if (home.Requires.Count > 0 && !HomeSystem.NeedsMet(town, b, home.Requires))
+            sb.AppendLine($"[color=#ffb060]Needs unmet for {b.NeedsUnmetDays} days; slips back after {HomeSystem.DowngradeAfterDays}.[/color]");
+        if (home.UpgradeTo is not { } nextId)
+        {
+            sb.AppendLine("Top tier.");
+            return;
+        }
+        var next = world.Data.Building(nextId);
+        string Mark(string need) => b.ResidentIds.Count > 0 && b.ResidentIds.All(id => town.FindCitizen(id)?.CoveredNeeds.Contains(need) == true)
+            ? $"[color=#90e090]{need}[/color]" : $"[color=#ff9070]{need}[/color]";
+        sb.AppendLine($"[b]Becomes a {next.Name}[/b] ({next.Housing} people) when every resident has: " +
+                      string.Join(", ", next.Home!.Requires.Select(Mark)));
+        sb.AppendLine($"Ready {b.UpgradeReadyDays}/{HomeSystem.UpgradeAfterDays} days; costs " +
+                      string.Join(", ", next.Cost.Select(kv => $"{kv.Value} {kv.Key}")) +
+                      (town.Rules.AutoUpgradeHomes ? "." : ". (Automatic upgrades are off in the rules.)"));
     }
 
     private void DescribeTownCentre(GameWorld world, Settlement town, Building b, StringBuilder sb)

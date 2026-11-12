@@ -199,6 +199,12 @@ public partial class Main : Node3D
             _placement.Begin(_session.World.Data.Building(id));
         };
         _hud.RoadRequested += StartRoadTool;
+        _hud.RoadTierRequested += tier =>
+        {
+            CancelTools();
+            ClearSelection();
+            _roadTool.Begin(tier);
+        };
         _hud.DemolishRequested += StartDemolishTool;
         _hud.SpeedRequested += speed =>
         {

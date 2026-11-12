@@ -15,7 +15,7 @@ public static class CommandCodec
         typeof(SetProductionLimitCommand), typeof(SetAutoBuildCommand), typeof(PlaceRoadCommand),
         typeof(RemoveRoadCommand), typeof(DemolishBuildingCommand), typeof(ClaimTerritoryCommand),
         typeof(ReleaseTerritoryCommand), typeof(ExpandTerritoryCommand), typeof(SetAutoExpandTerritoryCommand),
-        typeof(UpgradeTownCentreCommand), typeof(FoundSettlementCommand),
+        typeof(UpgradeTownCentreCommand), typeof(FoundSettlementCommand), typeof(SetAutoUpgradeHomesCommand),
         typeof(Trade.PostOfferCommand), typeof(Trade.CancelOfferCommand), typeof(Trade.AcceptOfferCommand),
         typeof(Trade.ProposeRouteCommand), typeof(Trade.AcceptRouteCommand), typeof(Trade.EndRouteCommand),
     };

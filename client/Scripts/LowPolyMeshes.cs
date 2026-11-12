@@ -36,6 +36,25 @@ public static class LowPolyMeshes
                 House(mb, new Vector3(0.2f, 0, 0.25f), new Vector3(w - 0.2f, 0.75f, h - 0.25f), Wattle, Thatch, 0.6f);
                 break;
 
+            case "cottage":
+                // Stone ground floor, half-timbered gable, tiled roof and a chimney.
+                mb.Box(new Vector3(0.15f, 0, 0.2f), new Vector3(w - 0.15f, 0.45f, h - 0.2f), Stone);
+                House(mb, new Vector3(0.15f, 0.45f, 0.2f), new Vector3(w - 0.15f, 0.85f, h - 0.2f), Wattle, Tiles, 0.6f);
+                mb.Box(new Vector3(w - 0.55f, 0.85f, 0.45f), new Vector3(w - 0.35f, 1.5f, 0.65f), Stone.Darkened(0.15f));
+                mb.Box(new Vector3(w / 2 - 0.12f, 0, h - 0.2f), new Vector3(w / 2 + 0.12f, 0.4f, h - 0.18f), Timber.Darkened(0.3f));
+                break;
+
+            case "townhouse":
+                // Two storeys with a jettied upper floor, slate roof and two chimneys.
+                mb.Box(new Vector3(0.12f, 0, 0.15f), new Vector3(w - 0.12f, 0.6f, h - 0.15f), Stone.Lightened(0.05f));
+                House(mb, new Vector3(0.05f, 0.6f, 0.08f), new Vector3(w - 0.05f, 1.3f, h - 0.08f), Wattle.Lightened(0.05f), Slate, 0.7f);
+                foreach (float x in new[] { 0.3f, w - 0.5f })
+                    mb.Box(new Vector3(x, 1.3f, 0.5f), new Vector3(x + 0.2f, 2.0f, 0.7f), Stone.Darkened(0.15f));
+                mb.Box(new Vector3(w / 2 - 0.13f, 0, h - 0.15f), new Vector3(w / 2 + 0.13f, 0.45f, h - 0.13f), Timber.Darkened(0.3f));
+                foreach (float x in new[] { 0.35f, w - 0.55f })
+                    mb.Box(new Vector3(x, 0.85f, h - 0.09f), new Vector3(x + 0.2f, 1.05f, h - 0.07f), new Color(0.25f, 0.35f, 0.5f)); // windows
+                break;
+
             case "woodcutter":
                 House(mb, new Vector3(0.15f, 0, 0.15f), new Vector3(w - 0.55f, 0.6f, h - 0.6f), Wattle, Thatch, 0.45f);
                 for (int i = 0; i < 3; i++) // log pile

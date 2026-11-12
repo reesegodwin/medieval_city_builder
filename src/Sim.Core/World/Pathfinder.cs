@@ -6,7 +6,27 @@ namespace Sim.Core.World;
 /// </summary>
 public static class Pathfinder
 {
+    /// <summary>Walking cost of a dirt road or bridge (open ground is 1).</summary>
     public const double RoadCost = 0.4;
+
+    private static double[] _roadWalkCosts = { RoadCost };
+    private static double[] _roadSpeeds = { 1 };
+    private static double _cheapestRoad = RoadCost;
+
+    /// <summary>Surface costs per road tier, from roads.json (set when game data loads).</summary>
+    public static void SetRoadTiers(double[] walkCosts, double[] caravanSpeeds)
+    {
+        _roadWalkCosts = walkCosts.Length > 0 ? walkCosts : new[] { RoadCost };
+        _roadSpeeds = caravanSpeeds.Length > 0 ? caravanSpeeds : new[] { 1.0 };
+        _cheapestRoad = _roadWalkCosts.Min();
+    }
+
+    public static double RoadWalkCost(in Tile tile) =>
+        tile.Terrain == Terrain.Water ? RoadCost : _roadWalkCosts[Math.Min(tile.RoadTier, _roadWalkCosts.Length - 1)];
+
+    /// <summary>Caravan travel cost of a road tile (1 for dirt; better surfaces are cheaper).</summary>
+    public static double RoadTravelCost(in Tile tile) =>
+        tile.Terrain == Terrain.Water ? 1 : 1 / _roadSpeeds[Math.Min(tile.RoadTier, _roadSpeeds.Length - 1)];
 
     /// <summary>Road-building cost of crossing open water, where a bridge would have to be built.</summary>
     public const double BridgePlanCost = 5.0;
@@ -32,9 +52,9 @@ public static class Pathfinder
         if (tile.BuildingId != 0) return null;
         if (mode == Mode.BuildRoad)
             return tile.IsRoad || tile.RoadPlanned ? 0.5 : tile.IsBuildable ? 1.0 : tile.Terrain == Terrain.Water ? BridgePlanCost : null;
-        if (mode == Mode.RoadOnly) return tile.IsRoad ? 1.0 : null;
+        if (mode == Mode.RoadOnly) return tile.IsRoad ? RoadTravelCost(tile) : null;
 
-        if (tile.IsRoad) return RoadCost; // includes bridges over water
+        if (tile.IsRoad) return RoadWalkCost(tile); // includes bridges over water
         return tile.Terrain switch
         {
             Terrain.Water => null,
@@ -48,7 +68,7 @@ public static class Pathfinder
     public static List<(int X, int Y)>? FindPath(WorldMap map, (int X, int Y) from, (int X, int Y) to,
         Mode mode = Mode.Walk, int maxExpanded = DefaultMaxExpanded)
     {
-        double minStep = mode == Mode.Walk ? RoadCost : 0.5;
+        double minStep = mode switch { Mode.Walk => _cheapestRoad, Mode.RoadOnly => 1 / _roadSpeeds.Max(), _ => 0.5 };
         return Search(map, from, (x, y) => x == to.X && y == to.Y, mode, maxExpanded,
             (x, y) => (Math.Abs(x - to.X) + Math.Abs(y - to.Y)) * minStep, allowBlockedGoal: true);
     }
@@ -60,7 +80,7 @@ public static class Pathfinder
     public static List<(int X, int Y)>? FindPathTowards(WorldMap map, (int X, int Y) from, Func<int, int, bool> isGoal,
         (int X, int Y) towards, Mode mode, int maxExpanded, Func<int, int, bool>? blocked = null)
     {
-        double minStep = mode == Mode.Walk ? RoadCost : 0.5;
+        double minStep = mode switch { Mode.Walk => _cheapestRoad, Mode.RoadOnly => 1 / _roadSpeeds.Max(), _ => 0.5 };
         return Search(map, from, isGoal, mode, maxExpanded,
             (x, y) => (Math.Abs(x - towards.X) + Math.Abs(y - towards.Y)) * minStep, allowBlockedGoal: false, blocked);
     }

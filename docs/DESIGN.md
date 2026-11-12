@@ -148,11 +148,23 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
 - **AI towns** (Auto on): build a Trading Post at 80 people. Daily they accept one other town's fair offer for something they're short of, accept routes that trade surpluses for shortages, list surpluses (90% of the stock limit or more) at the fair price, and post buy offers for shortages they can afford. They keep one offer per good, so they never buy what they're selling.
 - **AI roads to partners:** a governed town with a Trading Post plans a road towards the nearest town with a Trading Post that its roads don't reach yet, ending at that town's roads or its territory edge. The other town does the same, so they meet; two seed-42 towns are connected by about day 150. Retried every 10 days.
 
+## Housing tiers and classes
+- **Ladder** (`home` in `buildings.json`): Hovel (5 people, peasants), then Cottage (6, craftsmen), then Townhouse (8, burghers), same 2×2 footprint, upgraded in place. Only hovels can be placed.
+- **Up:** when every resident has had the next tier's needs for 5 days in a row, the home pays the upgrade cost and changes tier. Cottage needs water, market and faith; costs wood 10, stone 4. Townhouse adds clothing, furniture and drink; costs wood 10, stone 12, furniture 2, coin 20. Upgrades leave at least 40 wood and 20 stone, and at most 4 happen per day. A rule (`AutoUpgradeHomes`, on by default) turns them off.
+- **Down:** after 15 days of a tier's own needs going unmet, the home slips back a tier, and residents beyond the smaller capacity move out.
+- **Classes** (`classes.json`): taxes per adult per day are peasants 0.05, craftsmen 0.07, burghers 0.10. Better homes also give mood (+2, +4).
+- Result (720 days): most homes become townhouses and most people burghers; populations 742/806/738.
+
+## Road surfaces
+- `roads.json`: dirt (free; walk cost 0.4; caravans 1×; 0.05 roadworker-days), gravel (1 stone per tile; 0.3; 1.4×; 0.1), stone (2 stone; 0.22; 1.8×; 0.2). Bridges stay plain.
+- Resurfacing is planned like a road (materials up front, refunded if the plan is dropped) and built by roadworkers. Better surfaces mean cheaper walking, which raises hauling efficiency. Caravans prefer and travel faster on them.
+- Governed towns with stone to spare (75% of the limit or more, keeping half) resurface roads within 12 tiles of stockpiles, 25 tiles at a time: gravel, or stone from 300 people. By day 720 that's 450–570 stone tiles.
+
 ## Treasury and coin sinks
-- **Income:** taxes of `taxPerAdultDay` (0.06) coin per adult per day, plus trade.
+- **Income:** class taxes (see Housing tiers and classes), plus trade.
 - **Upkeep** (`upkeep` in `buildings.json`, coin per day): markets 0.4, taverns and chapels 0.3, workshops 0.3–0.5, mine 0.5, Trading Post 1, Town Hall 2, Castle 4. If the treasury can't pay, buildings with upkeep run at `unpaidOutput` (half) until it can. Debt never exceeds a day's upkeep.
 - **Coin costs:** Town Hall 150, Castle 600, Smithy and Carpenter 15 each (taken like any construction material). Basic services cost no coin, so early towns aren't starved of them.
-- Result over 720 days (three seeds): treasuries level off around 5,000–7,700 coin (they had been climbing to 10,000–13,000), upkeep is never unpaid, and idle adults stay at 0.4–4.4%.
+- Result over 720 days (three seeds, with housing classes): treasuries end around 5,000–11,000 coin, taxes roughly match upkeep, and upkeep goes unpaid at most once, briefly, in the early game.
 
 ## Colony Simulation (Dwarf Fortress / Songs of Syx-inspired depth, Stronghold look)
 
