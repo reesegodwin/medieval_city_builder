@@ -8,3 +8,9 @@
 - Building and resource balance lives in `src/Sim.Core/Data/*.json`.
 - Before committing, run `dotnet test`. For balance changes, also run a 720-day check on seeds 42, 7 and 1234:
   `dotnet run -c Release --project src/Sim.Console -- --days 720 --report none --seed 42`
+
+## Client (`client/`)
+- Godot 4.7.2 .NET, pinned through `Godot.NET.Sdk/4.7.2` in `client/MedievalClient.csproj`. If you bump it, update the README download link too.
+- Rendering and UI stay in `client/`; game rules stay in `Sim.Core`. The client talks to the simulation only through `client/Scripts/SimSession.cs`, so Phase 2 can swap in a network connection.
+- Art is procedural placeholder meshes (`client/Scripts/LowPolyMeshes.cs`). Citizens' walking is cosmetic; never feed client positions back into the simulation.
+- Verify client changes with `dotnet build client/MedievalClient.csproj`. When a Godot binary is available, also render a screenshot with `xvfb-run` (see README) and look at it.

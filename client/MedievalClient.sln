@@ -1,0 +1,27 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MedievalClient", "MedievalClient.csproj", "{362FAD1D-5168-4675-913D-5A20014A44D8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sim.Core", "..\src\Sim.Core\Sim.Core.csproj", "{F79BE2FD-D6A6-45E2-9F34-872FF7DCAC0E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		ExportDebug|Any CPU = ExportDebug|Any CPU
+		ExportRelease|Any CPU = ExportRelease|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{362FAD1D-5168-4675-913D-5A20014A44D8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{362FAD1D-5168-4675-913D-5A20014A44D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{362FAD1D-5168-4675-913D-5A20014A44D8}.ExportDebug|Any CPU.ActiveCfg = ExportDebug|Any CPU
+		{362FAD1D-5168-4675-913D-5A20014A44D8}.ExportDebug|Any CPU.Build.0 = ExportDebug|Any CPU
+		{362FAD1D-5168-4675-913D-5A20014A44D8}.ExportRelease|Any CPU.ActiveCfg = ExportRelease|Any CPU
+		{362FAD1D-5168-4675-913D-5A20014A44D8}.ExportRelease|Any CPU.Build.0 = ExportRelease|Any CPU
+		{F79BE2FD-D6A6-45E2-9F34-872FF7DCAC0E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F79BE2FD-D6A6-45E2-9F34-872FF7DCAC0E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F79BE2FD-D6A6-45E2-9F34-872FF7DCAC0E}.ExportDebug|Any CPU.ActiveCfg = Release|Any CPU
+		{F79BE2FD-D6A6-45E2-9F34-872FF7DCAC0E}.ExportDebug|Any CPU.Build.0 = Release|Any CPU
+		{F79BE2FD-D6A6-45E2-9F34-872FF7DCAC0E}.ExportRelease|Any CPU.ActiveCfg = Release|Any CPU
+		{F79BE2FD-D6A6-45E2-9F34-872FF7DCAC0E}.ExportRelease|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

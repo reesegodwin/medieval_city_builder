@@ -83,8 +83,8 @@ Not recommended: Unreal (too heavy for stylized low-poly, and C++ slows iteratio
 ## Phased Roadmap
 Each phase ends with something you can play.
 
-1. **Phase 0, Prototype the simulation (no graphics):** `Sim.Core` with one settlement, 4 resources, 5 buildings, the economy tick, and a console printout. Unit tests for production chains.
-2. **Phase 1, Visual settlement:** Godot client that renders a procedural map chunk, lets you place buildings and shows animated workers. A local server over WebSocket.
+1. **Phase 0, Prototype the simulation (no graphics):** `Sim.Core` with one settlement, 4 resources, 5 buildings, the economy tick, and a console printout. Unit tests for production chains. *(Done.)*
+2. **Phase 1, Visual settlement:** Godot client that renders a procedural map chunk, lets you place buildings and shows animated workers. *(In progress: first client done in `client/`.)* Decision: the simulation runs in-process inside the client through `SimSession` until Phase 2, which swaps it for a connection to the dedicated server without changing the renderers.
 3. **Phase 2, Persistence & multiplayer:** PostgreSQL saves, accounts, several players, interest management, running on a cheap Linux VPS.
 4. **Phase 3, War:** armies from population, the formation battle resolver, generals, fog of war and scouting.
 5. **Phase 4, Sieges & walls:** walls and towers, siege engines, multi-day sieges, Discord/email alerts.

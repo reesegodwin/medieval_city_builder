@@ -1,0 +1,23 @@
+; Engine configuration file.
+; Open this folder in Godot 4.7.2 (.NET edition) via Import.
+
+config_version=5
+
+[application]
+
+config/name="Medieval City Builder"
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.7", "C#", "Forward Plus")
+
+[display]
+
+window/size/viewport_width=1600
+window/size/viewport_height=900
+
+[dotnet]
+
+project/assembly_name="MedievalClient"
+
+[rendering]
+
+anti_aliasing/quality/msaa_3d=2

@@ -4,9 +4,9 @@ A persistent, multiplayer medieval city-builder and RTS that runs on a dedicated
 
 The full design and roadmap are in [docs/DESIGN.md](docs/DESIGN.md).
 
-## Status: Phase 0, headless colony simulation
+## Status: Phase 1, first playable client
 
-This phase has no graphics yet. The game rules live in a plain C# library that the future Godot client and dedicated server will share.
+The game rules live in a plain C# library (`src/Sim.Core`) that the Godot client and the future dedicated server share. The client in `client/` draws the simulation and lets you play it.
 
 What works today:
 - **An endless procedural world.** The map is generated in 64×64 chunks from a seed, with grassland, fertile river valleys, forest, rock, iron deposits, lakes and rivers. Chunks are created only when something looks at them, and the result doesn't depend on the order they were visited.
@@ -49,6 +49,63 @@ Run the tests:
 dotnet test
 ```
 
+## Running the game client (Phase 1)
+
+![Phase 1 client](docs/screenshots/phase1-town.png)
+
+### What to download
+
+| Tool | Link | Notes |
+|---|---|---|
+| **Godot 4.7.2, .NET edition** | https://godotengine.org/download/archive/4.7.2-stable/ | Get the **.NET** build, not the standard one. The project is pinned to 4.7.2. |
+| **.NET 8 SDK** | https://dotnet.microsoft.com/download/dotnet/8.0 | Needed by Godot .NET, the simulation and the tests. |
+| **Git** | https://git-scm.com/downloads | Optional GUI: GitHub Desktop, https://desktop.github.com |
+| **Code editor** | VS Code (https://code.visualstudio.com) with the C# Dev Kit extension, Visual Studio Community (https://visualstudio.microsoft.com/vs/community/), or JetBrains Rider (https://www.jetbrains.com/rider/, free for non-commercial use) | Any of these works with Godot C#. |
+| *Later:* Blender | https://www.blender.org/download/ | For your own low-poly models. Free CC0 placeholder art: https://kenney.nl/assets, https://quaternius.com |
+
+### Opening it
+
+1. Clone this repository.
+2. Start Godot, click **Import**, and select `client/project.godot`.
+3. Press **F5** (or the ▶ Play button). The first run builds the C# code, which takes a moment.
+
+### Controls
+
+| Input | Action |
+|---|---|
+| WASD / arrow keys / screen edge / middle-drag | Pan |
+| Mouse wheel | Zoom |
+| Q / E | Rotate the view 90° |
+| Left-click | Select a building or citizen, or place a building |
+| Right-click / Esc | Cancel placement or close the inspector |
+| Space | Pause |
+| 1–4 | Speed: 1× (real time, 1 game day per hour), 60×, 600×, 3600× |
+
+The bottom bar places buildings: a green ghost means the spot is valid, and red shows the reason it isn't. Placed buildings wait for materials, go up inside a scaffold, then start working. **Auto-build** lets the town's governor keep building on its own.
+
+### Command-line options
+
+These go after `--` on Godot's command line:
+
+| Option | Effect |
+|---|---|
+| `--seed N` | Use a different world |
+| `--warmup-days N` | Fast-forward the simulation N days before showing it |
+| `--inspect` | Open the inspector on a citizen at start |
+| `--screenshot out.png` | Save a screenshot after a few frames, then quit |
+
+To render a screenshot without a window (the same command used for the image above):
+
+```bash
+xvfb-run -a godot --path client --rendering-driver opengl3 --rendering-method gl_compatibility --resolution 1600x900 -- --warmup-days 200 --inspect --screenshot shot.png
+```
+
+To compile-check the client without the editor:
+
+```bash
+dotnet build client/MedievalClient.csproj
+```
+
 ## Project layout
 
 | Path | Contents |
@@ -64,9 +121,10 @@ dotnet test
 | `src/Sim.Core/Simulation/` | The world state root, the simulator loop, and settlement founding. |
 | `src/Sim.Console/` | Headless runner with text reports and an ASCII map. |
 | `tests/Sim.Tests/` | xUnit tests. |
+| `client/` | Godot 4 (C#) game client: procedural low-poly terrain, buildings and townsfolk, camera, HUD, placement and inspector. |
+| `client/Scripts/SimSession.cs` | The client's only door into the simulation (in-process now, network in Phase 2). |
 
 ## Next steps
 
-1. **Phase 0, continued:** services (well, market, chapel, tavern), food variety, a hauling-job model, and more settlements on one map.
-2. **Phase 1:** a Godot 4 (C#) client that draws a map chunk isometrically, with low-poly buildings, townsfolk walking to work, building placement, and clicking a citizen to inspect them.
-3. **Phase 2:** a dedicated server with PostgreSQL persistence and multiplayer.
+1. **Phase 1, continued:** roads, building demolition, a better art pass, sound, and services (well, market, chapel, tavern) with food variety.
+2. **Phase 2:** a dedicated server with PostgreSQL persistence and multiplayer. `SimSession` becomes a network client.

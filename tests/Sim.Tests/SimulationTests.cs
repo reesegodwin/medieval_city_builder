@@ -251,3 +251,30 @@ public class WholeSimulationTests
         Assert.Contains(town.Buildings, b => b.Def.Id == "quarry" && b.IsOperational);
     }
 }
+
+public class CommandTests
+{
+    [Fact]
+    public void AutoBuildCanBeToggledByCommand()
+    {
+        var (world, town, sim) = Scenario.NewTown(autoBuild: true);
+        Assert.True(world.Execute(new SetAutoBuildCommand(town.Id, false)).Ok);
+        Assert.False(town.Rules.AutoBuild);
+
+        int buildings = town.Buildings.Count;
+        sim.RunDays(10);
+        Assert.Equal(buildings, town.Buildings.Count);
+
+        Assert.False(world.Execute(new SetAutoBuildCommand(-1, true)).Ok);
+    }
+
+    [Fact]
+    public void NearestStockpileIsFound()
+    {
+        var (_, town, _) = Scenario.NewTown();
+        var farm = town.Buildings.First(b => b.Def.Id == "farm");
+        var nearest = Logistics.NearestStockpile(town, farm);
+        Assert.NotNull(nearest);
+        Assert.True(nearest!.Def.IsStockpile);
+    }
+}

@@ -29,6 +29,13 @@ public static class Logistics
             b.HaulFactor = 1.0 / (1.0 + distance / HalfEfficiencyDistance);
         }
     }
+
+    /// <summary>The operational stockpile closest to a building, or null if there is none.</summary>
+    public static Building? NearestStockpile(Settlement settlement, Building from) =>
+        settlement.Buildings
+            .Where(b => b.IsOperational && b.Def.IsStockpile)
+            .OrderBy(b => b.DistanceTo(from)).ThenBy(b => b.Id)
+            .FirstOrDefault();
 }
 
 public static class Work

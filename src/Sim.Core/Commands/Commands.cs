@@ -62,6 +62,17 @@ public sealed record SetReserveCommand(int SettlementId, string Resource, int Am
     }
 }
 
+public sealed record SetAutoBuildCommand(int SettlementId, bool Enabled) : ICommand
+{
+    public CommandResult Execute(GameWorld world)
+    {
+        var settlement = world.FindSettlement(SettlementId);
+        if (settlement == null) return CommandResult.Fail("Unknown settlement");
+        settlement.Rules.AutoBuild = Enabled;
+        return CommandResult.Success();
+    }
+}
+
 public static class Placement
 {
     /// <summary>How far from the settlement centre buildings may be placed.</summary>
