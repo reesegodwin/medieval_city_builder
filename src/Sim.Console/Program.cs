@@ -1,0 +1,198 @@
+﻿using System.Diagnostics;
+using Sim.Core.Settlements;
+using Sim.Core.Simulation;
+using Sim.Core.Systems;
+using Sim.Core.Time;
+using Sim.Core.World;
+
+// Medieval City Builder — headless simulation runner (Phase 0).
+//
+//   dotnet run --project src/Sim.Console -- --seed 42 --days 100 --report daily
+//
+// Options:
+//   --seed <n>         world seed (default 42)
+//   --days <n>         game days to simulate (default 100)
+//   --report <mode>    daily | weekly | none (default weekly)
+//   --map              print the town map at start and end
+//   --citizens         print every citizen at the end
+//   --realtime [x]     run at real speed (1 game day = 1 real hour), optionally sped up x times
+
+var options = Options.Parse(args);
+var world = new GameWorld(options.Seed);
+var settlement = SettlementFounder.Found(world);
+var sim = new Simulator(world);
+
+Console.WriteLine($"World seed {options.Seed}. {settlement.Name} founded at ({settlement.CenterX},{settlement.CenterY}) " +
+                  $"with {settlement.Citizens.Count} settlers.");
+Console.WriteLine($"Time scale: 1 game day = {TimeScale.RealSecondsPerGameDay / 3600:0.##} real hour(s), " +
+                  $"{TimeScale.TicksPerDay} ticks per day.");
+Console.WriteLine();
+if (options.ShowMap) Report.PrintMap(world, settlement);
+
+int eventCursor = world.Events.Count;
+sim.DayEnded += w =>
+{
+    long day = w.Time.Day;
+    bool print = options.ReportMode switch
+    {
+        "daily" => true,
+        "weekly" => day % 7 == 0,
+        _ => false,
+    };
+    if (print)
+    {
+        Report.PrintDay(w, settlement);
+        for (; eventCursor < w.Events.Count; eventCursor++)
+        {
+            var e = w.Events[eventCursor];
+            if (e.Kind is Sim.Core.Events.EventKind.BuildingPlaced) continue;
+            Console.WriteLine($"      - {e.Message}");
+        }
+    }
+    else
+    {
+        eventCursor = w.Events.Count;
+    }
+};
+
+var stopwatch = Stopwatch.StartNew();
+if (options.RealtimeSpeed is double speed)
+{
+    var tickInterval = TimeSpan.FromSeconds(TimeScale.RealSecondsPerTick / speed);
+    Console.WriteLine($"Running in real time at {speed}x (one tick every {tickInterval.TotalSeconds:0.###}s). Ctrl+C to stop.");
+    long ticks = (long)options.Days * TimeScale.TicksPerDay;
+    for (long i = 0; i < ticks; i++)
+    {
+        sim.Step();
+        Thread.Sleep(tickInterval);
+    }
+}
+else
+{
+    sim.RunDays(options.Days);
+}
+stopwatch.Stop();
+
+Console.WriteLine();
+Console.WriteLine($"=== {settlement.Name} after {options.Days} days ({world.Time}) — simulated in {stopwatch.ElapsedMilliseconds} ms ===");
+Report.PrintSummary(world, settlement);
+if (options.ShowMap) Report.PrintMap(world, settlement);
+if (options.ShowCitizens) Report.PrintCitizens(settlement);
+Console.WriteLine($"State hash: {world.ComputeStateHash():X16}");
+
+internal sealed record Options(ulong Seed, int Days, string ReportMode, bool ShowMap, bool ShowCitizens, double? RealtimeSpeed)
+{
+    public static Options Parse(string[] args)
+    {
+        ulong seed = 42;
+        int days = 100;
+        string report = "weekly";
+        bool map = false, citizens = false;
+        double? realtime = null;
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            string Next() => i + 1 < args.Length ? args[++i] : throw new ArgumentException($"{args[i]} needs a value");
+            switch (args[i])
+            {
+                case "--seed": seed = ulong.Parse(Next()); break;
+                case "--days": days = int.Parse(Next()); break;
+                case "--report": report = Next(); break;
+                case "--map": map = true; break;
+                case "--citizens": citizens = true; break;
+                case "--realtime":
+                    realtime = i + 1 < args.Length && double.TryParse(args[i + 1], out double x) ? x : 1;
+                    if (i + 1 < args.Length && double.TryParse(args[i + 1], out _)) i++;
+                    break;
+                default: throw new ArgumentException($"Unknown option {args[i]}");
+            }
+        }
+        return new Options(seed, days, report, map, citizens, realtime);
+    }
+}
+
+internal static class Report
+{
+    public static void PrintDay(GameWorld world, Settlement s)
+    {
+        int adults = s.Citizens.Count(c => c.IsAdult);
+        int idle = s.Citizens.Count(c => c.IsAdult && c.JobBuildingId == null);
+        int homeless = s.Citizens.Count(c => c.HomeBuildingId == null);
+        double mood = s.Citizens.Count > 0 ? s.Citizens.Average(c => c.Mood) : 0;
+        Console.WriteLine(
+            $"{world.Time,-20} Pop {s.Citizens.Count,3} ({adults} adults) | " +
+            $"grain {s.Stock.Get("grain"),4} bread {s.Stock.Get("bread"),4} ({Needs.FoodDays(world, s),5:0.0}d) | " +
+            $"wood {s.Stock.Get("wood"),4} stone {s.Stock.Get("stone"),4} | mood {mood,3:0} | idle {idle} homeless {homeless}");
+    }
+
+    public static void PrintSummary(GameWorld world, Settlement s)
+    {
+        PrintDay(world, s);
+        Console.WriteLine($"Births {world.TotalBirths}, deaths {world.TotalDeaths}. Storage {s.Stock.Total}/{s.StorageCapacity}, " +
+                          $"housing {s.HousingCapacity - s.FreeHousing}/{s.HousingCapacity}.");
+        Console.WriteLine("Buildings:");
+        foreach (var group in s.Buildings.GroupBy(b => b.Def.Name))
+        {
+            int done = group.Count(b => b.IsOperational);
+            string workers = group.First().Def.Jobs > 0
+                ? $", workers {group.Sum(b => b.WorkerIds.Count)}/{group.Where(b => b.IsOperational).Sum(b => b.Def.Jobs)}"
+                : "";
+            string problems = string.Join("; ", group.Where(b => b.Problem != null).Select(b => b.Problem).Distinct());
+            Console.WriteLine($"  {group.Key,-18} {done}/{group.Count()} built{workers}{(problems.Length > 0 ? $"  [{problems}]" : "")}");
+        }
+    }
+
+    public static void PrintCitizens(Settlement s)
+    {
+        Console.WriteLine("Citizens:");
+        foreach (var c in s.Citizens)
+        {
+            string job = c.JobBuildingId is int j ? s.FindBuilding(j)?.Def.Name ?? "?" : c.IsAdult ? "idle" : "child";
+            string best = c.Skills.Count > 0
+                ? string.Join(", ", c.Skills.OrderByDescending(kv => kv.Value).Take(2).Select(kv => $"{kv.Key} {kv.Value:0}"))
+                : "-";
+            string traits = c.Traits.Count > 0 ? string.Join(", ", c.Traits) : "-";
+            Console.WriteLine($"  {c.FullName,-22} {(int)c.AgeYears,3}y {c.Sex,-6} mood {c.Mood,3:0}  {job,-18} skills: {best,-28} traits: {traits}");
+        }
+    }
+
+    public static void PrintMap(GameWorld world, Settlement s, int radius = 30)
+    {
+        Console.WriteLine("Map ('.' grass, ',' fertile, 'T' forest, '^' rock, '*' iron, '~' water; letters = buildings, lowercase = under construction)");
+        for (int y = s.CenterY - radius / 2; y <= s.CenterY + radius / 2; y++)
+        {
+            var line = new System.Text.StringBuilder();
+            for (int x = s.CenterX - radius; x <= s.CenterX + radius; x++)
+            {
+                var tile = world.Map.GetTile(x, y);
+                if (tile.BuildingId != 0 && s.FindBuilding(tile.BuildingId) is { } b)
+                {
+                    char ch = b.Def.Id switch
+                    {
+                        "stockpile" => 'S',
+                        "hovel" => 'H',
+                        "farm" => 'F',
+                        "woodcutter" => 'W',
+                        "quarry" => 'Q',
+                        "bakery" => 'B',
+                        _ => '#',
+                    };
+                    line.Append(b.IsOperational ? ch : char.ToLowerInvariant(ch));
+                    continue;
+                }
+                line.Append(tile.Terrain switch
+                {
+                    Terrain.Grass => '.',
+                    Terrain.Fertile => ',',
+                    Terrain.Forest => 'T',
+                    Terrain.Rock => '^',
+                    Terrain.IronDeposit => '*',
+                    Terrain.Water => '~',
+                    _ => '?',
+                });
+            }
+            Console.WriteLine(line);
+        }
+        Console.WriteLine();
+    }
+}

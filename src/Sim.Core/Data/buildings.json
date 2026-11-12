@@ -1,0 +1,111 @@
+[
+  {
+    "id": "stockpile",
+    "name": "Stockpile",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.05,
+    "cost": {
+      "wood": 5
+    },
+    "storage": 500
+  },
+  {
+    "id": "hovel",
+    "name": "Hovel",
+    "width": 2,
+    "height": 2,
+    "buildDays": 0.15,
+    "cost": {
+      "wood": 12
+    },
+    "housing": 5
+  },
+  {
+    "id": "farm",
+    "name": "Wheat Farm",
+    "width": 4,
+    "height": 4,
+    "buildDays": 0.3,
+    "cost": {
+      "wood": 15
+    },
+    "jobs": 2,
+    "jobKind": "farmer",
+    "recipe": {
+      "outputs": {
+        "grain": 4
+      },
+      "workDays": 1
+    },
+    "fertileBonus": 0.6
+  },
+  {
+    "id": "woodcutter",
+    "name": "Woodcutter's Hut",
+    "width": 2,
+    "height": 2,
+    "buildDays": 0.15,
+    "cost": {
+      "wood": 5
+    },
+    "jobs": 1,
+    "jobKind": "woodcutter",
+    "recipe": {
+      "outputs": {
+        "wood": 6
+      },
+      "workDays": 1
+    },
+    "nearTerrain": {
+      "terrain": "forest",
+      "radius": 7,
+      "min": 10
+    }
+  },
+  {
+    "id": "quarry",
+    "name": "Quarry",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.4,
+    "cost": {
+      "wood": 20
+    },
+    "jobs": 2,
+    "jobKind": "quarrier",
+    "recipe": {
+      "outputs": {
+        "stone": 4
+      },
+      "workDays": 1
+    },
+    "nearTerrain": {
+      "terrain": "rock",
+      "radius": 6,
+      "min": 6
+    }
+  },
+  {
+    "id": "bakery",
+    "name": "Mill & Bakery",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.6,
+    "cost": {
+      "wood": 20,
+      "stone": 10
+    },
+    "jobs": 2,
+    "jobKind": "baker",
+    "recipe": {
+      "inputs": {
+        "grain": 4
+      },
+      "outputs": {
+        "bread": 5
+      },
+      "workDays": 1
+    }
+  }
+]

@@ -1,0 +1,6 @@
+[
+  { "id": "grain", "name": "Grain", "nutrition": 0.6, "mealMood": -6 },
+  { "id": "bread", "name": "Bread", "nutrition": 1.0, "mealMood": 6 },
+  { "id": "wood", "name": "Wood" },
+  { "id": "stone", "name": "Stone" }
+]
