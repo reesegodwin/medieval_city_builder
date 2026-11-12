@@ -1,6 +1,7 @@
 # Notes for Claude
 
 - Design and roadmap: `docs/DESIGN.md`. Keep it updated when design decisions change.
+- End every response with suggested next steps, unless it ends with a question for the user.
 - `src/Sim.Core` must stay engine-free (no Godot or Unity references). It is shared by the future server and client.
 - The simulation must stay deterministic. Use `GameWorld.Rng` (never `System.Random`, wall-clock time, or unordered dictionary iteration), and iterate settlements, buildings and citizens in their list order.
 - All changes from players or AI go through `ICommand`s in `src/Sim.Core/Commands`.
