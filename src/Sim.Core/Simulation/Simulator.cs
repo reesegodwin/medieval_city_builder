@@ -53,6 +53,7 @@ public sealed class Simulator
             {
                 LifeSystem.Daily(World, s);
                 ServiceSystem.Daily(World, s);
+                HomeSystem.Daily(World, s);
                 MigrationSystem.Daily(World, s);
                 EconomySystem.Daily(World, s);
                 Commands.TerritorySystem.Daily(World, s);

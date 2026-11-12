@@ -24,6 +24,7 @@ public partial class Hud : CanvasLayer
 
     public event Action<string>? BuildRequested;
     public event Action? RoadRequested;
+    public event Action<byte>? RoadTierRequested;
     public event Action? DemolishRequested;
     public event Action<double>? SpeedRequested;
     public event Action? PauseToggled;
@@ -140,6 +141,14 @@ public partial class Hud : CanvasLayer
             return b;
         }
         ToolButton("Roads\nbridges: wood", "Lay roads (R). Free on land; over water they become bridges (4 wood per tile). Roads make hauling faster; people walk along them.", () => RoadRequested?.Invoke());
+        for (int t = 1; t < data.RoadTiers.Count; t++)
+        {
+            var tier = data.RoadTiers[t];
+            byte index = (byte)t;
+            string price = string.Join(", ", tier.Cost.Select(kv => $"{kv.Value} {kv.Key}"));
+            ToolButton($"{tier.Name}\n{price}/tile", $"Lay a {tier.Name.ToLowerInvariant()} or resurface roads ({price} per tile). " +
+                "Walkers and haulers move faster on it, and caravans travel faster.", () => RoadTierRequested?.Invoke(index));
+        }
         ToolButton("Demolish\nrefund", "Tear down buildings or roads (X). Refunds part of the cost.", () => DemolishRequested?.Invoke());
         ToolButton("Territory\npaint", "Paint where your territory goes (T): drag to claim, Shift+drag to give land back, [ ] brush size.\n" +
             "Your allowance grows with population, up to the cap of your town centre (upgrade it to raise the cap).",
@@ -150,11 +159,12 @@ public partial class Hud : CanvasLayer
         foreach (var def in data.Buildings.Values)
         {
             if (def.IsTownCentre) continue; // upgraded from the inspector, never placed
+            if (def.Home is { Level: > 0 }) continue; // hovels become cottages and townhouses on their own
             string cost = def.Cost.Count == 0 ? "free" : string.Join(", ", def.Cost.Select(kv => $"{kv.Value} {kv.Key}"));
             var b = new Button
             {
                 Text = $"{def.Name}\n{cost}",
-                TooltipText = Describe(def),
+                TooltipText = Describe(data, def),
                 CustomMinimumSize = new Vector2(104, 44),
                 FocusMode = Control.FocusModeEnum.None,
             };
@@ -220,7 +230,7 @@ public partial class Hud : CanvasLayer
         }
     }
 
-    private static string Describe(BuildingDef def)
+    private static string Describe(GameData data, BuildingDef def)
     {
         var lines = new List<string> { def.Name, $"Size {def.Width}x{def.Height}, {def.BuildDays:0.##} worker-days to build" };
         if (def.Housing > 0) lines.Add($"Houses {def.Housing}");
@@ -234,6 +244,9 @@ public partial class Hud : CanvasLayer
         if (def.FertileBonus > 0) lines.Add($"+{def.FertileBonus:P0} output on fertile soil");
         if (def.NearTerrain is { } near) lines.Add($"Needs {near.Terrain} within {near.Radius} tiles");
         if (def.TownCentre is { } centre) lines.Add($"Town centre: territory up to {centre.TerritoryCap} tiles; its roadworkers build roads");
+        if (def.Home is { UpgradeTo: { } up } home)
+            lines.Add($"Home for {home.Class}s; becomes a {data.Building(up).Name.ToLowerInvariant()} once its people have " +
+                      string.Join(", ", data.Building(up).Home!.Requires) + " (taxes rise with each step)");
         if (def.Upkeep > 0) lines.Add($"Upkeep {def.Upkeep:0.#} coin a day (half output while the treasury can't pay)");
         if (def.Service is { } service)
         {

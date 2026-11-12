@@ -82,7 +82,7 @@ dotnet test
 | Mouse wheel | Zoom |
 | Q / E | Rotate the view 90° |
 | Left-click | Select a building or citizen, or place a building |
-| R | Road tool: click the start, then click the end. Dirt roads are free; roadworkers build them over time. They can run outside your territory (not into another town's), and over water they become bridges that cost wood |
+| R | Road tool (dirt): click the start, then click the end. The Gravel and Stone road buttons lay or resurface roads for stone per tile; better surfaces speed up walking, hauling and caravans. Dirt roads are free; roadworkers build them over time. They can run outside your territory (not into another town's), and over water they become bridges that cost wood |
 | X | Demolish tool: click a building or road tile |
 | T | Territory tool: drag to claim land, Shift+drag to give it back, `[` / `]` change the brush size |
 | J | Trade panel: market, your offers, new offer (with a fair-price button), routes and caravans. Needs a Trading Post |
@@ -136,7 +136,7 @@ dotnet build client/MedievalClient.csproj
 
 ### Trading
 
-Build a **Trading Post** and connect it to a road, then open the trade panel (J). Caravans only travel on roads, so to trade with another town, build a road towards it (it may leave your territory). Buildings cost upkeep in coin each day and your people pay taxes; if the treasury runs dry, buildings with upkeep work at half speed. Sell goods for coin, buy with coin, or barter goods for goods; **Fair price** fills in what merchants pay or charge, and you can raise it for anything you'd rather keep. Deals happen instantly, but the goods and coin travel by ox cart and arrive days later. Merchants visit every 10 days and buy anything listed at a fair price; in shared worlds you can also take other players' offers and set up standing trade routes.
+Build a **Trading Post** and connect it to a road, then open the trade panel (J). Caravans only travel on roads, so to trade with another town, build a road towards it (it may leave your territory). Hovels become cottages and then townhouses once their people have the services they need (water, market and faith, then clothing, furniture and a tavern), and better-housed people pay more tax. Buildings cost upkeep in coin each day; if the treasury runs dry, buildings with upkeep work at half speed. Sell goods for coin, buy with coin, or barter goods for goods; **Fair price** fills in what merchants pay or charge, and you can raise it for anything you'd rather keep. Deals happen instantly, but the goods and coin travel by ox cart and arrive days later. Merchants visit every 10 days and buy anything listed at a fair price; in shared worlds you can also take other players' offers and set up standing trade routes.
 
 ### Playing with friends
 

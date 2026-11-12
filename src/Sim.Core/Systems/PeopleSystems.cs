@@ -107,6 +107,8 @@ public static class Needs
         double variety = Math.Min(MaxVarietyMood, Math.Max(0, foods - 1) * VarietyMoodPerFood);
         if (variety > 0) Add(labels != null ? $"Food variety ({foods} kinds)" : "", variety);
         Add(c.HomeBuildingId != null ? "Has a home" : "Homeless", c.HomeBuildingId != null ? 5 : -20);
+        if (c.HomeBuildingId is int homeId && settlement.FindBuilding(homeId)?.Def is { Home.Mood: > 0 } fine)
+            Add(labels != null ? $"Lives in a {fine.Name.ToLowerInvariant()}" : "", fine.Home!.Mood);
         if (c.IsAdult) Add(c.JobBuildingId != null ? "Has work" : "Idle", c.JobBuildingId != null ? 3 : -3);
 
         int population = settlement.Citizens.Count;

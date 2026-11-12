@@ -493,7 +493,7 @@ public static class RoadSystem
             var plan = settlement.RoadPlans[0];
             double distance = Math.Abs(plan.X - settlement.CenterX) + Math.Abs(plan.Y - settlement.CenterY);
             double slowdown = 1 + distance / Commands.Roads.WalkHalfDistance;
-            double needed = (Commands.Roads.WorkDays(world.Map.GetTile(plan.X, plan.Y)) - plan.Progress) * slowdown;
+            double needed = (Commands.Roads.WorkDays(world, world.Map.GetTile(plan.X, plan.Y), plan.Tier) - plan.Progress) * slowdown;
             if (labour < needed)
             {
                 plan.Progress += labour / slowdown;
@@ -516,8 +516,14 @@ public static class RoadSystem
 /// </summary>
 public static class EconomySystem
 {
-    public static double DailyTax(GameWorld world, Settlement s) =>
-        s.Citizens.Count(c => c.IsAdult) * world.Data.Trade.TaxPerAdultDay;
+    /// <summary>Taxes per day: each adult pays their class's rate (peasants, craftsmen, burghers).</summary>
+    public static double DailyTax(GameWorld world, Settlement s)
+    {
+        double tax = 0;
+        foreach (var c in s.Citizens)
+            if (c.IsAdult) tax += HomeSystem.ClassOf(world, s, c).TaxPerAdultDay;
+        return tax;
+    }
 
     public static double DailyUpkeep(Settlement s) => s.Buildings.Where(b => b.IsOperational).Sum(b => b.Def.Upkeep);
 

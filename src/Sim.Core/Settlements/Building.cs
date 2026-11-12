@@ -13,7 +13,14 @@ public enum BuildingState
 public sealed class Building
 {
     public int Id { get; }
-    public BuildingDef Def { get; }
+    /// <summary>What this building is. Homes change it in place when they upgrade or downgrade.</summary>
+    public BuildingDef Def { get; internal set; }
+
+    /// <summary>Days in a row the residents have had the next home tier's needs met.</summary>
+    public int UpgradeReadyDays { get; set; }
+
+    /// <summary>Days in a row this home's own tier's needs have gone unmet.</summary>
+    public int NeedsUnmetDays { get; set; }
     public int X { get; }
     public int Y { get; }
 

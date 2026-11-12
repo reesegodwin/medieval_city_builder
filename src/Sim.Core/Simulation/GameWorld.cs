@@ -75,13 +75,16 @@ public sealed class GameWorld
         {
             h.Add(s.Id).Add(s.Territory.Count).Add(s.TerritoryCap).Add(s.HaulCoverage).Add(s.Roads.Count)
                 .Add(s.TaxAccrued).Add(s.UpkeepOwed).Add(s.UpkeepUnpaid);
-            foreach (var plan in s.RoadPlans) h.Add(plan.X).Add(plan.Y).Add(plan.Progress);
+            foreach (var plan in s.RoadPlans) h.Add(plan.X).Add(plan.Y).Add(plan.Progress).Add(plan.Tier);
+            foreach (var (x, y) in s.Roads)
+                if (Map.GetTile(x, y).RoadTier > 0) h.Add(x).Add(y).Add(Map.GetTile(x, y).RoadTier);
             foreach (var (tool, wear) in s.ToolWear) h.Add(tool).Add(wear);
             foreach (var (good, use) in s.GoodsUse) h.Add(good).Add(use);
             foreach (var (resource, amount) in s.Stock.Items) h.Add(resource).Add(amount);
             foreach (var b in s.Buildings)
             {
-                h.Add(b.Id).Add(b.Def.Id).Add((int)b.State).Add(b.ConstructionProgress).Add(b.CycleProgress);
+                h.Add(b.Id).Add(b.Def.Id).Add((int)b.State).Add(b.ConstructionProgress).Add(b.CycleProgress)
+                    .Add(b.UpgradeReadyDays).Add(b.NeedsUnmetDays);
                 foreach (int w in b.WorkerIds) h.Add(w);
                 foreach (int r in b.ResidentIds) h.Add(r);
             }

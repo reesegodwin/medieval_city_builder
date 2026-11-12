@@ -32,6 +32,56 @@ public sealed class ResourceDef
     public double Value { get; set; }
 }
 
+/// <summary>A social class (classes.json): who lives in a tier of home, and what they pay.</summary>
+public sealed class SocialClassDef
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+
+    /// <summary>Coin each adult of this class pays in taxes per game day.</summary>
+    public double TaxPerAdultDay { get; set; }
+}
+
+/// <summary>
+/// Makes a building a home tier. Homes upgrade in place to <see cref="UpgradeTo"/> once their residents have
+/// had that tier's <see cref="Requires"/> needs met for a while (and the upgrade's cost is in stock), and slip back
+/// when their own tier's needs go unmet.
+/// </summary>
+public sealed class HomeDef
+{
+    public int Level { get; set; }
+
+    /// <summary>The social class of the people living here.</summary>
+    public string Class { get; set; } = "peasant";
+
+    public string? UpgradeTo { get; set; }
+
+    /// <summary>Needs every resident must have covered to reach and keep this tier.</summary>
+    public List<string> Requires { get; set; } = new();
+
+    /// <summary>Mood bonus for living in this tier.</summary>
+    public double Mood { get; set; }
+}
+
+/// <summary>A road surface (roads.json); the list index is the tier stored on each road tile.</summary>
+public sealed class RoadTierDef
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+
+    /// <summary>Walking cost per tile (open ground is 1): lower means faster walking and better hauling.</summary>
+    public double WalkCost { get; set; } = 0.4;
+
+    /// <summary>Caravan speed relative to a dirt road.</summary>
+    public double CaravanSpeed { get; set; } = 1;
+
+    /// <summary>Roadworker-days to build (or upgrade to) one tile next to the town centre.</summary>
+    public double WorkDays { get; set; } = 0.05;
+
+    /// <summary>Materials per tile, paid when the road is planned.</summary>
+    public Dictionary<string, int> Cost { get; set; } = new();
+}
+
 /// <summary>Trade tuning (trade.json).</summary>
 public sealed class TradeRules
 {
@@ -59,9 +109,6 @@ public sealed class TradeRules
     public List<string> MerchantGoods { get; set; } = new();
 
     public int StartingCoin { get; set; } = 50;
-
-    /// <summary>Coin each adult pays in taxes per game day.</summary>
-    public double TaxPerAdultDay { get; set; } = 0.08;
 
     /// <summary>Output of buildings with upkeep while the treasury can't pay it.</summary>
     public double UnpaidOutput { get; set; } = 0.5;
@@ -180,6 +227,9 @@ public sealed class BuildingDef
 
     public GovernorHint? Governor { get; set; }
 
+    /// <summary>Set for homes that are part of the upgrade ladder (hovel, cottage, townhouse).</summary>
+    public HomeDef? Home { get; set; }
+
     /// <summary>Coin per game day the treasury pays to keep this building running once finished.</summary>
     public double Upkeep { get; set; }
 
@@ -211,10 +261,25 @@ public sealed class GameData
 
     public TradeRules Trade { get; }
 
+    /// <summary>Social classes, in data-file order.</summary>
+    public IReadOnlyList<SocialClassDef> Classes { get; }
+
+    public SocialClassDef ClassOf(string id) => Classes.FirstOrDefault(c => c.Id == id) ?? Classes[0];
+
+    /// <summary>The tier a home downgrades to (the one whose upgrade is <paramref name="homeId"/>), or null.</summary>
+    public BuildingDef? HomeBelow(string homeId) => BuildingList.FirstOrDefault(b => b.Home?.UpgradeTo == homeId);
+
+    /// <summary>Road surfaces from dirt (tier 0) upwards.</summary>
+    public IReadOnlyList<RoadTierDef> RoadTiers { get; }
+
     public GameData(IEnumerable<ResourceDef> resources, IEnumerable<BuildingDef> buildings, IEnumerable<NeedDef>? needs = null,
-        TradeRules? trade = null)
+        TradeRules? trade = null, IEnumerable<RoadTierDef>? roadTiers = null, IEnumerable<SocialClassDef>? classes = null)
     {
+        Classes = classes?.ToList() ?? new List<SocialClassDef> { new() { Id = "peasant", Name = "Peasants", TaxPerAdultDay = 0.06 } };
         Trade = trade ?? new TradeRules();
+        RoadTiers = roadTiers?.ToList() ?? new List<RoadTierDef> { new() { Id = "dirt", Name = "Dirt road" } };
+        // The pathfinder works on tiles alone, so it gets the surface costs here (the same data for every world).
+        World.Pathfinder.SetRoadTiers(RoadTiers.Select(t => t.WalkCost).ToArray(), RoadTiers.Select(t => t.CaravanSpeed).ToArray());
         Resources = resources.ToDictionary(r => r.Id);
         BuildingList = buildings.ToList();
         Buildings = BuildingList.ToDictionary(b => b.Id);
@@ -240,7 +305,9 @@ public sealed class GameData
         var buildings = LoadEmbedded<List<BuildingDef>>("buildings.json");
         var needs = LoadEmbedded<List<NeedDef>>("needs.json");
         var trade = LoadEmbedded<TradeRules>("trade.json");
-        return new GameData(resources, buildings, needs, trade);
+        var roads = LoadEmbedded<List<RoadTierDef>>("roads.json");
+        var classes = LoadEmbedded<List<SocialClassDef>>("classes.json");
+        return new GameData(resources, buildings, needs, trade, roads, classes);
     }
 
     private static T LoadEmbedded<T>(string fileName)
@@ -257,6 +324,18 @@ public sealed class GameData
 
     private void Validate()
     {
+        foreach (var home in BuildingList.Where(b => b.Home != null))
+        {
+            if (home.Home!.UpgradeTo is { } up)
+            {
+                if (!Buildings.TryGetValue(up, out var next) || next.Home == null)
+                    throw new InvalidDataException($"Home '{home.Id}' upgrades to '{up}', which isn't a home");
+                if (next.Width != home.Width || next.Height != home.Height)
+                    throw new InvalidDataException($"Home '{home.Id}' and its upgrade '{up}' must be the same size");
+            }
+            foreach (var need in home.Home.Requires)
+                if (Needs.All(n => n.Id != need)) throw new InvalidDataException($"Home '{home.Id}' requires unknown need '{need}'");
+        }
         foreach (var r in Trade.MerchantGoods)
             if (!Resources.ContainsKey(r)) throw new InvalidDataException($"Merchants sell unknown resource '{r}'");
 

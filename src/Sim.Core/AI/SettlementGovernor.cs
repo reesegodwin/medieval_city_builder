@@ -233,6 +233,7 @@ public static class SettlementGovernor
     {
         if (!settlement.Rules.AutoBuild) return;
         TradeGovernor.Daily(world, settlement);
+        UpgradeRoads(world, settlement);
         int maxSites = MaxActiveConstructionSites + settlement.Citizens.Count / 100;
         if (settlement.Buildings.Count(b => b.IsConstructionSite) >= maxSites) return;
 
@@ -264,6 +265,40 @@ public static class SettlementGovernor
             settlement.FailedSiteSearches[key] = today;
             if (++attempts >= MaxAttemptsPerDay) return;
         }
+    }
+
+    /// <summary>Roads within this distance of a stockpile carry the most hauling, so they're resurfaced first.</summary>
+    public const int RoadUpgradeRadius = 12;
+
+    /// <summary>Tiles resurfaced per batch.</summary>
+    public const int RoadUpgradeBatch = 25;
+
+    /// <summary>Towns this size and up pave with stone rather than gravel.</summary>
+    public const int StoneRoadPopulation = 300;
+
+    /// <summary>
+    /// With stone to spare (three quarters of its stock limit), resurface the roads nearest the stockpiles: gravel,
+    /// or stone in big towns. Stays above half the limit so building never runs short.
+    /// </summary>
+    private static void UpgradeRoads(GameWorld world, Settlement s)
+    {
+        if (s.RoadPlans.Count > 0 || world.Data.RoadTiers.Count < 2) return;
+        int limit = s.LimitOf("stone");
+        if (limit == int.MaxValue || s.Stock.Get("stone") < limit * 0.75) return;
+
+        byte target = (byte)Math.Min(world.Data.RoadTiers.Count - 1, s.Citizens.Count >= StoneRoadPopulation ? 2 : 1);
+        var stockpiles = s.Buildings.Where(b => b.Def.IsStockpile && b.IsOperational).ToList();
+        if (stockpiles.Count == 0) return;
+        int Distance((int X, int Y) t) => stockpiles.Min(b => Math.Abs(b.CenterX - t.X) + Math.Abs(b.CenterY - t.Y));
+
+        var tiles = s.Roads
+            .Where(t => Roads.NeedsWork(world, s, t.X, t.Y, target) && Distance(t) <= RoadUpgradeRadius)
+            .OrderBy(Distance).ThenBy(t => t.X).ThenBy(t => t.Y)
+            .Take(RoadUpgradeBatch).ToList();
+        if (tiles.Count == 0) return;
+        var cost = Roads.PlanCost(world, s, tiles, target);
+        if (s.Stock.Get("stone") - cost.GetValueOrDefault("stone") < limit / 2) return;
+        world.Execute(new PlaceRoadCommand(s.Id, tiles, target));
     }
 
     /// <summary>Upgrade the town centre once its territory cap is close to holding the town back and it's affordable.</summary>

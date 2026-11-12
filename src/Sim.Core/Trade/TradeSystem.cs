@@ -38,6 +38,21 @@ public static class Trading
     public static long TravelTicks(GameWorld world, int tiles) =>
         TimeScale.DaysToTicks(Math.Max(1, tiles / world.Data.Trade.CaravanTilesPerDay));
 
+    /// <summary>
+    /// Travel time along a path: each road step costs less on gravel or stone; a cross-country first leg (merchants)
+    /// counts its full distance at dirt-road speed.
+    /// </summary>
+    public static long TravelTicks(GameWorld world, IReadOnlyList<(int X, int Y)> path)
+    {
+        double tiles = 0;
+        for (int i = 1; i < path.Count; i++)
+        {
+            int d = Math.Abs(path[i].X - path[i - 1].X) + Math.Abs(path[i].Y - path[i - 1].Y);
+            tiles += d == 1 ? Pathfinder.RoadTravelCost(world.Map.GetTile(path[i].X, path[i].Y)) : d;
+        }
+        return TimeScale.DaysToTicks(Math.Max(1, tiles / world.Data.Trade.CaravanTilesPerDay));
+    }
+
     /// <summary>Finished road tiles at the Trading Post's door or around it, where caravans load and unload.</summary>
     public static List<(int X, int Y)> RoadEnds(GameWorld world, Settlement s)
     {
@@ -75,7 +90,7 @@ public static class Trading
             Cargo = new SortedDictionary<string, int>(cargo.ToDictionary(kv => kv.Key, kv => kv.Value), StringComparer.Ordinal),
             StartX = path[0].X, StartY = path[0].Y, EndX = path[^1].X, EndY = path[^1].Y,
             DepartTick = world.Time.Tick,
-            ArriveTick = world.Time.Tick + TravelTicks(world, path.Count),
+            ArriveTick = world.Time.Tick + TravelTicks(world, path),
             Path = Flatten(path),
         };
         world.Trade.Caravans.Add(caravan);
@@ -272,7 +287,7 @@ public static class TradeSystem
                 ToId = s.Id,
                 StartX = path[0].X, StartY = path[0].Y, EndX = path[^1].X, EndY = path[^1].Y,
                 DepartTick = now,
-                ArriveTick = now + Trading.TravelTicks(world, Trading.PathLength(path)),
+                ArriveTick = now + Trading.TravelTicks(world, path),
                 Path = path.SelectMany(t => new[] { t.X, t.Y }).ToList(),
             });
         }

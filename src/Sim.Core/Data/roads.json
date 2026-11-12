@@ -1,0 +1,5 @@
+[
+  {"id": "dirt", "name": "Dirt road", "walkCost": 0.4, "caravanSpeed": 1.0, "workDays": 0.05, "cost": {}},
+  {"id": "gravel", "name": "Gravel road", "walkCost": 0.3, "caravanSpeed": 1.4, "workDays": 0.1, "cost": {"stone": 1}},
+  {"id": "stone", "name": "Stone road", "walkCost": 0.22, "caravanSpeed": 1.8, "workDays": 0.2, "cost": {"stone": 2}}
+]

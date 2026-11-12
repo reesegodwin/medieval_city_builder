@@ -78,7 +78,63 @@
     "cost": {
       "wood": 12
     },
-    "housing": 5
+    "housing": 5,
+    "home": {
+      "level": 0,
+      "class": "peasant",
+      "upgradeTo": "cottage",
+      "mood": 0
+    }
+  },
+  {
+    "id": "cottage",
+    "name": "Cottage",
+    "width": 2,
+    "height": 2,
+    "buildDays": 0,
+    "cost": {
+      "wood": 10,
+      "stone": 4
+    },
+    "housing": 6,
+    "home": {
+      "level": 1,
+      "class": "craftsman",
+      "upgradeTo": "townhouse",
+      "mood": 2,
+      "requires": [
+        "water",
+        "market",
+        "faith"
+      ]
+    }
+  },
+  {
+    "id": "townhouse",
+    "name": "Townhouse",
+    "width": 2,
+    "height": 2,
+    "buildDays": 0,
+    "cost": {
+      "wood": 10,
+      "stone": 12,
+      "furniture": 2,
+      "coin": 20
+    },
+    "housing": 8,
+    "home": {
+      "level": 2,
+      "class": "burgher",
+      "mood": 4,
+      "requires": [
+        "water",
+        "market",
+        "faith",
+        "clothing",
+        "furniture",
+        "drink"
+      ]
+    }
   },
   {
     "id": "farm",

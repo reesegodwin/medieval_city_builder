@@ -132,6 +132,10 @@ internal static class Report
         PrintDay(world, s);
         Console.WriteLine($"Births {world.TotalBirths}, deaths {world.TotalDeaths}. Storage {s.Stock.Total}/{s.StorageCapacity}, " +
                           $"housing {s.HousingCapacity - s.FreeHousing}/{s.HousingCapacity}, road tiles {s.Roads.Count}.");
+        var homes = s.Buildings.Where(b => b.Def.Home != null && b.IsOperational).GroupBy(b => b.Def.Name)
+            .Select(g => $"{g.Count()} {g.Key.ToLowerInvariant()}s");
+        var classes = s.Citizens.GroupBy(c => HomeSystem.ClassOf(world, s, c).Name).Select(g => $"{g.Count()} {g.Key.ToLowerInvariant()}");
+        Console.WriteLine($"Homes: {string.Join(", ", homes)}. People: {string.Join(", ", classes)}.");
         var trade = world.Trade;
         Console.WriteLine($"Treasury: taxes {EconomySystem.DailyTax(world, s):0.#}/day, upkeep {EconomySystem.DailyUpkeep(s):0.#}/day" +
                           (s.UpkeepUnpaid ? " (UNPAID)" : "") + ".");

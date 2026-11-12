@@ -21,6 +21,9 @@ public partial class RoadTool : Node3D
     private List<(int X, int Y)> _tiles = new();
 
     public bool Active { get; private set; }
+
+    /// <summary>Surface being laid: 0 dirt, 1 gravel, 2 stone (index into roads.json).</summary>
+    public byte Tier { get; private set; }
     public string? Problem { get; private set; }
 
     public void Initialize(SimSession session, CameraRig camera)
@@ -33,8 +36,9 @@ public partial class RoadTool : Node3D
         AddChild(new MultiMeshInstance3D { Multimesh = _preview, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
 
-    public void Begin()
+    public void Begin(byte tier = 0)
     {
+        Tier = tier;
         Active = true;
         _start = null;
     }
@@ -52,13 +56,19 @@ public partial class RoadTool : Node3D
     {
         get
         {
-            if (Problem != null) return $"Road: {Problem}";
+            var world = _session.World;
+            string name = world.Data.RoadTiers[Tier].Name;
+            if (Problem != null) return $"{name}: {Problem}";
             if (_start == null)
-                return "Road: click where the road starts (right-click to stop). Dirt roads are free; roadworkers from the town centre " +
-                       "build them over time. They may leave your territory, but not enter another town's. Over water they become bridges.";
-            int wood = Roads.BridgeCost(_session.World, _tiles);
-            string bridge = wood > 0 ? $", bridge costs {wood} wood (you have {_session.PlayerTown.Stock.Get("wood")})" : "";
-            return $"Road: click where it ends ({_tiles.Count} tiles{bridge})";
+                return Tier == 0
+                    ? "Road: click where the road starts (right-click to stop). Dirt roads are free; roadworkers from the town centre " +
+                      "build them over time. They may leave your territory, but not enter another town's. Over water they become bridges."
+                    : $"{name}: click the start, then the end. Lays a new {name.ToLowerInvariant()} or resurfaces your roads " +
+                      $"({string.Join(", ", world.Data.RoadTiers[Tier].Cost.Select(kv => $"{kv.Value} {kv.Key}"))} per tile). " +
+                      "Faster walking and hauling, and faster caravans.";
+            var cost = Roads.PlanCost(world, _session.PlayerTown, _tiles, Tier);
+            string price = cost.Count == 0 ? "free" : string.Join(", ", cost.Select(kv => $"{kv.Value} {kv.Key}"));
+            return $"{name}: click where it ends ({_tiles.Count} tiles, {price})";
         }
     }
 
@@ -80,7 +90,8 @@ public partial class RoadTool : Node3D
         for (int i = 0; i < n; i++)
         {
             var (x, y) = _tiles[i];
-            bool isRoad = world.Map.GetTile(x, y) is { IsRoad: true } or { RoadPlanned: true };
+            // Existing roads are only "done" if they already have this surface (or better).
+            bool isRoad = !Roads.NeedsWork(world, _session.PlayerTown, x, y, Tier) && world.Map.GetTile(x, y) is { IsRoad: true } or { RoadPlanned: true };
             string? error = isRoad ? null : Roads.Check(world, _session.PlayerTown, x, y);
             Problem ??= error;
             _preview.SetInstanceTransform(i, new Transform3D(Basis.Identity, Coords.TileCenter(x, y) + new Vector3(0, GroundY(x, y) + 0.05f, 0)));
@@ -101,7 +112,7 @@ public partial class RoadTool : Node3D
         }
         if (_tiles.Count > MaxTiles) return CommandResult.Fail("Road too long");
 
-        var result = _session.Execute(new PlaceRoadCommand(_session.PlayerTown.Id, _tiles.ToList()));
+        var result = _session.Execute(new PlaceRoadCommand(_session.PlayerTown.Id, _tiles.ToList(), Tier));
         if (result.Ok) _start = null; // ready for the next road
         return result;
     }
