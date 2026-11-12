@@ -249,6 +249,14 @@ public class WholeSimulationTests
         Assert.DoesNotContain(world.Events, e => e.Kind == Sim.Core.Events.EventKind.Starvation);
         Assert.Contains(town.Buildings, b => b.Def.Id == "bakery" && b.IsOperational);
         Assert.Contains(town.Buildings, b => b.Def.Id == "quarry" && b.IsOperational);
+
+        // Food production is sized to need (bread and gardens counted), not built to twice what's eaten.
+        double need = town.Citizens.Sum(Needs.DailyFoodNeed);
+        double supply = SettlementGovernor.EstimatedFoodSupply(world, town);
+        Assert.True(supply >= need, $"Food supply {supply:0} below need {need:0}");
+        Assert.True(supply <= need * SettlementGovernor.FoodSupplyMargin * 1.15,
+            $"Food overbuilt: supply {supply:0} for need {need:0}");
+        Assert.True(Needs.FoodDays(world, town) > 3, $"Only {Needs.FoodDays(world, town):0.0} days of food");
     }
 }
 

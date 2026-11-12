@@ -159,6 +159,7 @@ Rough guess for one experienced developer: a playable Phase 3 in 6–12 months, 
 - **Walking stays cosmetic:** the client draws townsfolk following roads using the same pathfinder, but the simulation never depends on their drawn position.
 - **Sound:** all audio is synthesized in code (no third-party files), so there are no licences to track. Any future internet asset must have its licence verified at the source and be recorded in `CREDITS.md`.
 - **Bridges and territory (Phase 1c):** roads over water become bridges (4 wood per tile, up to 8 tiles per governor-built crossing). Territory radius = 44 + population / 8, capped at 100. The governor plans each building's connecting road before placing it, so it never builds somewhere it can't reach.
+- **Governor food sizing:** the governor adds farms until the estimated food supply covers 1.2 × daily need. The estimate uses recipes and nutrition from the data files, assumes 1.2 labour per worker-day, counts grain baked into bread as far as bakeries can take it, subtracts grain for breweries and includes garden vegetables. It also adds a farm whenever food falls below 3 days. Before this, each farm was counted as 6 nutrition of raw grain, so towns built about 1.7× the food they needed and whole sectors stopped at their stock limits together.
 - **Saves:** versioned JSON. Only changes are stored (terrain comes from the seed). Save and load are exact: a loaded world continues with the same state hash as the original.
 
 ## Battles: individual units + destructible structures (hybrid LOD simulation)

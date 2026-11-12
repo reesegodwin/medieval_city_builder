@@ -166,6 +166,12 @@ public static class SettlementGovernor
     /// <summary>Candidate sites per search that get a full road-route check.</summary>
     public const int MaxRouteChecksPerSearch = 10;
 
+    /// <summary>Labour a worker is assumed to give per day when sizing food production (a cautious <see cref="Work.DailyRate"/>).</summary>
+    public const double ExpectedWorkerRate = 1.2;
+
+    /// <summary>Planned food production must exceed the town's daily need by this factor.</summary>
+    public const double FoodSupplyMargin = 1.2;
+
     public static void Daily(GameWorld world, Settlement settlement)
     {
         if (!settlement.Rules.AutoBuild) return;
@@ -240,6 +246,44 @@ public static class SettlementGovernor
         return true;
     }
 
+    /// <summary>
+    /// Nutrition per day the settlement's food buildings (including planned ones) should produce when
+    /// staffed: farm grain, baked into bread as far as bakeries can take it, minus grain for breweries,
+    /// plus garden vegetables. Recipes and nutrition come from the game data.
+    /// </summary>
+    public static double EstimatedFoodSupply(GameWorld world, Settlement s)
+    {
+        double Rate(string defId, out RecipeDef? recipe)
+        {
+            var def = world.Data.Buildings.GetValueOrDefault(defId);
+            recipe = def?.Recipe;
+            if (def == null || recipe == null || recipe.WorkDays <= 0) return 0;
+            return s.CountIncludingPlanned(defId) * def.Jobs * ExpectedWorkerRate / recipe.WorkDays;
+        }
+        double Nutrition(string resource) => world.Data.Resources.GetValueOrDefault(resource)?.Nutrition ?? 0;
+
+        double farmCycles = Rate("farm", out var farm);
+        double grain = farmCycles * (farm?.Outputs.GetValueOrDefault("grain") ?? 0);
+
+        double breweryCycles = Rate("brewery", out var brewery);
+        grain = Math.Max(0, grain - breweryCycles * (brewery?.Inputs.GetValueOrDefault("grain") ?? 0));
+
+        double supply = 0;
+        double bakeryCycles = Rate("bakery", out var bakery);
+        int grainPerBake = bakery?.Inputs.GetValueOrDefault("grain") ?? 0;
+        if (grainPerBake > 0)
+        {
+            double baked = Math.Min(grain, bakeryCycles * grainPerBake);
+            supply += baked / grainPerBake * bakery!.Outputs.GetValueOrDefault("bread") * Nutrition("bread");
+            grain -= baked;
+        }
+        supply += grain * Nutrition("grain");
+
+        double gardenCycles = Rate("garden", out var garden);
+        supply += gardenCycles * (garden?.Outputs.GetValueOrDefault("vegetables") ?? 0) * Nutrition("vegetables");
+        return supply;
+    }
+
     /// <summary>What the settlement would like to build next, most important first.</summary>
     public static List<(string DefId, (int X, int Y)? Near)> Wishes(GameWorld world, Settlement s)
     {
@@ -294,10 +338,10 @@ public static class SettlementGovernor
         if (plannedHousing < 3 + homeless) Wish("hovel");
         foreach (var spot in ServiceGaps("water")) Wish("well", spot);
 
-        // Each farm (two farmers) reliably covers about 6 nutrition a day.
+        // Size farming to the town's need (counting bread and gardens), with an emergency top-up.
         double dailyFoodNeed = s.Citizens.Sum(Needs.DailyFoodNeed);
         bool grainSurplus = s.Stock.Get("grain") >= s.LimitOf("grain") * 0.8;
-        if ((foodDays < 3 && !grainSurplus) || farms * 6.0 < dailyFoodNeed)
+        if ((foodDays < 3 && !grainSurplus) || EstimatedFoodSupply(world, s) < dailyFoodNeed * FoodSupplyMargin)
         {
             if (!Understaffed("farm")) Wish("farm");
         }
