@@ -82,7 +82,7 @@ public partial class Main : Node3D
 
         _territory = new TerritoryRenderer { Name = "Territory" };
         AddChild(_territory);
-        _territory.Initialize(_session.World.Map, town);
+        _territory.Initialize(_session.World.Map, town, () => _camera.Distance);
 
         _placement = new PlacementTool { Name = "Placement" };
         AddChild(_placement);

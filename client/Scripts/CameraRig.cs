@@ -26,6 +26,9 @@ public partial class CameraRig : Node3D
     /// <summary>The ground point the camera looks at.</summary>
     public Vector3 Focus => Position;
 
+    /// <summary>Current distance from the focus point (eases towards the zoom target).</summary>
+    public float Distance => _distance;
+
     public override void _Ready()
     {
         _camera = new Camera3D { Fov = 40f, Far = 400f };
