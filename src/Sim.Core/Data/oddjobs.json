@@ -1,0 +1,10 @@
+{
+  "helperRate": 0.5,
+  "plannedRoadsPerHelper": 10,
+  "maxRoadHelpers": 6,
+  "gather": [
+    {"resource": "berries", "perDay": 2.0, "notInWinter": true},
+    {"resource": "firewood", "perDay": 2.5},
+    {"resource": "stone", "perDay": 2.0}
+  ]
+}

@@ -284,10 +284,14 @@ public sealed class GameData
     /// <summary>What changes with the seasons (spring, summer, autumn, winter).</summary>
     public SeasonRules Seasons { get; }
 
+    /// <summary>What adults without a job do (oddjobs.json).</summary>
+    public OddJobRules OddJobs { get; }
+
     public GameData(IEnumerable<ResourceDef> resources, IEnumerable<BuildingDef> buildings, IEnumerable<NeedDef>? needs = null,
         TradeRules? trade = null, IEnumerable<RoadTierDef>? roadTiers = null, IEnumerable<SocialClassDef>? classes = null,
-        DisasterRules? disasters = null, SeasonRules? seasons = null)
+        DisasterRules? disasters = null, SeasonRules? seasons = null, OddJobRules? oddJobs = null)
     {
+        OddJobs = oddJobs ?? new OddJobRules();
         Disasters = disasters ?? new DisasterRules();
         Seasons = seasons ?? new SeasonRules();
         Classes = classes?.ToList() ?? new List<SocialClassDef> { new() { Id = "peasant", Name = "Peasants", TaxPerAdultDay = 0.06 } };
@@ -324,7 +328,8 @@ public sealed class GameData
         var classes = LoadEmbedded<List<SocialClassDef>>("classes.json");
         var disasters = LoadEmbedded<DisasterRules>("disasters.json");
         var seasons = LoadEmbedded<SeasonRules>("seasons.json");
-        return new GameData(resources, buildings, needs, trade, roads, classes, disasters, seasons);
+        var oddJobs = LoadEmbedded<OddJobRules>("oddjobs.json");
+        return new GameData(resources, buildings, needs, trade, roads, classes, disasters, seasons, oddJobs);
     }
 
     private static T LoadEmbedded<T>(string fileName)
@@ -476,4 +481,30 @@ public sealed class SeasonRules
     /// <summary>A building's output averaged over the year (for planning).</summary>
     public double AverageOutputOf(string buildingId) =>
         Seasons.Count == 0 ? 1 : Seasons.Average(s => s.OutputOf(buildingId));
+}
+
+/// <summary>A good adults without a job can gather (oddjobs.json).</summary>
+public sealed class GatherDef
+{
+    public string Resource { get; set; } = "";
+    public double PerDay { get; set; }
+
+    /// <summary>Nothing to find in winter (berries and mushrooms).</summary>
+    public bool NotInWinter { get; set; }
+}
+
+/// <summary>What adults without a job do: help at building sites and on roads, or gather.</summary>
+public sealed class OddJobRules
+{
+    /// <summary>A helper's labour as a share of an average worker's.</summary>
+    public double HelperRate { get; set; } = 0.5;
+
+    /// <summary>One road helper per this many planned road tiles...</summary>
+    public int PlannedRoadsPerHelper { get; set; } = 10;
+
+    /// <summary>...up to this many.</summary>
+    public int MaxRoadHelpers { get; set; } = 6;
+
+    /// <summary>What gatherers bring in, in order of preference.</summary>
+    public List<GatherDef> Gather { get; set; } = new();
 }

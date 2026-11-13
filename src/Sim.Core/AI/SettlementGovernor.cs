@@ -476,6 +476,8 @@ public static class SettlementGovernor
         List<(int, int)> ServiceGaps(string need)
         {
             var none = new List<(int, int)>();
+            // Unpaid upkeep halves what services can serve; more of them would only add upkeep.
+            if (s.UpkeepUnpaid && world.Data.BuildingList.Any(d => d.Service?.Need == need && d.Upkeep > 0)) return none;
             var providers = s.Buildings.Where(b => b.Def.Service?.Need == need).ToList();
             if (providers.Any(b => b.IsConstructionSite)) return none;
             if (providers.Any(b => b.Def.Jobs > 0 && b.WorkerIds.Count == 0)) return none;

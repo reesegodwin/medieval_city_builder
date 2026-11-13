@@ -85,7 +85,7 @@ public static class Needs
     public static List<(string Label, double Mood)> MoodFactors(GameWorld world, Settlement settlement, Citizen c)
     {
         var factors = new List<(string, double)>();
-        MoodSum(world, settlement, c, factors);
+        MoodSum(world, settlement, c, factors, OddJobs.Available(world, settlement));
         return factors;
     }
 
@@ -93,7 +93,9 @@ public static class Needs
     /// Sum of all mood effects. Labels are only built when <paramref name="labels"/> is given, since
     /// this runs for every citizen every game hour.
     /// </summary>
-    public static double MoodSum(GameWorld world, Settlement settlement, Citizen c, List<(string, double)>? labels = null)
+    /// <param name="oddJobs">Whether people without a job can find odd jobs (worked out once for everyone).</param>
+    public static double MoodSum(GameWorld world, Settlement settlement, Citizen c, List<(string, double)>? labels = null,
+        bool? oddJobs = null)
     {
         double sum = 0;
         void Add(string label, double mood)
@@ -113,7 +115,9 @@ public static class Needs
         if (c.HomeBuildingId is int homeId && settlement.FindBuilding(homeId)?.Def is { Home.Mood: > 0 } fine)
             Add(labels != null ? $"Lives in a {fine.Name.ToLowerInvariant()}" : "", fine.Home!.Mood);
         if (c.IsSick) Add("Sick", world.Data.Disasters.SickMood);
-        else if (c.IsAdult) Add(c.JobBuildingId != null ? "Has work" : "Idle", c.JobBuildingId != null ? 3 : -3);
+        else if (c.IsAdult && c.JobBuildingId != null) Add("Has work", 3);
+        else if (c.IsAdult && !(oddJobs ??= OddJobs.Available(world, settlement))) Add("Idle", -3); // odd jobs: neither pleased nor bored
+        else if (c.IsAdult && labels != null) labels.Add(("Odd jobs", 0));
 
         int population = settlement.Citizens.Count;
         foreach (var need in world.Data.Needs)
@@ -132,9 +136,10 @@ public static class Needs
     /// <summary>Hourly: mood drifts toward a target set by how well the citizen's needs are met.</summary>
     public static void UpdateMood(GameWorld world, Settlement settlement)
     {
+        bool oddJobs = OddJobs.Available(world, settlement);
         foreach (var c in settlement.Citizens)
         {
-            double target = 50 + MoodSum(world, settlement, c);
+            double target = 50 + MoodSum(world, settlement, c, null, oddJobs);
             c.Mood += (Math.Clamp(target, 0, 100) - c.Mood) * 0.1;
         }
     }

@@ -165,7 +165,7 @@ public partial class LedgerPanel : PanelContainer
             .GroupBy(b => b.Def.Name).Select(g => $"{g.Count()} {g.Key.ToLowerInvariant()}s")) +
                       (homeless > 0 ? $"; [color=#ff9070]{homeless} homeless[/color]" : ""));
         sb.AppendLine($"[b]Adults:[/b] {working} working, {standby} on standby (stock limits reached), {hauling} hauling, " +
-                      (idle > 0 ? $"[color=#ffb060]{idle} idle[/color]" : "0 idle") +
+                      OddJobLine(s, idle) +
                       (sick > 0 ? $", [color=#ff9070]{sick} sick[/color]" : ""));
         var season = SeasonSystem.Current(World);
         int coldHomes = s.Buildings.Count(b => b.Cold);
@@ -211,6 +211,17 @@ public partial class LedgerPanel : PanelContainer
         foreach (var (label, (people, mood)) in complaints.OrderBy(kv => kv.Value.Mood).ThenBy(kv => kv.Key, StringComparer.Ordinal).Take(8))
             sb.AppendLine($"  {label}: {people} people (costs the town {-mood / Math.Max(1, s.Citizens.Count):0.0#} mood on average)");
         _overview.Text = sb.ToString();
+    }
+
+    /// <summary>"12 doing odd jobs (4 building, 1 on roads, 7 gathering)", or idle when there's nothing to do.</summary>
+    private string OddJobLine(Settlement s, int free)
+    {
+        if (free == 0) return "0 idle";
+        if (!OddJobs.Available(World, s)) return $"[color=#ffb060]{free} idle[/color] (nothing to do)";
+        var crew = OddJobs.Allocate(World, s);
+        bool gathering = crew.Gatherers > 0 && OddJobs.RoomForGathering(s) > 0 && OddJobs.GatherTasks(World, s).Count > 0;
+        return $"{free} doing odd jobs ({crew.AtSites} building, {crew.Roads} on roads, " +
+               (gathering ? $"{crew.Gatherers} gathering)" : $"[color=#ffb060]{crew.Gatherers} with nothing to gather[/color])");
     }
 
     // ---------- goods ----------
@@ -274,7 +285,8 @@ public partial class LedgerPanel : PanelContainer
     private static readonly Color TradedColor = new(0.55f, 0.75f, 1f);
     private static readonly Color StockColor = new(1f, 0.85f, 0.45f);
 
-    private static bool IsMade(string k) => LedgerKeys.Category(k) is LedgerKeys.Made or LedgerKeys.Taxes or LedgerKeys.Refunds;
+    private static bool IsMade(string k) => LedgerKeys.Category(k) is LedgerKeys.Made or LedgerKeys.Taxes or LedgerKeys.Refunds
+        or LedgerKeys.Gathered;
     private static bool IsUsed(string k) => LedgerKeys.Category(k) is LedgerKeys.Inputs or LedgerKeys.Eaten or LedgerKeys.Used
         or LedgerKeys.Building or LedgerKeys.Upkeep or LedgerKeys.Disaster or LedgerKeys.Heating or LedgerKeys.Spoiled;
     private static bool IsTraded(string k) => LedgerKeys.Category(k) is LedgerKeys.TradeIn or LedgerKeys.TradeOut or LedgerKeys.Offers;
@@ -329,6 +341,7 @@ public partial class LedgerPanel : PanelContainer
             LedgerKeys.Disaster => "Lost to disaster",
             LedgerKeys.Heating => "Firewood for homes",
             LedgerKeys.Spoiled => "Rotted (outside granaries)",
+            LedgerKeys.Gathered => "Gathered by odd-jobbers",
             _ => parts[0],
         };
         return parts.Length > 1 ? $"{what}: {parts[1]}" : what;
@@ -391,6 +404,16 @@ public partial class LedgerPanel : PanelContainer
             Cell(_work, $"{workers}/{slots}", workers < slots ? new Color(1f, 0.75f, 0.5f) : null);
             Cell(_work, standby > 0 ? standby.ToString() : "-");
             Cell(_work, problems.Length > 0 ? problems : "-", left: true);
+        }
+
+        // People without a job, and what they're doing about it.
+        var crew = OddJobs.Allocate(World, Town);
+        if (crew.People > 0)
+        {
+            Cell(_work, "Odd jobs", left: true);
+            Cell(_work, crew.People.ToString());
+            Cell(_work, "-");
+            Cell(_work, $"{crew.AtSites} building, {crew.Roads} on roads, {crew.Gatherers} gathering", left: true);
         }
     }
 }

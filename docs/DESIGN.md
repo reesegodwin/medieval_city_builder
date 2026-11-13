@@ -242,6 +242,28 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - Mutton is eaten as fast as it's made (80–97 a day).
   - Food now takes fewer workers, so towns build fewer farms (seed 42: 61 instead of 79) and bakeries. Late in the run about 55–70 adults are idle on two seeds; before, that spare labour sat "on standby" at farms that had hit their stock limit. Mood is about the same (87–91).
 
+## Odd jobs (`Systems/OddJobs.cs`, `oddjobs.json`)
+- Adults who can work but have no job do odd jobs instead of sitting idle.
+- **Allocation:** worked out from the citizens and buildings as they are, in list order, so nothing is saved and every client agrees:
+  1. **Building sites:** helpers up to each site's free builder slots.
+  2. **Roads:** one helper per 10 planned tiles, up to 6, while the town centre stands.
+  3. **Gathering:** everyone else.
+- **Helpers** add half an average worker's labour each, with no skill gain.
+- **Gatherers** are dealt round-robin over the goods still below their limit, booked as `gathered`:
+  - berries: 2 a day, not in winter;
+  - firewood: 2.5 a day;
+  - stones: 2 a day.
+- **Berries** are a new food: nutrition 0.5, meal mood +1, rotting at 4% a day.
+- **Free storage:** gatherers always leave a fifth of storage free, between 60 and 500. A first version filled a small town's only stockpile with stones; the farms couldn't store grain and the town starved.
+- **Mood:** odd jobs are neutral (0), between "Idle" (−3, only when there is truly nothing to do) and "Has work" (+3).
+- **Treasury fixes found while testing:**
+  - Home upgrades that cost coin (townhouses, 20 each) now leave 20 days of upkeep, at least 100 coin, in the treasury.
+  - The governor builds no more services with upkeep while upkeep is unpaid. Halved service capacity had looked like missing coverage, so it kept adding taverns, markets and breweries, which added more upkeep. Odd-jobbers made building faster and exposed this spiral: one seed ended with 13 coin.
+- **Result over 720 days:**
+  - Populations end at 796/830/771 and treasuries at 8,770 / 8,822 / 6,303.
+  - Idle adults are near 0. When people are free (e.g. 41 on seed 7 at day 500) they gather berries, firewood and stones.
+  - Late in the game, storage is often full, which limits what can be gathered.
+
 ## Disasters (`Systems/DisasterSystem.cs`, `disasters.json`)
 - **Mild:** nothing is lost for good except some goods in a burning stockpile. Each settlement can switch disasters off in the Rules panel (`SetDisastersCommand`). The setting is on by default and saved (save v11).
 - **Fire:** each working building has a 0.01% daily chance, halved within reach of a well. A burning building drops back to half-built: builders repair it with labour only, its workers and residents leave, and its work in progress is lost. A stockpile fire burns a quarter of its share of the stored goods (booked as `disaster:fire`). The town centre never burns.

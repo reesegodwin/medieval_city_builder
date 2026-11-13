@@ -47,6 +47,7 @@ public sealed class SettlementRules
         ["vegetables"] = 200,
         ["fish"] = 200,
         ["mutton"] = 150,
+        ["berries"] = 100,
         ["ale"] = 150,
         ["wood"] = 250,
         ["firewood"] = 200,
@@ -67,6 +68,7 @@ public sealed class SettlementRules
         ["vegetables"] = 6,
         ["fish"] = 5,
         ["mutton"] = 4,
+        ["berries"] = 1,
         ["ale"] = 1,
         ["firewood"] = 6, // a winter's heating
     };
