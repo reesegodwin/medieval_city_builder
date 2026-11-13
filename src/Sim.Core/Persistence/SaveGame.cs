@@ -168,6 +168,7 @@ public static class SaveGame
         PoorHouseholds = s.PoorHouseholds,
         CrimeDays = s.CrimeDays,
         Crimes = s.Crimes,
+        SiegesSuffered = s.SiegesSuffered,
         UpkeepOwed = s.UpkeepOwed,
         UpkeepUnpaid = s.UpkeepUnpaid,
         ShortageWarnings = s.ShortageWarnings.ToList(),
@@ -339,6 +340,7 @@ public static class SaveGame
         s.PoorHouseholds = save.PoorHouseholds;
         s.CrimeDays = save.CrimeDays;
         s.Crimes = save.Crimes;
+        s.SiegesSuffered = save.SiegesSuffered;
         s.UpkeepOwed = save.UpkeepOwed;
         s.UpkeepUnpaid = save.UpkeepUnpaid;
         foreach (string warning in save.ShortageWarnings ?? new()) s.ShortageWarnings.Add(warning);
@@ -427,6 +429,7 @@ public static class SaveGame
         public int PoorHouseholds { get; set; }
         public int CrimeDays { get; set; }
         public int Crimes { get; set; }
+        public int SiegesSuffered { get; set; }
         public double UpkeepOwed { get; set; }
         public bool UpkeepUnpaid { get; set; }
         public List<string>? ShortageWarnings { get; set; }

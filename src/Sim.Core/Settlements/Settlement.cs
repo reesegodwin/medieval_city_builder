@@ -332,6 +332,9 @@ public sealed class Settlement
     public int CrimeDays { get; set; }
     public int Crimes { get; set; }
 
+    /// <summary>Sieges laid to the town so far (a governed town strengthens its walls after one).</summary>
+    public int SiegesSuffered { get; set; }
+
     /// <summary>Upkeep owed but not yet paid (fractions, or what the treasury couldn't cover).</summary>
     public double UpkeepOwed { get; set; }
 

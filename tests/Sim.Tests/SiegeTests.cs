@@ -263,6 +263,36 @@ public class SiegeTests
         Assert.True(town.Stock.Get("coin") < coin);
     }
 
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(1, 1)]
+    public void BesiegedTownsBuildStoneWallsSooner(int sieges, int expectedTier)
+    {
+        var (world, town, _) = Scenario.NewTown();
+        town.Rules.Disasters = false;
+        town.Rules.AutoBuild = true;
+        Grow(world, town, Sim.Core.AI.SettlementGovernor.WallPopulation[0] - town.Citizens.Count + 10); // palisade-sized
+        town.SiegesSuffered = sieges;
+        foreach (string r in new[] { "wood", "stone" }) town.Stock.Add(r, town.LimitOf(r));
+        for (int day = 0; day < 5 && town.WallPlans.Count == 0; day++)
+        {
+            Sim.Core.Commands.Roads.FinishAllPlans(world, town);
+            Sim.Core.AI.SettlementGovernor.Daily(world, town);
+        }
+        Assert.NotEmpty(town.WallPlans);
+        Assert.All(town.WallPlans, p => Assert.Equal(expectedTier, p.Tier));
+    }
+
+    [Fact]
+    public void LayingSiegeCountsAgainstTheTown()
+    {
+        var (world, town, _) = WalledTown();
+        Siege.Begin(world, town, BandAtTheWalls(world, town, 30));
+        Assert.Equal(1, town.SiegesSuffered);
+        var loaded = SaveGame.FromJson(SaveGame.ToJson(world));
+        Assert.Equal(1, loaded.Settlements[0].SiegesSuffered);
+    }
+
     [Fact]
     public void SiegesSurviveSaveAndLoad()
     {

@@ -126,6 +126,7 @@ public static class Siege
     {
         band.Siege = true;
         band.SiegeDays = 0;
+        s.SiegesSuffered++;
         world.Log(EventKind.Battle, s, $"Siege: {Raids.Describe(s, band)} dug in before the walls and began building siege engines. " +
                                       "Sally out or pay them off, or hold out (K)");
     }
