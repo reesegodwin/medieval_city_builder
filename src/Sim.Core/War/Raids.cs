@@ -191,11 +191,15 @@ public static class Raids
         int adults = s.Citizens.Count(c => c.IsAdult);
         double share = s.Rules.MusterPercent / 100.0 * (level == Alert.CallToArms ? 2 : 1);
         int wanted = (int)Math.Round(adults * Math.Min(0.8, share)) - Armies.Soldiers(s);
-        while (wanted > 0)
+        // Those who can afford it take up the best gear in store; the rest come as militia.
+        foreach (string unit in new[] { "men_at_arms", "spearmen", "archers", "militia" })
         {
-            var (squad, _) = Armies.Raise(world, s, "militia", Math.Min(MusterSquadSize, wanted), levy: true);
-            if (squad == null) break;
-            wanted -= squad.SoldierIds.Count;
+            while (wanted > 0)
+            {
+                var (squad, _) = Armies.Raise(world, s, unit, Math.Min(MusterSquadSize, wanted), levy: true);
+                if (squad == null) break;
+                wanted -= squad.SoldierIds.Count;
+            }
         }
     }
 

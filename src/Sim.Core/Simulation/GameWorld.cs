@@ -80,7 +80,8 @@ public sealed class GameWorld
                 .Add(s.TaxAccrued).Add(s.UpkeepOwed).Add(s.UpkeepUnpaid)
                 .Add(s.Ledger.History.Count).Add(s.Ledger.Today.Flows.Sum(f => f.Value.Values.Sum()))
                 .Add(s.Rules.Disasters).Add(s.PoorHarvestDays).Add(s.HeatingOwed)
-                .Add(s.Rules.Raids).Add(s.Rules.MusterPercent).Add((int)s.Alert).Add(s.QuietDays);
+                .Add(s.Rules.Raids).Add(s.Rules.MusterPercent).Add((int)s.Alert).Add(s.QuietDays)
+                .Add(s.Rules.Government).Add(s.SalesAccrued).Add(s.ReliefHouseholds).Add(s.PoorHouseholds);
             foreach (string warning in s.ShortageWarnings) h.Add(warning);
             foreach (var (food, owed) in s.SpoilageOwed) h.Add(food).Add(owed);
             foreach (var plan in s.RoadPlans) h.Add(plan.X).Add(plan.Y).Add(plan.Progress).Add(plan.Tier);
@@ -111,7 +112,7 @@ public sealed class GameWorld
             }
             foreach (var c in s.Citizens)
             {
-                h.Add(c.Id).Add(c.AgeDays).Add(c.Satiation).Add(c.Mood).Add(c.SickDays).Add(c.SquadId ?? 0)
+                h.Add(c.Id).Add(c.AgeDays).Add(c.Satiation).Add(c.Mood).Add(c.SickDays).Add(c.SquadId ?? 0).Add(c.Coin)
                     .Add(c.JobBuildingId ?? 0).Add(c.HomeBuildingId ?? 0).Add(c.SpouseId ?? 0);
                 foreach (var (kind, skill) in c.Skills) h.Add(kind).Add(skill);
             }

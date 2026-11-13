@@ -161,6 +161,7 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
 - Governed towns with stone to spare (75% of the limit or more, keeping half) resurface roads within 12 tiles of stockpiles, 25 tiles at a time: gravel, or stone from 300 people. By day 720 that's 450–570 stone tiles.
 
 ## Treasury and coin sinks
+(Taxes are now income tax on wages; see "Household economy".)
 - **Income:** class taxes (see Housing tiers and classes), plus trade.
 - **Upkeep** (`upkeep` in `buildings.json`, coin per day): markets 0.4, taverns and chapels 0.3, workshops 0.3–0.5, mine 0.5, Trading Post 1, Town Hall 2, Castle 4. If the treasury can't pay, buildings with upkeep run at `unpaidOutput` (half) until it can. Debt never exceeds a day's upkeep.
 - **Coin costs:** Town Hall 150, Castle 600, Smithy and Carpenter 15 each (taken like any construction material). Basic services cost no coin, so early towns aren't starved of them.
@@ -453,6 +454,57 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - builds another service building where a home's *nearby* providers are full, not only when every one in town is full;
   - keeps about 1.25 breweries per tavern while ale is under half its limit;
   - sells food beyond 1.5 winter reserves in any season (1.25 in autumn).
+
+## Household economy (`Economy/Households.cs`, `households.json`)
+- **Wages.** Every working adult earns coin each day, set by their job's tier and their skill at it.
+  - Tiers: labourers 0.12, skilled trades such as bakers, brewers and weavers 0.18, masters such as carpenters, weaponsmiths and armourers 0.26.
+  - Skill moves pay ±20%. Idle (standby) workplaces pay half.
+  - Adults without a job earn a little from odd jobs. Soldiers get pay by their gear tier, and the general gets a salary.
+- **Who pays wages:**
+  - Producing work is paid in new coin, which stands for the value made.
+  - The treasury pays city jobs (builders, haulers, roadworkers) and the army as upkeep. So construction costs coin through its builders' wages, on top of materials.
+- **Income tax** is the government's share of wages. It replaces the old flat tax per class; soldiers pay none.
+- **Families buy what they use.** Every day each home pays from its adults' purses, in order:
+  1. food (per person; children half);
+  2. warmth (per home, in winter);
+  3. then the services and goods its people used: faith, market, clothing, the tavern, furniture.
+
+  What a family can't afford, it goes without. That need counts as unmet: mood falls and homes slip back. The exception is anything the government gives to the poor for free. Spending goes to the treasury.
+- **Classes come from income.** Skilled and master households afford the tavern and clothes and rise to townhouses. Labourers get by in cottages.
+- **Unemployment** is the player's problem to solve: jobless adults only earn odd-job pennies.
+- **Savings and inheritance:**
+  - Savings pile up in well-off homes.
+  - When someone dies or leaves, their savings go to their spouse, else to another adult at home, else to the town.
+  - New adults (settlers, newcomers) bring 4 coin.
+- **Gear by what families can afford.** A recruit takes up a unit's gear only if their family has saved 40% of the gear's value. That is 3.2 coin for spearmen and 8.8 for men-at-arms, so a prosperous town fields better soldiers. At a muster, those who can afford it take up the best gear in store (men-at-arms, then spearmen, then archers), and the rest come as militia.
+- **Governments** (per town, `SetGovernmentCommand`, in the Rules panel):
+
+  | Government | Tax on wages | Pay | Prices | Free for the poor |
+  |---|---|---|---|---|
+  | **Free Traders** (default) | 10% | by skill | normal | food only |
+  | **Common Weal** | 25% | partly evened out | normal | food, warmth, water, faith and market |
+  | **Commune** | 50% | the same for everyone | ×0.75 | the same as Common Weal |
+  | **Iron Rule** | 20% | by skill | normal | food |
+
+  Under Iron Rule, soldiers also get 1.5× pay.
+- **Performance:**
+  - Payday is one pass over citizens and spending one pass over homes, once per game day. That's O(people), with no per-tick or per-frame work.
+  - A test holds 5,000 citizens under 25 ms per game day. Real runs are far below that; a game day lasts at least 20 real seconds even on the fastest worlds.
+- **Balance (720 days, Free Traders):**
+
+  | Seed | Townhouses | Treasury |
+  |---|---|---|
+  | 42 | 43 | 1,236 |
+  | 7 | 70 | 7,610 |
+  | 1234 | 53 | 1,987 |
+
+  Burgher homes hold about 50 coin and craftsman homes 2–12. About 20 homes go without something, mostly ale.
+- **Later:**
+  - shops owned by families (profits instead of minted wages);
+  - prices that follow supply;
+  - families paying for their own home upgrades;
+  - per-government moods and laws;
+  - migration drawn to high wages.
 
 ## Battles: individual units + destructible structures (hybrid LOD simulation)
 

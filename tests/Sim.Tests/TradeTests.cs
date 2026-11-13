@@ -1,3 +1,4 @@
+using Sim.Core.Economy;
 using Sim.Core.AI;
 using Sim.Core.Commands;
 using Sim.Core.Events;
@@ -116,7 +117,8 @@ public class TradeTests
 
         sim.RunTicks(TimeScale.TicksPerHour * 2);
         Assert.Equal(10, b.Stock.Get("cloth"));
-        Assert.True(a.Stock.Get("coin") >= aCoin + 30 - 5); // coin arrived (a little may have been spent on nothing)
+        // The coin arrived (the treasury's other flows, such as upkeep and households' spending, are booked apart).
+        Assert.Equal(30, a.Ledger.History.Append(a.Ledger.Today).Sum(d => d.Get("coin", LedgerKeys.TradeIn)), 3);
     }
 
     [Fact]

@@ -70,6 +70,9 @@ public sealed class Citizen
     /// <summary>The squad this citizen serves in, if called up. Soldiers don't work.</summary>
     public int? SquadId { get; set; }
 
+    /// <summary>Savings: wages in, what the family buys out (see <see cref="Economy.HouseholdSystem"/>).</summary>
+    public double Coin { get; set; }
+
     /// <summary>Notable life events, for the inspection panel and faction chronicle.</summary>
     public List<string> History { get; } = new();
 

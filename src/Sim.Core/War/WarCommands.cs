@@ -48,8 +48,20 @@ public static class Armies
         var unit = world.Data.War.Unit(unitId);
         if (unit == null) return (null, "Unknown kind of soldier");
         if (size <= 0) return (null, "A squad needs soldiers");
-        var people = Recruitable(s).Take(size).ToList();
-        if (people.Count == 0) return (null, "Nobody free to serve");
+        // Gear goes to those whose families can afford to keep it up: a rich town fields better soldiers.
+        double price = Economy.HouseholdSystem.GearPrice(world, unit);
+        var candidates = Recruitable(s);
+        bool anyone = candidates.Count > 0;
+        if (price > 0) candidates = candidates.Where(c => Economy.HouseholdSystem.FamilyPurse(s, c) >= price).ToList();
+        // A levy takes up only the gear there is.
+        if (levy)
+            foreach (var (r, n) in unit.Gear)
+                size = Math.Min(size, s.Stock.Get(r) / n);
+        var people = candidates.Take(size).ToList();
+        if (people.Count == 0)
+            return (null, !anyone ? "Nobody free to serve"
+                : price > 0 && candidates.Count == 0 ? $"No family can afford {unit.Name.ToLowerInvariant()}'s gear (needs {price:0.#} coin saved)"
+                : $"Needs {string.Join(", ", unit.Gear.Select(kv => $"{kv.Value} {kv.Key}"))} per soldier");
         size = people.Count;
         var gear = unit.Gear.ToDictionary(kv => kv.Key, kv => kv.Value * size);
         if (!s.Stock.TryTakeAll(gear))
@@ -94,9 +106,14 @@ public static class Armies
         if (s.General?.CitizenId == c.Id) s.General = null;
     }
 
-    /// <summary>Coin per day for the army.</summary>
-    public static double DailyUpkeep(GameWorld world, Settlement s) =>
-        s.Squads.Sum(q => (world.Data.War.Unit(q.UnitId)?.UpkeepPerSoldierDay ?? 0) * q.SoldierIds.Count);
+    /// <summary>Coin per day for the army: soldiers' and the general's pay.</summary>
+    public static double DailyUpkeep(GameWorld world, Settlement s)
+    {
+        double factor = world.Data.Households.Government(s.Rules.Government).SoldierPay;
+        double pay = s.Squads.Sum(q => (world.Data.War.Unit(q.UnitId)?.PayPerSoldierDay ?? 0) * q.SoldierIds.Count);
+        if (s.General != null) pay += world.Data.Households.GeneralPay;
+        return pay * factor;
+    }
 }
 
 /// <summary>Raises a squad of a kind of soldier (needs a barracks with room, people, and their gear).</summary>

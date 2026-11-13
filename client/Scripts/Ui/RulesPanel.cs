@@ -48,6 +48,25 @@ public partial class RulesPanel : PanelContainer
         var town = _session.PlayerTown;
         var world = _session.World;
 
+        Section(body, "Government", "How the town is run: what is taxed, how pay is spread and what the poor get for free. " +
+                                    "Families earn wages and buy what they use; a richer town has more burghers and better-armed soldiers.");
+        var govs = world.Data.Households.Governments;
+        var picker = new OptionButton { FocusMode = FocusModeEnum.None };
+        foreach (var g in govs) picker.AddItem(g.Name);
+        picker.Selected = Math.Max(0, govs.FindIndex(g => g.Id == town.Rules.Government));
+        var govNote = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, CustomMinimumSize = new Vector2(340, 0) };
+        govNote.AddThemeFontSizeOverride("font_size", 12);
+        void Describe(Sim.Core.Economy.GovernmentDef g) =>
+            govNote.Text = $"{g.Description}\nTax {g.TaxRate:P0} of wages; free for the poor: {string.Join(", ", g.Relief)}.";
+        Describe(govs[picker.Selected]);
+        picker.ItemSelected += index =>
+        {
+            var g = govs[(int)index];
+            if (_session.Execute(new Sim.Core.Economy.SetGovernmentCommand(town.Id, g.Id)).Ok) Describe(g);
+        };
+        body.AddChild(picker);
+        body.AddChild(govNote);
+
         Section(body, "Job priorities", "Higher numbers are filled first. Builders, and food during shortages, get extra priority.");
         var jobKinds = town.Rules.JobPriority.Keys
             .Union(world.Data.Buildings.Values.Select(b => b.JobKind).OfType<string>())
