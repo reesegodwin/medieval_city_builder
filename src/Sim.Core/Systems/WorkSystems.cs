@@ -167,6 +167,7 @@ public static class ConstructionSystem
     {
         double tools = Tools.Multiplier(world, settlement);
         int workersThisTick = 0;
+        var oddJobs = OddJobs.Allocate(world, settlement); // people without a job lend a hand
         foreach (var b in settlement.Buildings)
         {
             if (b.State == BuildingState.AwaitingMaterials)
@@ -186,9 +187,11 @@ public static class ConstructionSystem
 
             if (b.State != BuildingState.UnderConstruction) continue;
 
-            b.ConstructionProgress += Work.LabourThisTick(settlement, b, JobKinds.Builder) * tools * Logistics.EffectiveHaulFactor(settlement, b);
+            int helpers = oddJobs.HelpersAt(b);
+            b.ConstructionProgress += (Work.LabourThisTick(settlement, b, JobKinds.Builder) + OddJobs.HelperLabourThisTick(world, helpers)) *
+                                      tools * Logistics.EffectiveHaulFactor(settlement, b);
             workersThisTick += b.WorkerIds.Count;
-            b.Problem = b.WorkerIds.Count == 0 ? "No builders" : b.NoRoute ? Logistics.NoRouteProblem : null;
+            b.Problem = b.WorkerIds.Count + helpers == 0 ? "No builders" : b.NoRoute ? Logistics.NoRouteProblem : null;
 
             if (b.ConstructionProgress >= b.Def.BuildDays)
             {
@@ -499,7 +502,8 @@ public static class RoadSystem
         }
         if (!crew.IsOperational || crew.CurrentJobKind != JobKinds.Roadworker) return; // being upgraded
 
-        double labour = Work.LabourThisTick(settlement, crew, JobKinds.Roadworker) * Tools.Multiplier(world, settlement);
+        double labour = (Work.LabourThisTick(settlement, crew, JobKinds.Roadworker) +
+                         OddJobs.HelperLabourThisTick(world, OddJobs.Allocate(world, settlement).Roads)) * Tools.Multiplier(world, settlement);
         bool built = false;
         while (labour > 1e-12 && settlement.RoadPlans.Count > 0)
         {

@@ -127,7 +127,7 @@ internal static class Report
         Console.WriteLine(
             $"{world.Time,-20} Pop {s.Citizens.Count,3} ({adults} adults) | " +
             $"grain {s.Stock.Get("grain"),4} bread {s.Stock.Get("bread"),4} ({Needs.FoodDays(world, s),5:0.0}d) | " +
-            $"wood {s.Stock.Get("wood"),4} stone {s.Stock.Get("stone"),4} | cold homes {s.Buildings.Count(b => b.Cold)} sick {s.Citizens.Count(c => c.IsSick)} | mood {mood,3:0} | idle {idle} haulers {haulers} ({s.HaulCoverage:P0}) homeless {homeless} | " +
+            $"wood {s.Stock.Get("wood"),4} stone {s.Stock.Get("stone"),4} | coin {s.Stock.Get("coin")} | cold homes {s.Buildings.Count(b => b.Cold)} sick {s.Citizens.Count(c => c.IsSick)} | mood {mood,3:0} | odd jobs {idle} haulers {haulers} ({s.HaulCoverage:P0}) homeless {homeless} | " +
             string.Join(" ", world.Data.Needs.Select(n => $"{n.Id} {ServiceSystem.Coverage(s, n.Id):P0}")));
     }
 
@@ -156,6 +156,11 @@ internal static class Report
         double spoiled = world.Data.FoodsByPreference.Sum(f => -s.Ledger.History.Sum(d => d.Get(f.Id, Sim.Core.Economy.LedgerKeys.Spoiled)));
         Console.WriteLine($"Food: {SeasonSystem.FoodStock(world, s)} stored, granaries keep {s.FoodStoreCapacity} from rot; " +
                           $"{spoiled:0} rotted in the last {s.Ledger.History.Count} days. Firewood {s.Stock.Get("firewood")}.");
+        var odd = OddJobs.Allocate(world, s);
+        string gathered = string.Join(", ", world.Data.OddJobs.Gather.Select(g =>
+            $"{s.Ledger.History.Sum(d => d.Get(g.Resource, Sim.Core.Economy.LedgerKeys.Gathered)):0} {g.Resource}"));
+        Console.WriteLine($"Odd jobs: {odd.People} people ({odd.AtSites} building, {odd.Roads} on roads, {odd.Gatherers} gathering); " +
+                          $"gathered in the last {s.Ledger.History.Count} days: {gathered}.");
         var mine = world.Events.Where(e => e.SettlementId == s.Id).ToList();
         int Count(string text) => mine.Count(e => e.Kind == Sim.Core.Events.EventKind.Disaster && e.Message.StartsWith(text));
         Console.WriteLine($"Disasters: {Count("Fire")} fires, {Count("Sickness")} outbreaks of sickness, {Count("A poor harvest")} poor harvests. " +

@@ -20,6 +20,13 @@ public static class HomeSystem
     public const int WoodReserve = 40;
     public const int StoneReserve = 20;
 
+    /// <summary>
+    /// Upgrades also leave this many days of upkeep in the treasury (at least <see cref="MinCoinReserve"/>):
+    /// spending it on townhouses once left upkeep unpaid, which halved what taverns and markets could serve.
+    /// </summary>
+    public const int UpkeepDaysReserve = 20;
+    public const int MinCoinReserve = 100;
+
     /// <summary>Whether every resident has all these needs covered (and there is at least one).</summary>
     public static bool NeedsMet(Settlement s, Building home, IReadOnlyList<string> needs)
     {
@@ -76,7 +83,10 @@ public static class HomeSystem
     private static bool CanAfford(Settlement s, IReadOnlyDictionary<string, int> cost) =>
         s.Stock.Has(cost) &&
         s.Stock.Get("wood") - cost.GetValueOrDefault("wood") >= WoodReserve &&
-        s.Stock.Get("stone") - cost.GetValueOrDefault("stone") >= StoneReserve;
+        s.Stock.Get("stone") - cost.GetValueOrDefault("stone") >= StoneReserve &&
+        (!cost.ContainsKey(Economy.Inventory.Coin) ||
+         s.Stock.Get(Economy.Inventory.Coin) - cost[Economy.Inventory.Coin] >=
+         Math.Max(MinCoinReserve, EconomySystem.DailyUpkeep(s) * UpkeepDaysReserve));
 
     /// <summary>Swaps the home's tier in place; people beyond a smaller home's room move out and find another.</summary>
     private static void Change(GameWorld world, Settlement s, Building home, BuildingDef to)
