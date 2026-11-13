@@ -127,7 +127,7 @@ internal static class Report
         Console.WriteLine(
             $"{world.Time,-20} Pop {s.Citizens.Count,3} ({adults} adults) | " +
             $"grain {s.Stock.Get("grain"),4} bread {s.Stock.Get("bread"),4} ({Needs.FoodDays(world, s),5:0.0}d) | " +
-            $"wood {s.Stock.Get("wood"),4} stone {s.Stock.Get("stone"),4} | mood {mood,3:0} | idle {idle} haulers {haulers} ({s.HaulCoverage:P0}) homeless {homeless} | " +
+            $"wood {s.Stock.Get("wood"),4} stone {s.Stock.Get("stone"),4} | cold homes {s.Buildings.Count(b => b.Cold)} sick {s.Citizens.Count(c => c.IsSick)} | mood {mood,3:0} | idle {idle} haulers {haulers} ({s.HaulCoverage:P0}) homeless {homeless} | " +
             string.Join(" ", world.Data.Needs.Select(n => $"{n.Id} {ServiceSystem.Coverage(s, n.Id):P0}")));
     }
 

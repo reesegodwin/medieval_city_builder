@@ -58,11 +58,13 @@ public sealed class SettlementRules
     /// <summary>Per-citizen stock targets; the effective limit is the larger of this and the flat limit.</summary>
     public SortedDictionary<string, int> PerCitizenLimits { get; } = new(StringComparer.Ordinal)
     {
-        ["grain"] = 3,
-        ["bread"] = 3,
-        ["vegetables"] = 2,
-        ["fish"] = 2,
+        // Room for a winter's reserve: farms yield little in winter (see seasons.json).
+        ["grain"] = 10,
+        ["bread"] = 10,
+        ["vegetables"] = 6,
+        ["fish"] = 5,
         ["ale"] = 1,
+        ["wood"] = 1, // firewood for winter
     };
 
     /// <summary>Below this stock a resource counts as scarce and its producers get extra job priority.</summary>
@@ -242,6 +244,9 @@ public sealed class Settlement
 
     /// <summary>Days left of a poor harvest (farms and gardens produce less).</summary>
     public int PoorHarvestDays { get; set; }
+
+    /// <summary>Firewood burned but not yet taken from stock (less than one unit).</summary>
+    public double HeatingOwed { get; set; }
 
     /// <summary>Household goods used but not yet amounting to a whole unit, per resource.</summary>
     public SortedDictionary<string, double> GoodsUse { get; } = new(StringComparer.Ordinal);

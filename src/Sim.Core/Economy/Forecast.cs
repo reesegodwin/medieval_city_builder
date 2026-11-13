@@ -13,6 +13,9 @@ public static class Forecast
     /// <summary>Days of history the rate is averaged over.</summary>
     public const int RateDays = 7;
 
+    /// <summary>Coin comes in lumps (merchants visit every 10 days), so its rate is averaged over longer.</summary>
+    public const int CoinRateDays = 14;
+
     /// <summary>Warn when a watched good will run out within this many days...</summary>
     public const double WarnDays = 10;
 
@@ -32,7 +35,7 @@ public static class Forecast
     public static double NetPerDay(GameWorld world, Settlement s, string resource) =>
         resource == Food
             ? world.Data.FoodsByPreference.Sum(f => s.Ledger.Average(f.Id, _ => true, RateDays) * f.Nutrition)
-            : s.Ledger.Average(resource, _ => true, RateDays);
+            : s.Ledger.Average(resource, _ => true, resource == Inventory.Coin ? CoinRateDays : RateDays);
 
     /// <summary>Days until a good runs out at the current rate; infinity when it isn't falling.</summary>
     public static double DaysLeft(GameWorld world, Settlement s, string resource)

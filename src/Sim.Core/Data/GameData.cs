@@ -275,11 +275,15 @@ public sealed class GameData
     /// <summary>Fires, sickness and poor harvests.</summary>
     public DisasterRules Disasters { get; }
 
+    /// <summary>What changes with the seasons (spring, summer, autumn, winter).</summary>
+    public SeasonRules Seasons { get; }
+
     public GameData(IEnumerable<ResourceDef> resources, IEnumerable<BuildingDef> buildings, IEnumerable<NeedDef>? needs = null,
         TradeRules? trade = null, IEnumerable<RoadTierDef>? roadTiers = null, IEnumerable<SocialClassDef>? classes = null,
-        DisasterRules? disasters = null)
+        DisasterRules? disasters = null, SeasonRules? seasons = null)
     {
         Disasters = disasters ?? new DisasterRules();
+        Seasons = seasons ?? new SeasonRules();
         Classes = classes?.ToList() ?? new List<SocialClassDef> { new() { Id = "peasant", Name = "Peasants", TaxPerAdultDay = 0.06 } };
         Trade = trade ?? new TradeRules();
         RoadTiers = roadTiers?.ToList() ?? new List<RoadTierDef> { new() { Id = "dirt", Name = "Dirt road" } };
@@ -313,7 +317,8 @@ public sealed class GameData
         var roads = LoadEmbedded<List<RoadTierDef>>("roads.json");
         var classes = LoadEmbedded<List<SocialClassDef>>("classes.json");
         var disasters = LoadEmbedded<DisasterRules>("disasters.json");
-        return new GameData(resources, buildings, needs, trade, roads, classes, disasters);
+        var seasons = LoadEmbedded<SeasonRules>("seasons.json");
+        return new GameData(resources, buildings, needs, trade, roads, classes, disasters, seasons);
     }
 
     private static T LoadEmbedded<T>(string fileName)
@@ -428,4 +433,38 @@ public sealed class DisasterRules
 
     /// <summary>Output of farms and gardens (buildings with a fertile bonus) during a poor harvest.</summary>
     public double PoorHarvestOutput { get; set; } = 0.7;
+}
+
+/// <summary>One season's effects (seasons.json).</summary>
+public sealed class SeasonDef
+{
+    public string Name { get; set; } = "";
+
+    /// <summary>Output multiplier by building id (e.g. farms grow little in winter). Unlisted buildings: 1.</summary>
+    public Dictionary<string, double> Output { get; set; } = new();
+
+    /// <summary>Firewood each occupied home burns per day.</summary>
+    public double HeatingWoodPerHomeDay { get; set; }
+
+    public double OutputOf(string buildingId) => Output.TryGetValue(buildingId, out double f) ? f : 1;
+}
+
+/// <summary>The seasons, in order from spring (seasons.json).</summary>
+public sealed class SeasonRules
+{
+    /// <summary>Spring, summer, autumn and winter. With none, nothing changes through the year.</summary>
+    public List<SeasonDef> Seasons { get; set; } = new();
+
+    /// <summary>Mood of people whose home has no firewood (or who have no home) while homes need heating.</summary>
+    public double ColdMood { get; set; } = -12;
+
+    /// <summary>Days of food the governor makes room for before winter.</summary>
+    public int WinterReserveDays { get; set; } = 30;
+
+    public SeasonDef Of(Time.Season season) =>
+        (int)season < Seasons.Count ? Seasons[(int)season] : new SeasonDef { Name = season.ToString() };
+
+    /// <summary>A building's output averaged over the year (for planning).</summary>
+    public double AverageOutputOf(string buildingId) =>
+        Seasons.Count == 0 ? 1 : Seasons.Average(s => s.OutputOf(buildingId));
 }

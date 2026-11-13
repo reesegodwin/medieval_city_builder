@@ -17,6 +17,7 @@ public enum EventKind
     Shortage,
     Trade,
     Disaster,
+    Season,
 }
 
 /// <summary>

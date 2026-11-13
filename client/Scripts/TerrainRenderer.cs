@@ -123,7 +123,7 @@ public partial class TerrainRenderer : Node3D
             }
         }
 
-        root.AddChild(new MeshInstance3D { Mesh = ground.Commit() });
+        root.AddChild(new MeshInstance3D { Mesh = ground.Commit(SeasonLook.Default) });
         if (!water.IsEmpty)
             root.AddChild(new MeshInstance3D { Mesh = water.Commit(Materials.Water), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
 

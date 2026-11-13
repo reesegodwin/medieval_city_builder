@@ -76,7 +76,7 @@ public sealed class GameWorld
             h.Add(s.Id).Add(s.Territory.Count).Add(s.TerritoryCap).Add(s.HaulCoverage).Add(s.Roads.Count)
                 .Add(s.TaxAccrued).Add(s.UpkeepOwed).Add(s.UpkeepUnpaid)
                 .Add(s.Ledger.History.Count).Add(s.Ledger.Today.Flows.Sum(f => f.Value.Values.Sum()))
-                .Add(s.Rules.Disasters).Add(s.PoorHarvestDays);
+                .Add(s.Rules.Disasters).Add(s.PoorHarvestDays).Add(s.HeatingOwed);
             foreach (string warning in s.ShortageWarnings) h.Add(warning);
             foreach (var plan in s.RoadPlans) h.Add(plan.X).Add(plan.Y).Add(plan.Progress).Add(plan.Tier);
             foreach (var (x, y) in s.Roads)
@@ -87,7 +87,7 @@ public sealed class GameWorld
             foreach (var b in s.Buildings)
             {
                 h.Add(b.Id).Add(b.Def.Id).Add((int)b.State).Add(b.ConstructionProgress).Add(b.CycleProgress)
-                    .Add(b.UpgradeReadyDays).Add(b.NeedsUnmetDays);
+                    .Add(b.UpgradeReadyDays).Add(b.NeedsUnmetDays).Add(b.Cold);
                 foreach (int w in b.WorkerIds) h.Add(w);
                 foreach (int r in b.ResidentIds) h.Add(r);
             }

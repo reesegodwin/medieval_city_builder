@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 11;
+    public const int CurrentVersion = 12;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -109,6 +109,7 @@ public static class SaveGame
             NeedsUnmetDays = b.NeedsUnmetDays,
             ServedCount = b.ServedCount,
             Problem = b.Problem,
+            Cold = b.Cold,
             WorkerIds = b.WorkerIds.ToList(),
             ResidentIds = b.ResidentIds.ToList(),
         }).ToList(),
@@ -149,6 +150,7 @@ public static class SaveGame
         UpkeepUnpaid = s.UpkeepUnpaid,
         ShortageWarnings = s.ShortageWarnings.ToList(),
         PoorHarvestDays = s.PoorHarvestDays,
+        HeatingOwed = s.HeatingOwed,
         ToolWear = new(s.ToolWear),
         GoodsUse = new(s.GoodsUse),
         FailedSiteSearches = new(s.FailedSiteSearches),
@@ -205,7 +207,9 @@ public static class SaveGame
         // Goods added since the save was made (e.g. fish) get the default limits.
         var defaults = new SettlementRules();
         foreach (var (k, v) in defaults.ProductionLimits) s.Rules.ProductionLimits.TryAdd(k, v);
-        foreach (var (k, v) in defaults.PerCitizenLimits) s.Rules.PerCitizenLimits.TryAdd(k, v);
+        // Per-citizen limits can't be edited; older saves get the larger winter reserves.
+        foreach (var (k, v) in defaults.PerCitizenLimits)
+            s.Rules.PerCitizenLimits[k] = Math.Max(v, s.Rules.PerCitizenLimits.GetValueOrDefault(k));
         foreach (var (k, v) in defaults.JobPriority) s.Rules.JobPriority.TryAdd(k, v);
 
         foreach (var b in save.Buildings)
@@ -223,6 +227,7 @@ public static class SaveGame
                 NeedsUnmetDays = b.NeedsUnmetDays,
                 ServedCount = b.ServedCount,
                 Problem = b.Problem,
+                Cold = b.Cold,
             };
             building.WorkerIds.AddRange(b.WorkerIds);
             building.ResidentIds.AddRange(b.ResidentIds);
@@ -279,6 +284,7 @@ public static class SaveGame
         s.UpkeepUnpaid = save.UpkeepUnpaid;
         foreach (string warning in save.ShortageWarnings ?? new()) s.ShortageWarnings.Add(warning);
         s.PoorHarvestDays = save.PoorHarvestDays;
+        s.HeatingOwed = save.HeatingOwed; // version 11 and older had no heating
         // Version 3 and older had no tools or household goods; both start with nothing carried over.
         CopyInto(save.ToolWear, s.ToolWear);
         CopyInto(save.GoodsUse, s.GoodsUse);
@@ -351,6 +357,7 @@ public static class SaveGame
         public bool UpkeepUnpaid { get; set; }
         public List<string>? ShortageWarnings { get; set; }
         public int PoorHarvestDays { get; set; }
+        public double HeatingOwed { get; set; }
         public SortedDictionary<string, double> ToolWear { get; set; } = new(StringComparer.Ordinal);
         public SortedDictionary<string, double> GoodsUse { get; set; } = new(StringComparer.Ordinal);
         public Dictionary<string, long> FailedSiteSearches { get; set; } = new();
@@ -386,6 +393,7 @@ public static class SaveGame
         public int NeedsUnmetDays { get; set; }
         public int ServedCount { get; set; }
         public string? Problem { get; set; }
+        public bool Cold { get; set; }
         public List<int> WorkerIds { get; set; } = new();
         public List<int> ResidentIds { get; set; } = new();
     }

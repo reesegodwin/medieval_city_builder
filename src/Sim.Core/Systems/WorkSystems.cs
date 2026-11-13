@@ -537,7 +537,8 @@ public static class EconomySystem
     /// <summary>Output factor for a building, given the state of the treasury.</summary>
     public static double OutputFactor(GameWorld world, Settlement s, Building b) =>
         (s.UpkeepUnpaid && b.Def.Upkeep > 0 ? world.Data.Trade.UnpaidOutput : 1) *
-        (s.PoorHarvestDays > 0 && b.Def.FertileBonus > 0 ? world.Data.Disasters.PoorHarvestOutput : 1);
+        (s.PoorHarvestDays > 0 && b.Def.FertileBonus > 0 ? world.Data.Disasters.PoorHarvestOutput : 1) *
+        SeasonSystem.Current(world).OutputOf(b.Def.Id);
 
     /// <summary>Books the taxes collected, split by class in proportion to what each class owes.</summary>
     private static void RecordTaxes(GameWorld world, Settlement s, int collected)

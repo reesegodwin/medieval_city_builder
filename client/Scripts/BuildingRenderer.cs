@@ -18,12 +18,12 @@ public partial class BuildingRenderer : Node3D
         public Sim.Core.Data.BuildingDef? ShownDef;
     }
 
-    private static readonly StandardMaterial3D[] Tints =
+    private static readonly ShaderMaterial[] Tints =
     {
-        Materials.Tinted(new Color(1f, 1f, 1f)),
-        Materials.Tinted(new Color(0.94f, 0.92f, 0.88f)),
-        Materials.Tinted(new Color(1f, 0.97f, 0.9f)),
-        Materials.Tinted(new Color(0.9f, 0.9f, 0.92f)),
+        SeasonLook.Make(new Color(1f, 1f, 1f)),
+        SeasonLook.Make(new Color(0.94f, 0.92f, 0.88f)),
+        SeasonLook.Make(new Color(1f, 0.97f, 0.9f)),
+        SeasonLook.Make(new Color(0.9f, 0.9f, 0.92f)),
     };
 
     private readonly Dictionary<int, View> _views = new();
