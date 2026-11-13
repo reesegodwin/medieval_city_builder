@@ -262,8 +262,13 @@ public static class ProductionSystem
                 continue;
             }
 
+            // A workplace with several products (a pasture's wool and mutton) makes only those still below their
+            // limit, so one full store doesn't stop the others or overflow.
+            bool several = recipe.Outputs.Count > 1;
+            bool Wanted(string resource) => !several || settlement.Stock.Get(resource) < settlement.LimitOf(resource);
             int total = 0;
-            foreach (int amount in recipe.Outputs.Values) total += (int)Math.Round(amount * b.TerrainMultiplier);
+            foreach (var (resource, amount) in recipe.Outputs)
+                if (Wanted(resource)) total += (int)Math.Round(amount * b.TerrainMultiplier);
             if (total > freeStorage)
             {
                 b.Problem = "Storage full";
@@ -272,6 +277,7 @@ public static class ProductionSystem
 
             foreach (var (resource, amount) in recipe.Outputs)
             {
+                if (!Wanted(resource)) continue;
                 int made = (int)Math.Round(amount * b.TerrainMultiplier);
                 settlement.Stock.Add(resource, made);
                 settlement.Ledger.Record(resource, made, Economy.LedgerKeys.Made);

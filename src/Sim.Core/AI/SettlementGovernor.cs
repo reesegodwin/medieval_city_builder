@@ -239,6 +239,10 @@ public static class SettlementGovernor
     /// <summary>Towns this size and up store food in granaries rather than more stockpiles.</summary>
     public const int GranaryPopulation = 60;
 
+    /// <summary>Towns this size and up keep sheep for mutton, one pasture per <see cref="PeoplePerPasture"/> people.</summary>
+    public const int PasturePopulation = 40;
+    public const int PeoplePerPasture = 70;
+
     /// <summary>Towns this size and up gather firewood (the first winter comes at day 271).</summary>
     public const int FirewoodPopulation = 15;
 
@@ -446,6 +450,8 @@ public static class SettlementGovernor
         supply += gardenCycles * (garden?.Outputs.GetValueOrDefault("vegetables") ?? 0) * Nutrition("vegetables");
         double fishingCycles = Rate("fishing_hut", out var fishing);
         supply += fishingCycles * (fishing?.Outputs.GetValueOrDefault("fish") ?? 0) * Nutrition("fish");
+        double pastureCycles = Rate("pasture", out var pasture);
+        supply += pastureCycles * (pasture?.Outputs.GetValueOrDefault("mutton") ?? 0) * Nutrition("mutton");
         return supply;
     }
 
@@ -560,6 +566,10 @@ public static class SettlementGovernor
         // Services and variety as the town grows.
         if (farms >= 2 && s.CountIncludingPlanned("garden") < 1 + population / 40 && !Understaffed("garden"))
             Wish("garden");
+        // Pastures for mutton (and wool) once the town is past its first harvests.
+        if (population >= PasturePopulation && s.CountIncludingPlanned("pasture") < 1 + population / PeoplePerPasture &&
+            s.Stock.Get("mutton") < s.LimitOf("mutton") / 2 && !Understaffed("pasture"))
+            Wish("pasture");
         if (population >= 30)
             foreach (var spot in ServiceGaps("faith")) Wish("chapel", spot);
         if (population >= 40)
