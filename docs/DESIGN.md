@@ -571,6 +571,11 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - They only act once an engine is finished.
   - They ride out if they have 1.25× the band's numbers.
   - Otherwise they hold out and let the archers work. They pay tribute (only if it's under 30% of the treasury) when the siege has lasted 15 days, or when a breach is imminent (the wall is below 35%, or the finished engines would knock a tile down within a day) and the fight at the breach looks risky (everyone called up wouldn't outnumber the band 1.5:1).
+- **Lessons learned:** a governed town that has been besieged (`Settlement.SiegesSuffered`) changes how it builds walls:
+  - it builds stone walls straight away, without waiting for 400 people;
+  - it starts building at half its stone and wood limit, keeping a third for homes;
+  - once its ring is closed, it adds strong points before upgrading the rest of the ring: gatehouses on its gates first (rams strike there), then towers.
+- **Breaches are patched straight away** in any ring that is mostly up: at the ring's own tier if the stores allow, otherwise with a palisade that is upgraded later. This applies whether or not the town has been besieged.
 - **Engines are rolled into place:** a finished engine spends its first day being moved up, when archers in range can already shoot it, and only batters from the next day.
 - **Client:**
   - Army panel (K): day, engines, the wall under attack, and Sally and Pay buttons.
@@ -580,11 +585,11 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - `--demo-siege` sets up a siege for screenshots.
 - **720 days:** each seed had several sieges; every battle was won and nobody starved.
 
-  | Seed | Sieges | Paid off | Breaches (all beaten back) |
-  |---|---|---|---|
-  | 42 | 6 | 5 | 1 |
-  | 7 | 11 | 1 | 9 |
-  | 1234 | 5 | 0 | 3 |
+  | Seed | Sieges | Paid off | Breaches (all beaten back) | Rings now |
+  |---|---|---|---|---|
+  | 42 | 4 | 1 | 3 | 167 stone, 8 gatehouses, 6 towers |
+  | 7 | 7 | 0 | 7 | 201 stone, 5 gatehouses, 8 towers |
+  | 1234 | 3 | 0 | 3 | 171 stone, 8 gatehouses, 9 towers |
 - **Later:** player-vs-player sieges, fire, mining, starving a town out.
 
 ## Battles: individual units + destructible structures (hybrid LOD simulation)

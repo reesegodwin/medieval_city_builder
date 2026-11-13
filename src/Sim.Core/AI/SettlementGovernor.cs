@@ -305,6 +305,7 @@ public static class SettlementGovernor
     /// <summary>Towns ring themselves with a palisade at this size, stone at the next, a large wall at the last.</summary>
     public static readonly int[] WallPopulation = { 150, 400, 700 };
 
+
     /// <summary>A tower every this many ring tiles, once the ring is built.</summary>
     public const int TowerSpacing = 16;
 
@@ -328,17 +329,41 @@ public static class SettlementGovernor
         for (int i = 0; i < Math.Min(WallPopulation.Length, world.Data.WallTiers.Count); i++)
             if (population >= WallPopulation[i]) tier = i;
         if (tier < 0) return;
+        // A town that has been besieged doesn't wait for the population to grow: stone walls at once.
+        bool besiegedBefore = s.SiegesSuffered > 0;
+        if (besiegedBefore) tier = Math.Min(Math.Max(tier, 1), world.Data.WallTiers.Count - 1);
         if (s.WallRing.Count == 0) PlanRing(world, s);
         if (s.WallRing.Count == 0 || s.WallPlans.Count > 0 || s.RoadPlans.Count > 0) return;
 
+        // Gaps in a ring that once stood (a breach, say) are closed at once: at the ring's tier if the stores allow,
+        // else with a cheap palisade to be upgraded later. Only for a ring that is mostly up; a new ring is laid out below.
+        if (s.Walls.Count > 0 && s.Walls.Count >= s.WallRing.Count / 2)
+        {
+            var open = s.WallRing.Where(r => !s.Walls.ContainsKey((r.X, r.Y)) && !world.Map.GetTile(r.X, r.Y).WallPlanned &&
+                                             Walls.Check(world, s, r.X, r.Y) == null).Take(WallBatch).ToList();
+            foreach (byte patchTier in new[] { (byte)tier, (byte)0 }.Distinct())
+            {
+                var total = new Dictionary<string, int>();
+                foreach (var (_, _, gate) in open)
+                    foreach (var (r, n) in Walls.PieceCost(world, patchTier, gate ? WallPiece.Gate : WallPiece.Wall))
+                        total[r] = total.GetValueOrDefault(r) + n;
+                if (open.Count == 0 || !s.Stock.Has(total)) continue;
+                world.Execute(new PlaceWallCommand(s.Id, open.Select(r => (r.X, r.Y)).ToList(), patchTier,
+                    open.Where(r => r.Gate).Select(r => (r.X, r.Y)).ToList()));
+                return;
+            }
+        }
+
         var def = world.Data.WallTiers[tier];
-        // How much of each material may be spent: three quarters of the limit in store, keeping half.
+        // How much of each material may be spent: three quarters of the limit in store, keeping half. After a siege
+        // the town digs deeper: building starts at half the limit and keeps about a third (homes need stone too).
+        double startShare = besiegedBefore ? 0.5 : 0.75, keepShare = besiegedBefore ? 0.35 : 0.5;
         var budget = new Dictionary<string, int>();
         foreach (string r in def.Cost.Keys.Concat(def.GateCost.Keys).Concat(def.Tower.Cost.Keys).Concat(def.Gatehouse.Cost.Keys).Distinct())
         {
             int limit = s.LimitOf(r);
-            if (limit == int.MaxValue || s.Stock.Get(r) < limit * 0.75) return;
-            budget[r] = s.Stock.Get(r) - limit / 2;
+            if (limit == int.MaxValue || s.Stock.Get(r) < limit * startShare) return;
+            budget[r] = s.Stock.Get(r) - (int)(limit * keepShare);
         }
         var spend = new Dictionary<string, int>();
         bool Afford(Dictionary<string, int> cost)
@@ -347,6 +372,29 @@ public static class SettlementGovernor
             foreach (var (r, n) in cost) spend[r] = spend.GetValueOrDefault(r) + n;
             return true;
         }
+
+        // Strong points on the ring: a tower every few tiles, a gatehouse on each gate a road runs through. After a siege
+        // the gates (where rams strike) come first. One at a time.
+        bool StrongPoint()
+        {
+            for (int pass = besiegedBefore ? 0 : 1; pass < 2; pass++)
+            for (int i = 0; i < s.WallRing.Count; i++)
+            {
+                var (x, y, _) = s.WallRing[i];
+                if (!s.Walls.TryGetValue((x, y), out var wall)) continue;
+                var tile = world.Map.GetTile(x, y);
+                WallPiece? want = wall.Piece == WallPiece.Wall && i % TowerSpacing == TowerSpacing / 4 ? WallPiece.Tower
+                    : wall.Piece == WallPiece.Gate && tile.IsRoad ? WallPiece.Gatehouse : null;
+                if (pass == 0 && want != WallPiece.Gatehouse) continue;
+                if (want is not { } piece || !Afford(Walls.PieceCost(world, wall.Tier, piece))) continue;
+                world.Execute(piece == WallPiece.Tower ? new PlaceTowerCommand(s.Id, x, y) : new PlaceGatehouseCommand(s.Id, x, y));
+                return true;
+            }
+            return false;
+        }
+
+        // A besieged town fortifies its closed ring with strong points before upgrading the rest of it.
+        if (besiegedBefore && WallSystem.Enclose(world, s).RingTier >= 0 && StrongPoint()) return;
 
         // First the ring itself, at this tier: plain walls and gates first, then the dearer towers and gatehouses.
         var batch = new List<(int X, int Y)>();
@@ -374,18 +422,8 @@ public static class SettlementGovernor
         }
         if (!ringDone) return;
 
-        // Then strong points on the finished ring: a tower every few tiles, a gatehouse on each gate a road runs through.
-        for (int i = 0; i < s.WallRing.Count; i++)
-        {
-            var (x, y, _) = s.WallRing[i];
-            if (!s.Walls.TryGetValue((x, y), out var wall)) continue;
-            var tile = world.Map.GetTile(x, y);
-            WallPiece? want = wall.Piece == WallPiece.Wall && i % TowerSpacing == TowerSpacing / 4 ? WallPiece.Tower
-                : wall.Piece == WallPiece.Gate && tile.IsRoad ? WallPiece.Gatehouse : null;
-            if (want is not { } piece || !Afford(Walls.PieceCost(world, wall.Tier, piece))) continue;
-            world.Execute(piece == WallPiece.Tower ? new PlaceTowerCommand(s.Id, x, y) : new PlaceGatehouseCommand(s.Id, x, y));
-            return; // one strong point at a time
-        }
+        // Then strong points on the finished ring.
+        StrongPoint();
     }
 
     /// <summary>
