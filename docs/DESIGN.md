@@ -548,6 +548,12 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   | Trebuchet | 8 | 80 | ×2 against large stone walls |
 
   The band builds whichever engine would bring down some wall tile soonest for its build time.
+- **Archers only reach engines in range:**
+  - Engines are built out of bowshot, 3 tiles beyond the archers' range of 8.
+  - Once finished, each engine is rolled up to where it works from: rams to the wall (range 1), catapults to 6 tiles, trebuchets to 12.
+  - Each day the archers in squads (up to the wall-walk's room, 1.5 damage each) and the towers (6 each) shoot at the nearest engine within range. A wrecked engine is gone.
+  - Engine strength: ram 120 (its hide roof halves arrow damage), catapult 80, trebuchet 150.
+  - Trebuchets out-range the archers, so only a sally can stop one. Engines still being built are never shot at.
 - **Battering:** built engines batter the wall tile they can bring down soonest. Only tiles with outside ground on one side and walled-in ground on the other count, so a corner is never wasted on.
 - **Breach:** when a tile reaches 0 hit points it is knocked down (nothing to salvage), the ring opens and the band storms in. Everyone eligible is called up, and the walls now help less.
 - **Siege length:** after 30 days the band gives up; it also gives up if fewer than 10 are left.
@@ -569,7 +575,7 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - Battered walls show soot cracks and fallen stones.
   - `--demo-siege` sets up a siege for screenshots.
 - **720 days:** each seed had several sieges: seed 42 paid off all 6; seed 7 paid off 3 of 3; seed 1234 paid off 2 of 5, with 1 breach that was beaten back. No starvation.
-- **Later:** player-vs-player sieges, archers on walls shooting at engines, fire, mining, starving a town out.
+- **Later:** player-vs-player sieges, fire, mining, starving a town out.
 
 ## Battles: individual units + destructible structures (hybrid LOD simulation)
 

@@ -147,10 +147,14 @@
     "outsideOutput": 0.5,
     "siegeMood": -3,
     "repairHpPerDay": 40,
+    "archerRange": 8,
+    "buildMargin": 3,
+    "arrowDamagePerArcher": 1.5,
+    "arrowDamagePerTower": 6,
     "engines": [
-      {"id": "ram", "name": "Battering ram", "buildDays": 2, "damage": 60, "vsTier": [3, 1, 0.5], "vsGate": 2},
-      {"id": "catapult", "name": "Catapult", "buildDays": 5, "damage": 45, "vsTier": [1, 1.5, 0.8], "vsGate": 1},
-      {"id": "trebuchet", "name": "Trebuchet", "buildDays": 8, "damage": 80, "vsTier": [1, 1.5, 2], "vsGate": 1}
+      {"id": "ram", "name": "Battering ram", "buildDays": 2, "damage": 60, "vsTier": [3, 1, 0.5], "vsGate": 2, "range": 1, "hp": 120, "arrowFactor": 0.5},
+      {"id": "catapult", "name": "Catapult", "buildDays": 5, "damage": 45, "vsTier": [1, 1.5, 0.8], "vsGate": 1, "range": 6, "hp": 80, "arrowFactor": 1},
+      {"id": "trebuchet", "name": "Trebuchet", "buildDays": 8, "damage": 80, "vsTier": [1, 1.5, 2], "vsGate": 1, "range": 12, "hp": 150, "arrowFactor": 1}
     ]
   },
   "garrisonShare": 0.03,

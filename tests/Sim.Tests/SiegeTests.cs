@@ -205,6 +205,38 @@ public class SiegeTests
     }
 
     [Fact]
+    public void ArchersOnlyShootEnginesThatComeWithinRange()
+    {
+        var (world, town, _) = WalledTown(1);
+        Grow(world, town, 60);
+        town.Stock.Add("bows", 30);
+        for (int i = 0; i < 2; i++) Assert.NotNull(Armies.Raise(world, town, "archers", 10, levy: true).Squad);
+        var rules = world.Data.War.Siege;
+        Assert.True(Siege.ArrowDamage(world, town) > 0);
+        Assert.True(rules.ArcherRange < rules.Engine("trebuchet")!.Range); // trebuchets out-range archers
+        Assert.True(Siege.InArcherRange(rules, rules.Engine("catapult")!));
+        Assert.True(Siege.InArcherRange(rules, rules.Engine("ram")!));
+
+        var band = BandAtTheWalls(world, town, 40);
+        Siege.Begin(world, town, band);
+        var building = new SiegeEngine { Kind = "catapult", Progress = 0.5 };     // still being built, out of bowshot
+        var trebuchet = new SiegeEngine { Kind = "trebuchet", Progress = 1, Hp = 150 }; // working from beyond range
+        var catapult = new SiegeEngine { Kind = "catapult", Progress = 1, Hp = 80 };    // rolled up within range
+        band.Engines.AddRange(new[] { building, trebuchet, catapult });
+
+        Siege.ShootAtEngines(world, town, band);
+        Assert.True(catapult.Hp < 80);
+        Assert.Equal(150, trebuchet.Hp);
+        Assert.Equal(0, building.Hp);
+
+        for (int day = 0; day < 40 && band.Engines.Contains(catapult); day++) Siege.ShootAtEngines(world, town, band);
+        Assert.DoesNotContain(catapult, band.Engines);  // wrecked
+        Assert.Contains(trebuchet, band.Engines);       // untouched
+        Assert.Contains(building, band.Engines);
+        Assert.Contains(world.Events, e => e.Message.Contains("archers wrecked"));
+    }
+
+    [Fact]
     public void SiegesSurviveSaveAndLoad()
     {
         var (world, town, _) = WalledTown(1);

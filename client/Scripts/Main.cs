@@ -727,8 +727,8 @@ public partial class Main : Node3D
         world.War.Warbands.Add(band);
         Siege.Begin(world, town, band);
         band.SiegeDays = 9;
-        band.Engines.Add(new SiegeEngine { Kind = "ram", Progress = 1 });
-        band.Engines.Add(new SiegeEngine { Kind = "catapult", Progress = 1 });
+        band.Engines.Add(new SiegeEngine { Kind = "ram", Progress = 1, Hp = 70 });
+        band.Engines.Add(new SiegeEngine { Kind = "catapult", Progress = 1, Hp = 80 });
         band.Engines.Add(new SiegeEngine { Kind = "trebuchet", Progress = 0.5 });
         band.HasTarget = true;
         band.TargetX = target.X;
