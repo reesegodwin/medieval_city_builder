@@ -532,6 +532,26 @@ public sealed class DisasterRules
 
     /// <summary>Output of farms and gardens (buildings with a fertile bonus) during a poor harvest.</summary>
     public double PoorHarvestOutput { get; set; } = 0.7;
+
+    /// <summary>Bathhouses: how much full hygiene coverage lowers the chance of sickness.</summary>
+    public double HygieneProtection { get; set; } = 0.4;
+
+    /// <summary>Herbalists: how much full coverage lowers the chance of sickness, and days of illness shed per day.</summary>
+    public double HealingProtection { get; set; } = 0.2;
+    public int HealingRecovery { get; set; } = 2;
+
+    // Crime (CrimeSystem): troubled adults (unhappy, or from a penniless family) out of the watch's reach may steal.
+    public int CrimeMinPopulation { get; set; } = 100;
+    public double CrimeChancePerTroubled { get; set; } = 0.002;
+    public double CrimeMaxChance { get; set; } = 0.4;
+    public double TroubledMood { get; set; } = 40;
+    public double TroubledPurse { get; set; } = 0.5;
+
+    /// <summary>A thief takes this share of a family's savings (at most <see cref="MaxTheft"/>).</summary>
+    public double TheftShare { get; set; } = 0.25;
+    public double MaxTheft { get; set; } = 20;
+    public double CrimeMood { get; set; } = -2;
+    public int CrimeMoodDays { get; set; } = 10;
 }
 
 /// <summary>One season's effects (seasons.json).</summary>

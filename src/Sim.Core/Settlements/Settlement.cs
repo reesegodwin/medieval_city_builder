@@ -30,6 +30,9 @@ public sealed class SettlementRules
         ["weaponsmith"] = 1,
         ["bowyer"] = 1,
         ["armourer"] = 1,
+        ["herbalist"] = 3,
+        ["bath_keeper"] = 2,
+        ["guard"] = 3,
         [JobKinds.Roadworker] = 4,
         [JobKinds.Hauler] = 1, // only people nobody else needs; the first to be pulled into other work
     };
@@ -102,6 +105,9 @@ public sealed class SettlementRules
 
     /// <summary>How the town is run (households.json "governments"): taxes, pay, relief for the poor.</summary>
     public string Government { get; set; } = "free_traders";
+
+    /// <summary>Whether troubled people out of the watch's reach may steal (CrimeSystem).</summary>
+    public bool Crime { get; set; } = true;
 
     /// <summary>
     /// Whether spare territory allowance is claimed automatically, evenly around the centre. Turn it off to
@@ -321,6 +327,10 @@ public sealed class Settlement
     /// <summary>Homes the town gave something to for free yesterday, and homes that went without something.</summary>
     public int ReliefHouseholds { get; set; }
     public int PoorHouseholds { get; set; }
+
+    /// <summary>Days the town is still unsettled by a theft, and thefts so far.</summary>
+    public int CrimeDays { get; set; }
+    public int Crimes { get; set; }
 
     /// <summary>Upkeep owed but not yet paid (fractions, or what the treasury couldn't cover).</summary>
     public double UpkeepOwed { get; set; }

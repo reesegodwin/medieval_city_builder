@@ -59,6 +59,7 @@ public sealed class Simulator
                 MigrationSystem.Daily(World, s);
                 EconomySystem.Daily(World, s);
                 DisasterSystem.Daily(World, s);
+                CrimeSystem.Daily(World, s);
                 SeasonSystem.Daily(World, s);
                 OddJobs.Daily(World, s);
                 Economy.Forecast.Daily(World, s);

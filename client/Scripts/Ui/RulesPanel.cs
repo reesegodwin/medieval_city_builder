@@ -90,6 +90,12 @@ public partial class RulesPanel : PanelContainer
         disasters.Toggled += on => _session.Execute(new SetDisastersCommand(town.Id, on));
         body.AddChild(disasters);
 
+        Section(body, "Crime", "Unhappy or penniless people out of a guardhouse's reach may steal from the richest homes " +
+                               "(or the treasury). Guardhouses keep the homes around them safe.");
+        var crime = new CheckBox { Text = "Thieves", ButtonPressed = town.Rules.Crime, FocusMode = FocusModeEnum.None };
+        crime.Toggled += on => _session.Execute(new Sim.Core.Systems.SetCrimeCommand(town.Id, on));
+        body.AddChild(crime);
+
         Section(body, "Stock limits", "Workplaces stop (and free their workers) once stock reaches the limit. " +
                                        "Food limits also grow with population.");
         foreach (var resource in world.Data.Resources.Values)

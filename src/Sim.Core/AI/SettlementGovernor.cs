@@ -242,6 +242,7 @@ public static class SettlementGovernor
     /// <summary>Towns this size and up keep sheep for mutton, one pasture per <see cref="PeoplePerPasture"/> people.</summary>
     public const int PasturePopulation = 40;
     public const int PeoplePerPasture = 70;
+    public const int PeoplePerComfortBuilding = 150;
     public const double BreweriesPerTavern = 1.25;
 
     /// <summary>Towns this size and up gather firewood (the first winter comes at day 271).</summary>
@@ -272,10 +273,13 @@ public static class SettlementGovernor
         bool fieldReady = false;
         // Land found to be cut off from the road network (beyond bridge range): skipped for the rest of today.
         var deadLand = new HashSet<(int X, int Y)>();
+        // A kind of building with no site today: its other spots are skipped too, so the day's few searches go to
+        // other wishes (a crowded old town needing taverns shouldn't stop a guardhouse being built at all).
+        var noSiteToday = new HashSet<string>(StringComparer.Ordinal);
         foreach (var (defId, near) in Wishes(world, settlement))
         {
             var def = world.Data.Building(defId);
-            if (!settlement.Stock.Has(def.Cost)) continue;
+            if (!settlement.Stock.Has(def.Cost) || noSiteToday.Contains(defId)) continue;
 
             string key = $"{defId}@{near}";
             if (settlement.FailedSiteSearches.TryGetValue(key, out long failedDay) && today - failedDay < FailedSiteRetryDays)
@@ -293,6 +297,7 @@ public static class SettlementGovernor
             if (TryBuild(world, settlement, def, near, field, deadLand)) return;
 
             settlement.FailedSiteSearches[key] = today;
+            noSiteToday.Add(defId);
             if (++attempts >= MaxAttemptsPerDay) return;
         }
     }
@@ -718,6 +723,21 @@ public static class SettlementGovernor
             if (s.Stock.Get("ale") >= 10)
                 foreach (var spot in ServiceGaps("drink")) Wish("tavern", spot);
             foreach (var spot in ServiceGaps("market")) Wish("market", spot);
+        }
+        // Health, cleanliness and the watch as the town grows: a few of each, so they don't drain the workforce.
+        // The first of each may go anywhere; later ones go where people aren't reached.
+        void Comfort(string id, string need)
+        {
+            int count = s.CountIncludingPlanned(id);
+            if (count >= 1 + population / PeoplePerComfortBuilding) return;
+            var spots = ServiceGaps(need);
+            if (spots.Count > 0) Wish(id, count == 0 ? null : spots[0]);
+        }
+        if (population >= 80) Comfort("herbalist", "healing");
+        if (population >= 150)
+        {
+            if (s.Stock.Get("firewood") >= 20) Comfort("bathhouse", "hygiene");
+            Comfort("guardhouse", "law");
         }
 
         // When wood is what's holding everything back, a cheap woodcutter comes last as a fallback.

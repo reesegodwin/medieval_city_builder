@@ -8,9 +8,9 @@
   "childShare": 0.5,
   "startingCoin": 4,
   "gearAffordShare": 0.4,
-  "cityJobs": ["builder", "hauler", "roadworker"],
+  "cityJobs": ["builder", "hauler", "roadworker", "guard"],
   "jobTiers": {
-    "baker": 2, "brewer": 2, "barkeep": 2, "weaver": 2, "smoker": 2, "priest": 2, "trader": 2, "smith": 2, "bowyer": 2,
+    "baker": 2, "brewer": 2, "barkeep": 2, "weaver": 2, "smoker": 2, "priest": 2, "herbalist": 2, "trader": 2, "smith": 2, "bowyer": 2,
     "carpenter": 3, "weaponsmith": 3, "armourer": 3
   },
   "prices": [
@@ -21,7 +21,9 @@
     {"need": "market", "price": 0.012},
     {"need": "clothing", "price": 0.012},
     {"need": "drink", "price": 0.016},
-    {"need": "furniture", "price": 0.008}
+    {"need": "furniture", "price": 0.008},
+    {"need": "healing", "price": 0.004},
+    {"need": "hygiene", "price": 0.006}
   ],
   "governments": [
     {

@@ -202,7 +202,7 @@ internal static class Report
             double wages = s.Citizens.Sum(c => Sim.Core.Economy.HouseholdSystem.Wage(world, s, c).Pay);
             int jobless = s.Citizens.Count(c => c.CanWork && c.JobBuildingId == null);
             Console.WriteLine($"Households ({world.Data.Households.Government(s.Rules.Government).Name}): {byClass}; wages {wages:0.#}/day; " +
-                              $"{jobless} jobless; {s.ReliefHouseholds} homes on relief, {s.PoorHouseholds} going without.");
+                              $"{jobless} jobless; {s.ReliefHouseholds} homes on relief, {s.PoorHouseholds} going without; {s.Crimes} thefts.");
         }
         Console.WriteLine($"Treasury: taxes {EconomySystem.DailyTax(world, s):0.#}/day, upkeep {EconomySystem.DailyUpkeep(world, s):0.#}/day" +
                           (s.UpkeepUnpaid ? " (UNPAID)" : "") + ".");

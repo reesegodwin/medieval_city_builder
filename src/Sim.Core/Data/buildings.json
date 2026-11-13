@@ -643,5 +643,64 @@
     "jobKind": "merchant",
     "trade": true,
     "upkeep": 1
+  },
+  {
+    "id": "herbalist",
+    "name": "Herbalist's Hut",
+    "width": 2,
+    "height": 2,
+    "buildDays": 0.3,
+    "cost": {
+      "wood": 15
+    },
+    "jobs": 1,
+    "jobKind": "herbalist",
+    "service": {
+      "need": "healing",
+      "radius": 24,
+      "capacity": 150
+    },
+    "upkeep": 0.1
+  },
+  {
+    "id": "bathhouse",
+    "name": "Bathhouse",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.8,
+    "cost": {
+      "wood": 30,
+      "stone": 25
+    },
+    "jobs": 1,
+    "jobKind": "bath_keeper",
+    "service": {
+      "need": "hygiene",
+      "radius": 16,
+      "capacity": 60,
+      "consumesPerPersonDay": {
+        "firewood": 0.02
+      }
+    },
+    "upkeep": 0.3
+  },
+  {
+    "id": "guardhouse",
+    "name": "Guardhouse",
+    "width": 2,
+    "height": 2,
+    "buildDays": 0.5,
+    "cost": {
+      "wood": 15,
+      "stone": 15
+    },
+    "jobs": 2,
+    "jobKind": "guard",
+    "service": {
+      "need": "law",
+      "radius": 22,
+      "capacity": 150
+    },
+    "upkeep": 0.1
   }
 ]

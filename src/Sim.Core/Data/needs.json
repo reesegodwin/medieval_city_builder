@@ -3,6 +3,9 @@
   {"id": "faith", "name": "Faith", "coveredMood": 5, "missingMood": -4, "minPopulation": 30},
   {"id": "drink", "name": "Tavern", "coveredMood": 5, "missingMood": 0, "minPopulation": 0},
   {"id": "market", "name": "Market", "coveredMood": 3, "missingMood": -2, "minPopulation": 40},
+  {"id": "healing", "name": "Herbalist", "coveredMood": 2, "missingMood": 0, "minPopulation": 80},
+  {"id": "hygiene", "name": "Bathhouse", "coveredMood": 3, "missingMood": 0, "minPopulation": 150},
+  {"id": "law", "name": "Town watch", "coveredMood": 2, "missingMood": 0, "minPopulation": 150},
   {"id": "clothing", "name": "Clothing", "coveredMood": 4, "missingMood": -2, "minPopulation": 100, "via": "market", "goods": {"cloth": 0.01}},
   {"id": "furniture", "name": "Furniture", "coveredMood": 3, "missingMood": 0, "minPopulation": 150, "via": "market", "goods": {"furniture": 0.005}}
 ]

@@ -14,5 +14,17 @@
   "sickMood": -10,
   "poorHarvestChance": 0.15,
   "poorHarvestDays": 30,
-  "poorHarvestOutput": 0.7
+  "poorHarvestOutput": 0.7,
+  "hygieneProtection": 0.4,
+  "healingProtection": 0.2,
+  "healingRecovery": 2,
+  "crimeMinPopulation": 100,
+  "crimeChancePerTroubled": 0.002,
+  "crimeMaxChance": 0.4,
+  "troubledMood": 40,
+  "troubledPurse": 0.5,
+  "theftShare": 0.25,
+  "maxTheft": 20,
+  "crimeMood": -2,
+  "crimeMoodDays": 10
 }
