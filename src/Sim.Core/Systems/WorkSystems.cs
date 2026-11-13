@@ -168,6 +168,7 @@ public static class ConstructionSystem
         double tools = Tools.Multiplier(world, settlement);
         int workersThisTick = 0;
         var oddJobs = OddJobs.Allocate(world, settlement); // people without a job lend a hand
+        double daylight = SeasonSystem.Current(world).Daylight; // building is outdoor work
         foreach (var b in settlement.Buildings)
         {
             if (b.State == BuildingState.AwaitingMaterials)
@@ -189,7 +190,7 @@ public static class ConstructionSystem
 
             int helpers = oddJobs.HelpersAt(b);
             b.ConstructionProgress += (Work.LabourThisTick(settlement, b, JobKinds.Builder) + OddJobs.HelperLabourThisTick(world, helpers)) *
-                                      tools * Logistics.EffectiveHaulFactor(settlement, b);
+                                      tools * Logistics.EffectiveHaulFactor(settlement, b) * daylight;
             workersThisTick += b.WorkerIds.Count;
             b.Problem = b.WorkerIds.Count + helpers == 0 ? "No builders" : b.NoRoute ? Logistics.NoRouteProblem : null;
 
@@ -514,7 +515,8 @@ public static class RoadSystem
         if (!crew.IsOperational || crew.CurrentJobKind != JobKinds.Roadworker) return; // being upgraded
 
         double labour = (Work.LabourThisTick(settlement, crew, JobKinds.Roadworker) +
-                         OddJobs.HelperLabourThisTick(world, OddJobs.Allocate(world, settlement).Roads)) * Tools.Multiplier(world, settlement);
+                         OddJobs.HelperLabourThisTick(world, OddJobs.Allocate(world, settlement).Roads)) * Tools.Multiplier(world, settlement) *
+                        SeasonSystem.Current(world).Daylight;
         bool built = false;
         while (labour > 1e-12 && settlement.RoadPlans.Count > 0)
         {
@@ -559,7 +561,8 @@ public static class EconomySystem
     public static double OutputFactor(GameWorld world, Settlement s, Building b) =>
         (s.UpkeepUnpaid && b.Def.Upkeep > 0 ? world.Data.Trade.UnpaidOutput : 1) *
         (s.PoorHarvestDays > 0 && b.Def.FertileBonus > 0 ? world.Data.Disasters.PoorHarvestOutput : 1) *
-        SeasonSystem.Current(world).OutputOf(b.Def.Id);
+        SeasonSystem.Current(world).OutputOf(b.Def.Id) *
+        (b.Def.Outdoor ? SeasonSystem.Current(world).Daylight : 1);
 
     /// <summary>Books the taxes collected, split by class in proportion to what each class owes.</summary>
     private static void RecordTaxes(GameWorld world, Settlement s, int collected)

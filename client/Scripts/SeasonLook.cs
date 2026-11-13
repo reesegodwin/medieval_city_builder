@@ -77,6 +77,29 @@ void fragment() {
         };
     }
 
+    /// <summary>How deep into winter it is (0..1): in through early winter, out with the thaw, a hint in late autumn.</summary>
+    public static float Winterness(GameTime time)
+    {
+        double dayInSeason = (time.DayOfYear - 1) % TimeScale.DaysPerSeason + time.TickOfDay / (double)TimeScale.TicksPerDay;
+        float Ramp(double from, double to) => (float)Math.Clamp((dayInSeason - from) / (to - from), 0, 1);
+        return time.Season switch
+        {
+            Season.Winter => Ramp(0, 10),
+            Season.Spring => 1 - Ramp(0, 10),
+            Season.Autumn => 0.3f * Ramp(60, 90),
+            _ => 0,
+        };
+    }
+
+    /// <summary>Short winter days: a lower, dimmer, cooler sun (long shadows); the summer sun is high and warm.</summary>
+    public static void LightSun(DirectionalLight3D sun, GameTime time)
+    {
+        float w = Winterness(time);
+        sun.LightEnergy = Mathf.Lerp(0.85f, 0.68f, w);
+        sun.LightColor = new Color(1f, 0.95f, 0.85f).Lerp(new Color(0.88f, 0.92f, 1f), w);
+        sun.RotationDegrees = new Vector3(Mathf.Lerp(-50f, -30f, w), 35f, 0f);
+    }
+
     /// <summary>Call every frame; only touches the materials when the look has visibly changed.</summary>
     public static void Update(GameWorld world)
     {
