@@ -18,6 +18,11 @@ public static class MilitaryGovernor
         return Math.Max(1, (int)Math.Ceiling(s.Citizens.Count * war.GarrisonShare / war.SquadSize));
     }
 
+    /// <summary>The most experienced adult (oldest under 50) who isn't serving or already the general.</summary>
+    public static Citizens.Citizen? GeneralCandidate(Settlement s) =>
+        s.Citizens.Where(c => c.IsAdult && c.SquadId == null && c.AgeYears < 50 && c.Id != s.General?.CitizenId)
+            .OrderByDescending(c => c.AgeDays).ThenBy(c => c.Id).FirstOrDefault();
+
     public static void Daily(GameWorld world, Settlement s)
     {
         var war = world.Data.War;
@@ -25,10 +30,7 @@ public static class MilitaryGovernor
 
         if (s.General == null)
         {
-            // The most experienced adult (oldest under 50) who isn't serving.
-            var pick = s.Citizens.Where(c => c.IsAdult && c.SquadId == null && c.AgeYears < 50)
-                .OrderByDescending(c => c.AgeDays).ThenBy(c => c.Id).FirstOrDefault();
-            if (pick != null) world.Execute(new PromoteGeneralCommand(s.Id, pick.Id));
+            if (GeneralCandidate(s) is { } pick) world.Execute(new PromoteGeneralCommand(s.Id, pick.Id));
         }
 
         int regular = s.Squads.Count(q => !q.Levy);

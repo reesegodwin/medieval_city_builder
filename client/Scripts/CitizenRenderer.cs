@@ -57,6 +57,14 @@ public partial class CitizenRenderer : Node3D
     public static Color JobColor(Settlement settlement, Citizen c)
     {
         if (!c.IsAdult) return new Color(0.85f, 0.85f, 0.75f);
+        if (c.SquadId is int squadId)
+            return settlement.Squads.FirstOrDefault(q => q.Id == squadId)?.UnitId switch
+            {
+                "spearmen" => new Color(0.25f, 0.35f, 0.65f),
+                "archers" => new Color(0.2f, 0.42f, 0.22f),
+                "men_at_arms" => new Color(0.78f, 0.8f, 0.85f),
+                _ => new Color(0.5f, 0.38f, 0.25f), // militia in their own clothes, with a leather jerkin
+            };
         if (c.JobBuildingId is not int jobId || settlement.FindBuilding(jobId) is not { } job)
             return new Color(0.45f, 0.5f, 0.6f);
         return job.CurrentJobKind switch
@@ -117,7 +125,7 @@ public partial class CitizenRenderer : Node3D
 
     private Route GetRoute(Citizen c)
     {
-        int jobId = c.JobBuildingId ?? 0, homeId = c.HomeBuildingId ?? 0;
+        int jobId = (c.SquadId != null ? DrillGround(c) : c.JobBuildingId) ?? 0, homeId = c.HomeBuildingId ?? 0;
         bool cached = _routes.TryGetValue(c.Id, out var route);
         if (cached && route!.JobId == jobId && route.HomeId == homeId &&
             (route.Pathed && route.RoadVersion == _settlement.RoadVersion || _pathBudget <= 0))
@@ -129,6 +137,25 @@ public partial class CitizenRenderer : Node3D
         route = BuildRoute(c, jobId, homeId, usePaths);
         _routes[c.Id] = route;
         return route;
+    }
+
+    /// <summary>
+    /// Where a soldier spends the day: the nearest barracks (drilling in its yard); with the militia mustered and
+    /// raiders close, the town hall or keep, where they gather.
+    /// </summary>
+    private int? DrillGround(Citizen c)
+    {
+        var home = c.HomeBuildingId is int h ? _settlement.FindBuilding(h) : null;
+        string[] kinds = _settlement.Alert >= Sim.Core.War.Alert.Muster
+            ? new[] { "castle", "town_hall", "keep", "barracks" }
+            : new[] { "barracks", "castle", "town_hall", "keep" };
+        foreach (string kind in kinds)
+        {
+            var best = _settlement.Buildings.Where(b => b.Def.Id == kind && b.IsOperational)
+                .OrderBy(b => home == null ? 0 : b.DistanceTo(home)).FirstOrDefault();
+            if (best != null) return best.Id;
+        }
+        return null;
     }
 
     private readonly record struct Waypoint(Vector3 Point, (int X, int Y) WalkTile, float Dwell);
@@ -156,7 +183,7 @@ public partial class CitizenRenderer : Node3D
             bool field = job.IsOperational && (job.Def.Id == "farm" || job.Def.Id == "garden");
             Vector3 workPoint = field
                 ? Coords.TileCorner(job.X, job.Y) + new Vector3(0.3f + Rand(3) * (job.Def.Width - 0.6f), 0, 0.3f + Rand(4) * (job.Def.Height - 0.6f))
-                : Near(Coords.BuildingDoor(job), 0.8f, 5);
+                : Near(Coords.BuildingDoor(job), c.SquadId != null ? 4f : 0.8f, 5); // soldiers drill in the yard
             var work = new Waypoint(workPoint, job.DoorTile, 7f);
             var stock = Logistics.NearestStockpile(_settlement, job);
             var stockStop = stock != null ? new Waypoint(Near(Coords.BuildingDoor(stock), 1.2f, 7), stock.DoorTile, 1.5f) : work;

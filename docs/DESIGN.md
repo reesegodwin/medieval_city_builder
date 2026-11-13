@@ -439,6 +439,12 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - If the town loses, the raiders loot a share of coin and goods.
   - Levies stand down after 2 quiet days. A `Raids` rule turns it off per town. Battle reports are kept (last 20).
 - **Scouting** (`Raids.Describe`): far bands give a rough size, nearer ones a rounded breakdown, and bands at the walls give exact numbers.
+- **Client:**
+  - The army panel (K) shows the alert, the general and squads, recruit and disband buttons, gear, the raid and muster rules, and recent battles.
+  - An alert banner shows while raiders are about.
+  - Warbands are drawn as a dark crowd under a red banner. They only appear inside the town's watch radius (fog of war, applied in the client), and slide smoothly between daily moves.
+  - Soldiers wear their unit's colour (militia brown, spearmen blue, archers green, men-at-arms steel). They drill in the barracks yard and gather at the keep or castle during a muster.
+  - Lockstep clients hold the full state, so the fog of war is a presentation rule for now. A server-authoritative mode would have to filter it on the server.
 - **Governor:**
   - From 150 people, a governed town appoints a general and keeps a garrison of about 3% of its people (in squads, up to its barracks' room). It wishes for a barracks.
   - It recruits only from spare hands, never during a muster.
