@@ -485,6 +485,7 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - Savings pile up in well-off homes.
   - When someone dies or leaves, their savings go to their spouse, else to another adult at home, else to the town.
   - New adults (settlers, newcomers) bring 4 coin.
+- **Families pay for their own home upgrades.** A family with twice the coin part of an upgrade saved pays that part itself (builders' pay), and the town only gives the materials. This is a sink for burgher savings, and it makes upgrades follow wealth.
 - **Gear by what families can afford.** A recruit takes up a unit's gear only if their family has saved 40% of the gear's value. That is 3.2 coin for spearmen and 8.8 for men-at-arms, so a prosperous town fields better soldiers. At a muster, those who can afford it take up the best gear in store (men-at-arms, then spearmen, then archers), and the rest come as militia.
 - **Governments** (per town, `SetGovernmentCommand`, in the Rules panel):
 
@@ -511,7 +512,6 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
 - **Later:**
   - shops owned by families (profits instead of minted wages);
   - prices that follow supply;
-  - families paying for their own home upgrades;
   - per-government moods and laws;
   - migration drawn to high wages.
 
