@@ -20,6 +20,8 @@ public partial class Hud : CanvasLayer
     private Label _feedLabel = null!;
     private Label _status = null!;
     private Label _alert = null!;
+    private PanelContainer _buildMenu = null!;
+    private VBoxContainer _feedBox = null!;
     private Button _pause = null!;
     private CheckBox _autoBuild = null!;
     private CheckBox _autoTerritory = null!;
@@ -127,7 +129,7 @@ public partial class Hud : CanvasLayer
         }
 
         // --- Build menu (bottom) ---
-        var bottom = new PanelContainer();
+        var bottom = _buildMenu = new PanelContainer();
         bottom.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomWide);
         bottom.GrowVertical = Control.GrowDirection.Begin;
         AddChild(bottom);
@@ -206,7 +208,7 @@ public partial class Hud : CanvasLayer
         }
 
         // --- Event feed and status (bottom-left, above the build menu) ---
-        var feedBox = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        var feedBox = _feedBox = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         feedBox.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomLeft);
         feedBox.OffsetTop = -400;
         feedBox.OffsetBottom = -182; // the build menu is up to three rows tall
@@ -241,11 +243,11 @@ public partial class Hud : CanvasLayer
             MouseFilter = Control.MouseFilterEnum.Ignore,
             Visible = false,
         };
-        // Right of the side panels (which take the left 490 pixels), under the controls help.
-        _alert.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopRight);
+        // Between the side panels (the left 490 pixels) and the inspector (the right 390), under the controls help.
+        _alert.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopWide);
         _alert.OffsetTop = 112;
-        _alert.OffsetLeft = -1080;
-        _alert.OffsetRight = -20;
+        _alert.OffsetLeft = 490;
+        _alert.OffsetRight = -390;
         _alert.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _alert.AddThemeFontSizeOverride("font_size", 22);
         _alert.AddThemeColorOverride("font_shadow_color", Colors.Black);
@@ -308,8 +310,24 @@ public partial class Hud : CanvasLayer
         return string.Join("\n", lines);
     }
 
+    /// <summary>
+    /// Keeps the side panels (rules, trade, ledger, army, inspector) and the event feed above the build menu,
+    /// however many rows it wraps to at this window size.
+    /// </summary>
+    private void FitAboveBuildMenu()
+    {
+        float clear = _buildMenu.Size.Y + 8;
+        if (clear < 40) return; // not laid out yet
+        foreach (var child in GetChildren())
+            if (child is PanelContainer panel && panel != _buildMenu && Mathf.IsEqualApprox(panel.AnchorBottom, 1) && panel.AnchorTop == 0)
+                panel.OffsetBottom = -clear;
+        _feedBox.OffsetBottom = -clear;
+        _feedBox.OffsetTop = -clear - 218;
+    }
+
     public void Refresh(SimSession session)
     {
+        FitAboveBuildMenu();
         var world = session.World;
         var town = session.PlayerTown;
         double moodNow = town.Citizens.Count > 0 ? town.Citizens.Average(c => c.Mood) : 0;
