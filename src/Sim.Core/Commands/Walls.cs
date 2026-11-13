@@ -8,8 +8,8 @@ namespace Sim.Core.Commands;
 
 /// <summary>
 /// Low-level wall tile changes (callers go through the wall commands). Walls are drawn like roads, paid when
-/// planned and built by the town-centre crew. A finished wall stops everyone except at gates; a wall drawn across
-/// a road becomes a gate there.
+/// planned and built by the town-centre crew. A finished wall stops everyone except at gates (and gatehouses); a
+/// wall drawn across a road becomes a gate there. Towers and gatehouses are placed on walls and gates.
 /// </summary>
 public static class Walls
 {
@@ -17,6 +17,60 @@ public static class Walls
     public const double DemolishRefund = 0.25;
 
     public static Data.WallTierDef Def(GameWorld world, int tier) => world.Data.WallTiers[Math.Clamp(tier, 0, world.Data.WallTiers.Count - 1)];
+
+    /// <summary>What a piece of this kind of wall costs.</summary>
+    public static Dictionary<string, int> PieceCost(GameWorld world, int tier, WallPiece piece)
+    {
+        var def = Def(world, tier);
+        return piece switch
+        {
+            WallPiece.Gate => def.GateCost,
+            WallPiece.Tower => def.Tower.Cost,
+            WallPiece.Gatehouse => def.Gatehouse.Cost,
+            _ => def.Cost,
+        };
+    }
+
+    public static int PieceHitPoints(GameWorld world, int tier, WallPiece piece)
+    {
+        var def = Def(world, tier);
+        return piece switch { WallPiece.Tower => def.Tower.HitPoints, WallPiece.Gatehouse => def.Gatehouse.HitPoints, _ => def.HitPoints };
+    }
+
+    public static double PieceWorkDays(GameWorld world, int tier, WallPiece piece)
+    {
+        var def = Def(world, tier);
+        return piece switch { WallPiece.Tower => def.Tower.WorkDays, WallPiece.Gatehouse => def.Gatehouse.WorkDays, _ => def.WorkDays };
+    }
+
+    public static string PieceName(GameWorld world, int tier, WallPiece piece)
+    {
+        var def = Def(world, tier);
+        return piece switch
+        {
+            WallPiece.Gate => $"{def.Name} gate",
+            WallPiece.Tower => def.Tower.Name,
+            WallPiece.Gatehouse => def.Gatehouse.Name,
+            _ => def.Name,
+        };
+    }
+
+    /// <summary>Whether a piece can become another: walls take gates and towers, gates take gatehouses.</summary>
+    public static bool CanBecome(WallPiece from, WallPiece to) =>
+        from == to || (from == WallPiece.Wall && to is WallPiece.Gate or WallPiece.Tower) ||
+        (from == WallPiece.Gate && to == WallPiece.Gatehouse);
+
+    /// <summary>
+    /// The piece a tile ends up as: what's there (a plain wall if nothing), turned into the wanted piece where it can
+    /// be; a plain wall across a road is a gate.
+    /// </summary>
+    public static WallPiece Resolve(in Tile tile, WallPiece? existing, WallPiece? want)
+    {
+        var piece = existing ?? WallPiece.Wall;
+        if (want is { } w && CanBecome(piece, w)) piece = w;
+        if (piece == WallPiece.Wall && (tile.IsRoad || tile.RoadPlanned)) piece = WallPiece.Gate;
+        return piece;
+    }
 
     /// <summary>Returns null if a wall can go on this tile, otherwise why not.</summary>
     public static string? Check(GameWorld world, Settlement settlement, int x, int y)
@@ -28,18 +82,15 @@ public static class Walls
         return null;
     }
 
-    /// <summary>Whether planning this tier (or a gate) here would do anything.</summary>
-    public static bool NeedsWork(Settlement settlement, in Tile tile, int x, int y, byte tier, bool gate)
+    /// <summary>Whether planning this tier (and piece) here would do anything.</summary>
+    public static bool NeedsWork(Settlement settlement, in Tile tile, int x, int y, byte tier, WallPiece? want = null)
     {
         if (tile.WallPlanned) return false;
         if (!settlement.Walls.TryGetValue((x, y), out var wall)) return true;
-        return tier > wall.Tier || (gate && !wall.Gate);
+        return tier > wall.Tier || Resolve(tile, wall.Piece, want) != wall.Piece;
     }
 
-    /// <summary>A wall laid across a road (or asked for as a gate) is a gate.</summary>
-    private static bool IsGateTile(in Tile tile, bool gate) => gate || tile.IsRoad || tile.RoadPlanned;
-
-    /// <summary>Materials to plan these tiles: a gate's cost where it's a gate, the wall's cost elsewhere.</summary>
+    /// <summary>Materials to plan these tiles at a tier (each tile at the price of the piece it will be).</summary>
     public static Dictionary<string, int> PlanCost(GameWorld world, Settlement settlement, IEnumerable<(int X, int Y)> tiles, byte tier,
         IReadOnlyCollection<(int X, int Y)>? gates = null)
     {
@@ -47,25 +98,26 @@ public static class Walls
         foreach (var (x, y) in tiles.Distinct())
         {
             var tile = world.Map.GetTile(x, y);
-            byte target = settlement.Walls.TryGetValue((x, y), out var existing) ? Math.Max(tier, existing.Tier) : tier;
-            bool gate = IsGateTile(tile, gates?.Contains((x, y)) == true) || existing?.Gate == true;
-            if (!NeedsWork(settlement, tile, x, y, target, gate)) continue;
-            var def = Def(world, target);
-            foreach (var (r, n) in gate ? def.GateCost : def.Cost) cost[r] = cost.GetValueOrDefault(r) + n;
+            WallPiece? want = gates?.Contains((x, y)) == true ? WallPiece.Gate : null;
+            if (!NeedsWork(settlement, tile, x, y, tier, want)) continue;
+            settlement.Walls.TryGetValue((x, y), out var existing);
+            byte target = existing != null ? Math.Max(tier, existing.Tier) : tier;
+            foreach (var (r, n) in PieceCost(world, target, Resolve(tile, existing?.Piece, want))) cost[r] = cost.GetValueOrDefault(r) + n;
         }
         return cost;
     }
 
-    internal static void Plan(GameWorld world, Settlement settlement, int x, int y, byte tier, bool gate)
+    internal static void Plan(GameWorld world, Settlement settlement, int x, int y, byte tier, WallPiece? want)
     {
         ref var tile = ref world.Map.GetTile(x, y);
-        byte target = settlement.Walls.TryGetValue((x, y), out var existing) ? Math.Max(tier, existing.Tier) : tier;
-        bool isGate = IsGateTile(tile, gate) || existing?.Gate == true;
-        if (!NeedsWork(settlement, tile, x, y, target, isGate)) return;
+        if (!NeedsWork(settlement, tile, x, y, tier, want)) return;
+        settlement.Walls.TryGetValue((x, y), out var existing);
+        byte target = existing != null ? Math.Max(tier, existing.Tier) : tier;
+        var piece = Resolve(tile, existing?.Piece, want);
         tile.WallPlanned = true;
-        // A new gate is open from the start (nothing stands there yet); an existing wall opens once the gate is built.
-        if (isGate && existing == null) tile.IsGate = true;
-        settlement.WallPlans.Add(new WallPlan { X = x, Y = y, Tier = target, Gate = isGate });
+        // A new opening is open from the start (nothing stands there yet); an existing wall opens once it's built.
+        if (existing == null) tile.IsGate = piece.IsOpening();
+        settlement.WallPlans.Add(new WallPlan { X = x, Y = y, Tier = target, Piece = piece });
         settlement.WallVersion++;
     }
 
@@ -77,11 +129,9 @@ public static class Walls
         var plan = settlement.WallPlans[index];
         ref var tile = ref world.Map.GetTile(x, y);
         tile.WallPlanned = false;
-        if (!settlement.Walls.TryGetValue((x, y), out var existing)) tile.IsGate = false;
-        else tile.IsGate = existing.Gate;
+        tile.IsGate = settlement.Walls.TryGetValue((x, y), out var existing) && existing.Gate;
         settlement.WallPlans.RemoveAt(index);
-        var def = Def(world, plan.Tier);
-        foreach (var (r, n) in plan.Gate ? def.GateCost : def.Cost)
+        foreach (var (r, n) in PieceCost(world, plan.Tier, plan.Piece))
         {
             settlement.Stock.Add(r, n);
             settlement.Ledger.Record(r, n, LedgerKeys.Refunds);
@@ -94,10 +144,11 @@ public static class Walls
     {
         ref var tile = ref world.Map.GetTile(plan.X, plan.Y);
         tile.WallPlanned = false;
-        bool gate = plan.Gate || tile.IsRoad;
+        var piece = plan.Piece == WallPiece.Wall && tile.IsRoad ? WallPiece.Gate : plan.Piece;
         tile.WallTier = (byte)(plan.Tier + 1);
-        tile.IsGate = gate;
-        settlement.Walls[(plan.X, plan.Y)] = new WallSegment { Tier = plan.Tier, Gate = gate, Hp = Def(world, plan.Tier).HitPoints };
+        tile.IsGate = piece.IsOpening();
+        settlement.Walls[(plan.X, plan.Y)] = new WallSegment
+            { Tier = plan.Tier, Piece = piece, Hp = PieceHitPoints(world, plan.Tier, piece) };
         settlement.WallPlans.Remove(plan);
         settlement.WallVersion++;
     }
@@ -117,8 +168,7 @@ public static class Walls
         tile.WallTier = 0;
         tile.IsGate = false;
         settlement.Walls.Remove((x, y));
-        var def = Def(world, wall.Tier);
-        foreach (var (r, n) in wall.Gate ? def.GateCost : def.Cost)
+        foreach (var (r, n) in PieceCost(world, wall.Tier, wall.Piece))
         {
             int back = (int)(n * DemolishRefund);
             if (back <= 0) continue;
@@ -127,11 +177,57 @@ public static class Walls
         }
         settlement.WallVersion++;
     }
+
+    /// <summary>
+    /// Turns a wall (finished or planned) into a gate or tower, or a gate into a gatehouse. A planned piece is
+    /// swapped (its materials go towards the new one); a finished one gets a plan and changes once built.
+    /// </summary>
+    public static CommandResult PlacePiece(GameWorld world, Settlement settlement, int x, int y, WallPiece piece)
+    {
+        ref var tile = ref world.Map.GetTile(x, y);
+        int planIndex = settlement.WallPlans.FindIndex(p => p.X == x && p.Y == y);
+        bool finished = settlement.Walls.TryGetValue((x, y), out var wall);
+        string where = piece == WallPiece.Gatehouse ? "Gatehouses go on a gate" : $"{piece}s go in a wall";
+        if (!finished && planIndex < 0) return CommandResult.Fail(where);
+
+        if (planIndex >= 0)
+        {
+            var plan = settlement.WallPlans[planIndex];
+            if (plan.Piece == piece) return CommandResult.Fail($"Already a {piece.ToString().ToLowerInvariant()}");
+            if (!CanBecome(plan.Piece, piece)) return CommandResult.Fail(where);
+            var old = PieceCost(world, plan.Tier, plan.Piece);
+            var cost = PieceCost(world, plan.Tier, piece);
+            foreach (var (r, n) in old) settlement.Stock.Add(r, n);
+            if (!settlement.Stock.TryTakeAll(cost))
+            {
+                settlement.Stock.TryTakeAll(old);
+                return CommandResult.Fail($"Needs {string.Join(", ", cost.Select(kv => $"{kv.Value} {kv.Key}"))}");
+            }
+            settlement.Ledger.RecordAll(old, 1, LedgerKeys.Refunds);
+            settlement.Ledger.RecordAll(cost, -1, LedgerKeys.Building);
+            plan.Piece = piece;
+            plan.Progress = 0;
+            if (!finished) tile.IsGate = piece.IsOpening();
+            settlement.WallVersion++;
+            return CommandResult.Success();
+        }
+
+        if (wall!.Piece == piece) return CommandResult.Fail($"Already a {piece.ToString().ToLowerInvariant()}");
+        if (!CanBecome(wall.Piece, piece)) return CommandResult.Fail(where);
+        var price = PieceCost(world, wall.Tier, piece);
+        if (!settlement.Stock.TryTakeAll(price)) return CommandResult.Fail($"Needs {string.Join(", ", price.Select(kv => $"{kv.Value} {kv.Key}"))}");
+        settlement.Ledger.RecordAll(price, -1, LedgerKeys.Building);
+        tile.WallPlanned = true;
+        settlement.WallPlans.Add(new WallPlan { X = x, Y = y, Tier = wall.Tier, Piece = piece });
+        settlement.WallVersion++;
+        return CommandResult.Success();
+    }
 }
 
 /// <summary>
 /// Plans a wall of a tier along the tiles (paid up front; the crew builds it over time). Existing walls of ours are
-/// upgraded; road tiles become gates. All tiles must be valid, or nothing is planned.
+/// upgraded, keeping their gates, towers and gatehouses; road tiles become gates. All tiles must be valid, or nothing
+/// is planned.
 /// </summary>
 public sealed record PlaceWallCommand(int SettlementId, IReadOnlyList<(int X, int Y)> Tiles, byte Tier = 0,
     IReadOnlyList<(int X, int Y)>? Gates = null) : ISettlementCommand
@@ -148,13 +244,14 @@ public sealed record PlaceWallCommand(int SettlementId, IReadOnlyList<(int X, in
             if (Walls.Check(world, settlement, x, y) is { } error) return CommandResult.Fail($"({x},{y}): {error}");
         }
         var gates = (IReadOnlyCollection<(int X, int Y)>)(Gates ?? Array.Empty<(int X, int Y)>()).ToHashSet();
-        if (!Tiles.Any(t => Walls.NeedsWork(settlement, world.Map.GetTile(t.X, t.Y), t.X, t.Y, Tier, gates.Contains(t))))
+        WallPiece? Want((int X, int Y) t) => gates.Contains(t) ? WallPiece.Gate : null;
+        if (!Tiles.Any(t => Walls.NeedsWork(settlement, world.Map.GetTile(t.X, t.Y), t.X, t.Y, Tier, Want(t))))
             return CommandResult.Fail("Nothing to build: that wall is already there (or planned)");
         var cost = Walls.PlanCost(world, settlement, Tiles, Tier, gates);
         if (!settlement.Stock.TryTakeAll(cost))
             return CommandResult.Fail($"Needs {string.Join(", ", cost.Select(kv => $"{kv.Value} {kv.Key}"))}");
         settlement.Ledger.RecordAll(cost, -1, LedgerKeys.Building);
-        foreach (var (x, y) in Tiles) Walls.Plan(world, settlement, x, y, Tier, gates.Contains((x, y)));
+        foreach (var t in Tiles) Walls.Plan(world, settlement, t.X, t.Y, Tier, Want(t));
         return CommandResult.Success();
     }
 }
@@ -162,43 +259,22 @@ public sealed record PlaceWallCommand(int SettlementId, IReadOnlyList<(int X, in
 /// <summary>Turns a wall tile (finished or planned) into a gate, for the gate's cost.</summary>
 public sealed record PlaceGateCommand(int SettlementId, int X, int Y) : ISettlementCommand
 {
-    public CommandResult Execute(GameWorld world)
-    {
-        var settlement = world.FindSettlement(SettlementId);
-        if (settlement == null) return CommandResult.Fail("Unknown settlement");
-        ref var tile = ref world.Map.GetTile(X, Y);
-        int planIndex = settlement.WallPlans.FindIndex(p => p.X == X && p.Y == Y);
-        bool finished = settlement.Walls.TryGetValue((X, Y), out var wall);
-        if (!finished && planIndex < 0) return CommandResult.Fail("Gates go in a wall");
-        if ((finished && wall!.Gate) || (planIndex >= 0 && settlement.WallPlans[planIndex].Gate)) return CommandResult.Fail("Already a gate");
+    public CommandResult Execute(GameWorld world) =>
+        world.FindSettlement(SettlementId) is { } s ? Walls.PlacePiece(world, s, X, Y, WallPiece.Gate) : CommandResult.Fail("Unknown settlement");
+}
 
-        if (planIndex >= 0)
-        {
-            // A planned wall becomes a planned gate: the wall's materials go towards the gate's.
-            var plan = settlement.WallPlans[planIndex];
-            var def = Walls.Def(world, plan.Tier);
-            foreach (var (r, n) in def.Cost) settlement.Stock.Add(r, n);
-            if (!settlement.Stock.TryTakeAll(def.GateCost))
-            {
-                settlement.Stock.TryTakeAll(def.Cost);
-                return CommandResult.Fail($"Needs {string.Join(", ", def.GateCost.Select(kv => $"{kv.Value} {kv.Key}"))}");
-            }
-            settlement.Ledger.RecordAll(def.Cost, 1, LedgerKeys.Refunds);
-            settlement.Ledger.RecordAll(def.GateCost, -1, LedgerKeys.Building);
-            plan.Gate = true;
-            if (!finished) tile.IsGate = true;
-            settlement.WallVersion++;
-            return CommandResult.Success();
-        }
+/// <summary>Raises a tower on a wall tile: taller than the wall, holding more defenders.</summary>
+public sealed record PlaceTowerCommand(int SettlementId, int X, int Y) : ISettlementCommand
+{
+    public CommandResult Execute(GameWorld world) =>
+        world.FindSettlement(SettlementId) is { } s ? Walls.PlacePiece(world, s, X, Y, WallPiece.Tower) : CommandResult.Fail("Unknown settlement");
+}
 
-        var cost = Walls.Def(world, wall!.Tier).GateCost;
-        if (!settlement.Stock.TryTakeAll(cost)) return CommandResult.Fail($"Needs {string.Join(", ", cost.Select(kv => $"{kv.Value} {kv.Key}"))}");
-        settlement.Ledger.RecordAll(cost, -1, LedgerKeys.Building);
-        tile.WallPlanned = true;
-        settlement.WallPlans.Add(new WallPlan { X = X, Y = Y, Tier = wall.Tier, Gate = true });
-        settlement.WallVersion++;
-        return CommandResult.Success();
-    }
+/// <summary>Fortifies a gate into a gatehouse: flanking towers over the passage, still open to traffic.</summary>
+public sealed record PlaceGatehouseCommand(int SettlementId, int X, int Y) : ISettlementCommand
+{
+    public CommandResult Execute(GameWorld world) =>
+        world.FindSettlement(SettlementId) is { } s ? Walls.PlacePiece(world, s, X, Y, WallPiece.Gatehouse) : CommandResult.Fail("Unknown settlement");
 }
 
 /// <summary>Cancels planned walls (materials back) and tears down finished ones (a quarter back).</summary>

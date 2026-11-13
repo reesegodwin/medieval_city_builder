@@ -1,5 +1,6 @@
 using Godot;
 using Sim.Core.Commands;
+using Sim.Core.Settlements;
 
 namespace MedievalClient;
 
@@ -27,8 +28,10 @@ public partial class WallTool : Node3D
     /// <summary>Kind of wall (index into walls.json).</summary>
     public byte Tier { get; private set; }
 
-    /// <summary>Gate mode: one click turns a wall tile into a gate.</summary>
-    public bool GateMode { get; private set; }
+    /// <summary>Placing a gate, tower or gatehouse on a wall (one click), rather than drawing a wall.</summary>
+    public WallPiece? Piece { get; private set; }
+
+    public bool GateMode => Piece != null;
 
     public string? Problem { get; private set; }
 
@@ -42,10 +45,10 @@ public partial class WallTool : Node3D
         AddChild(new MultiMeshInstance3D { Multimesh = _preview, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
 
-    public void Begin(byte tier, bool gate = false)
+    public void Begin(byte tier, WallPiece? piece = null)
     {
         Tier = tier;
-        GateMode = gate;
+        Piece = piece;
         Active = true;
         _start = null;
     }
@@ -67,10 +70,20 @@ public partial class WallTool : Node3D
         get
         {
             var world = _session.World;
-            if (GateMode)
-                return Problem != null ? $"Gate: {Problem}" :
-                    "Gate: click a wall to put a gate in it (right-click to stop). People, carts and roads pass through gates; " +
-                    $"a gate costs {Price(world.Data.WallTiers[0].GateCost)} in a palisade, more in stone.";
+            if (Piece is { } piece)
+            {
+                var stone = world.Data.WallTiers[Math.Min(1, world.Data.WallTiers.Count - 1)];
+                string what = piece switch
+                {
+                    WallPiece.Tower => $"Tower: click a wall to raise a tower on it: taller, with room for more defenders " +
+                                       $"({Price(world.Data.WallTiers[0].Tower.Cost)} on a palisade, {Price(stone.Tower.Cost)} on stone).",
+                    WallPiece.Gatehouse => $"Gatehouse: click a gate to fortify it with flanking towers; traffic still passes " +
+                                           $"({Price(world.Data.WallTiers[0].Gatehouse.Cost)} on a palisade, {Price(stone.Gatehouse.Cost)} on stone). Press G again for gates.",
+                    _ => "Gate: click a wall to put a gate in it. People, carts and roads pass through gates; " +
+                         $"a gate costs {Price(world.Data.WallTiers[0].GateCost)} in a palisade, more in stone. Press G again for a gatehouse.",
+                };
+                return Problem != null ? $"{piece}: {Problem}" : what + " (right-click to stop)";
+            }
             var def = world.Data.WallTiers[Tier];
             if (Problem != null) return $"{def.Name}: {Problem}";
             if (_start == null)
@@ -102,15 +115,17 @@ public partial class WallTool : Node3D
             var (x, y) = _tiles[i];
             var tile = world.Map.GetTile(x, y);
             Color color;
-            if (GateMode)
+            if (Piece is { } want)
             {
-                bool wall = town.Walls.ContainsKey((x, y)) || tile.WallPlanned;
-                Problem ??= wall ? null : "Gates go in a wall";
-                color = wall ? GateColor : Invalid;
+                var current = town.Walls.TryGetValue((x, y), out var seg) ? seg.Piece
+                    : town.WallPlans.FirstOrDefault(p => p.X == x && p.Y == y)?.Piece;
+                bool ok = current is { } c && c != want && Walls.CanBecome(c, want);
+                Problem ??= ok ? null : want == WallPiece.Gatehouse ? "Gatehouses go on a gate" : $"{want}s go on a plain wall";
+                color = ok ? GateColor : Invalid;
             }
             else
             {
-                bool done = !Walls.NeedsWork(town, tile, x, y, Tier, tile.IsRoad);
+                bool done = !Walls.NeedsWork(town, tile, x, y, Tier);
                 string? error = town.Walls.ContainsKey((x, y)) || tile.WallPlanned ? null : Walls.Check(world, town, x, y);
                 Problem ??= error;
                 color = done ? Existing : error != null ? Invalid : tile.IsRoad ? GateColor : Valid;
@@ -127,7 +142,16 @@ public partial class WallTool : Node3D
     {
         if (!Active || _tiles.Count == 0) return null;
         var town = _session.PlayerTown;
-        if (GateMode) return _session.Execute(new PlaceGateCommand(town.Id, _tiles[0].X, _tiles[0].Y));
+        if (Piece is { } piece)
+        {
+            var (px, py) = _tiles[0];
+            return _session.Execute(piece switch
+            {
+                WallPiece.Tower => new PlaceTowerCommand(town.Id, px, py),
+                WallPiece.Gatehouse => new PlaceGatehouseCommand(town.Id, px, py),
+                _ => (Sim.Core.Commands.ICommand)new PlaceGateCommand(town.Id, px, py),
+            });
+        }
         if (_start == null)
         {
             _start = _tiles[0];

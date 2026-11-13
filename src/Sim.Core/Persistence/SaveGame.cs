@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 14;
+    public const int CurrentVersion = 15;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -140,8 +140,9 @@ public static class SaveGame
         Roads = s.Roads.Select(r => new[] { r.X, r.Y, (int)tierOf(r) }).ToList(),
         RoadPlans = s.RoadPlans.Select(p => new RoadPlan { X = p.X, Y = p.Y, Progress = p.Progress, Tier = p.Tier }).ToList(),
         RoadVersion = s.RoadVersion,
-        Walls = s.Walls.Select(kv => new[] { kv.Key.X, kv.Key.Y, kv.Value.Tier, kv.Value.Gate ? 1 : 0, kv.Value.Hp }).ToList(),
-        WallPlans = s.WallPlans.Select(p => new WallPlan { X = p.X, Y = p.Y, Tier = p.Tier, Gate = p.Gate, Progress = p.Progress }).ToList(),
+        // [x, y, tier, piece, hp]; version 14 stored a gate flag (0 or 1) where the piece is, which reads the same.
+        Walls = s.Walls.Select(kv => new[] { kv.Key.X, kv.Key.Y, kv.Value.Tier, (int)kv.Value.Piece, kv.Value.Hp }).ToList(),
+        WallPlans = s.WallPlans.Select(p => new WallPlan { X = p.X, Y = p.Y, Tier = p.Tier, Piece = p.Piece, Progress = p.Progress }).ToList(),
         WallVersion = s.WallVersion,
         WallRing = s.WallRing.Select(r => new[] { r.X, r.Y, r.Gate ? 1 : 0 }).ToList(),
         Territory = TerritoryRuns(s),
@@ -280,8 +281,9 @@ public static class SaveGame
         {
             ref var tile = ref world.Map.GetTile(w[0], w[1]);
             tile.WallTier = (byte)(w[2] + 1);
-            tile.IsGate = w[3] != 0;
-            s.Walls[(w[0], w[1])] = new WallSegment { Tier = (byte)w[2], Gate = w[3] != 0, Hp = w[4] };
+            var piece = (WallPiece)w[3];
+            tile.IsGate = piece.IsOpening();
+            s.Walls[(w[0], w[1])] = new WallSegment { Tier = (byte)w[2], Piece = piece, Hp = w[4] };
         }
         foreach (var plan in save.WallPlans ?? new())
         {

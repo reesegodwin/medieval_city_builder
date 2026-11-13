@@ -85,6 +85,18 @@ public sealed class RoadTierDef
     public Dictionary<string, int> Cost { get; set; } = new();
 }
 
+/// <summary>A tower or gatehouse in a kind of wall (walls.json).</summary>
+public sealed class WallPieceDef
+{
+    public string Name { get; set; } = "";
+    public Dictionary<string, int> Cost { get; set; } = new();
+    public double WorkDays { get; set; } = 2;
+    public int HitPoints { get; set; } = 300;
+
+    /// <summary>Soldiers it holds (for the coming battle phase).</summary>
+    public int Defenders { get; set; }
+}
+
 /// <summary>A kind of town wall (walls.json): palisade, stone wall, large stone wall.</summary>
 public sealed class WallTierDef
 {
@@ -111,6 +123,12 @@ public sealed class WallTierDef
 
     /// <summary>Soldiers a tile of wall-walk holds (for the coming battle phase).</summary>
     public int DefendersPerTile { get; set; }
+
+    /// <summary>A tower raised on this kind of wall.</summary>
+    public WallPieceDef Tower { get; set; } = new() { Name = "Tower" };
+
+    /// <summary>A gate fortified with flanking towers.</summary>
+    public WallPieceDef Gatehouse { get; set; } = new() { Name = "Gatehouse" };
 }
 
 /// <summary>Trade tuning (trade.json).</summary>

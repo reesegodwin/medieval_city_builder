@@ -28,6 +28,8 @@ public partial class Hud : CanvasLayer
     public event Action? DemolishRequested;
     public event Action<byte>? WallRequested;
     public event Action? GateRequested;
+    public event Action? TowerRequested;
+    public event Action? GatehouseRequested;
     public event Action<double>? SpeedRequested;
     public event Action? PauseToggled;
     public event Action<bool>? AutoBuildToggled;
@@ -164,6 +166,17 @@ public partial class Hud : CanvasLayer
         }
         ToolButton("Gate\nin a wall", "Put a gate in a wall (G): people, carts and roads pass through. Walls drawn across roads get gates by themselves.",
             () => GateRequested?.Invoke());
+        if (data.WallTiers.Count > 1)
+        {
+            string Price(Dictionary<string, int> cost) => string.Join(", ", cost.Select(kv => $"{kv.Value} {kv.Key}"));
+            var stone = data.WallTiers[1];
+            ToolButton($"Tower\n{Price(data.WallTiers[0].Tower.Cost)}+", $"Raise a tower on a wall (B): taller, with room for more defenders. " +
+                $"Cost depends on the wall: {Price(data.WallTiers[0].Tower.Cost)} on a palisade, {Price(stone.Tower.Cost)} on stone.",
+                () => TowerRequested?.Invoke());
+            ToolButton($"Gatehouse\n{Price(data.WallTiers[0].Gatehouse.Cost)}+", $"Fortify a gate with flanking towers (G twice); traffic still passes. " +
+                $"Cost depends on the wall: {Price(data.WallTiers[0].Gatehouse.Cost)} on a palisade, {Price(stone.Gatehouse.Cost)} on stone.",
+                () => GatehouseRequested?.Invoke());
+        }
         ToolButton("Demolish\nrefund", "Tear down buildings, roads or walls (X). Refunds part of the cost.", () => DemolishRequested?.Invoke());
         ToolButton("Territory\npaint", "Paint where your territory goes (T): drag to claim, Shift+drag to give land back, [ ] brush size.\n" +
             "Your allowance grows with population, up to the cap of your town centre (upgrade it to raise the cap).",
@@ -220,7 +233,7 @@ public partial class Hud : CanvasLayer
         // --- Controls help (top-right, under the bar) ---
         var help = new Label
         {
-            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   V: walls   G: gate   X: demolish   T: territory   P: rules   J: trade   L: ledger\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
+            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   V: walls   G: gate   B: tower   X: demolish   T: territory   P: rules   J: trade   L: ledger\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
             HorizontalAlignment = HorizontalAlignment.Right,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };

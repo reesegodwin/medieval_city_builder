@@ -80,8 +80,8 @@ public sealed class GameWorld
             foreach (string warning in s.ShortageWarnings) h.Add(warning);
             foreach (var (food, owed) in s.SpoilageOwed) h.Add(food).Add(owed);
             foreach (var plan in s.RoadPlans) h.Add(plan.X).Add(plan.Y).Add(plan.Progress).Add(plan.Tier);
-            foreach (var ((x, y), wall) in s.Walls) h.Add(x).Add(y).Add(wall.Tier).Add(wall.Gate).Add(wall.Hp);
-            foreach (var plan in s.WallPlans) h.Add(plan.X).Add(plan.Y).Add(plan.Tier).Add(plan.Gate).Add(plan.Progress);
+            foreach (var ((x, y), wall) in s.Walls) h.Add(x).Add(y).Add(wall.Tier).Add((int)wall.Piece).Add(wall.Hp);
+            foreach (var plan in s.WallPlans) h.Add(plan.X).Add(plan.Y).Add(plan.Tier).Add((int)plan.Piece).Add(plan.Progress);
             foreach (var (x, y, gate) in s.WallRing) h.Add(x).Add(y).Add(gate);
             foreach (var (x, y) in s.Roads)
                 if (Map.GetTile(x, y).RoadTier > 0) h.Add(x).Add(y).Add(Map.GetTile(x, y).RoadTier);

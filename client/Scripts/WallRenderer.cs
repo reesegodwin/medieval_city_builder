@@ -51,14 +51,22 @@ public partial class WallRenderer : Node3D
         {
             float g = TerrainShape.HeightAt(_map, x + 0.5f, y + 0.5f);
             bool e = IsWall(x + 1, y), w = IsWall(x - 1, y), n = IsWall(x, y - 1), s = IsWall(x, y + 1);
+            bool alongX = e || w || !(n || s);
+            if (wall.Piece == WallPiece.Gatehouse)
+            {
+                Gatehouse(mb, x, y, g, wall.Tier, alongX);
+                continue;
+            }
             if (wall.Tier == 0)
             {
                 if (wall.Gate) Gate(mb, x, y, g, wall.Tier, alongX: e || w);
                 else Segment(mb, x, y, g, wall.Tier, e, w, n, s);
+                if (wall.Piece == WallPiece.Tower) Watchtower(mb, x, y, g);
                 continue;
             }
             StoneWall(mb, x, y, g, wall.Tier, e, w, n, s, wall.Gate);
-            if (WallSystem.IsStair(_world, _settlement, x, y) && !wall.Gate) Stairs(mb, x, y, g, wall.Tier, alongX: e || w);
+            if (wall.Piece == WallPiece.Tower) StoneTower(mb, x, y, g, wall.Tier);
+            else if (WallSystem.IsStair(_world, _settlement, x, y) && !wall.Gate) Stairs(mb, x, y, g, wall.Tier, alongX: e || w);
         }
         _mesh.Mesh = mb.Commit(SeasonLook.Default);
 
@@ -197,15 +205,117 @@ public partial class WallRenderer : Node3D
             Run(new Vector3(cx + t - p, top, z0), new Vector3(cx + t, top, z1), crenellated: sideInside != 1);
         }
 
-        // Large walls: a tower every few tiles, rising above the walk.
-        if (tier >= 2 && !gate && (x + y) % 8 == 0)
+    }
+
+    private static readonly Color Roof = new(0.36f, 0.38f, 0.44f);
+    private static readonly Color Slit = new(0.12f, 0.12f, 0.14f);
+
+    /// <summary>Battlements around the top edge of a square block.</summary>
+    private static void Crown(MeshBuilder mb, float x0, float z0, float x1, float z1, float top, float size = 0.18f)
+    {
+        for (float px = x0; px < x1 - 0.01f; px += size * 2)
         {
-            mb.Box(new Vector3(x - 0.05f, g, y - 0.05f), new Vector3(x + 1.05f, g + h + 0.8f, y + 1.05f), face.Lightened(0.03f), walk);
-            for (int i = 0; i < 4; i++)
-            {
-                float ox = i % 2 == 0 ? x - 0.05f : x + 0.8f, oz = i < 2 ? y - 0.05f : y + 0.8f;
-                mb.Box(new Vector3(ox, g + h + 0.8f, oz), new Vector3(ox + 0.25f, g + h + 1.05f, oz + 0.25f), DarkStone);
-            }
+            mb.Box(new Vector3(px, top, z0), new Vector3(Mathf.Min(px + size, x1), top + size, z0 + size), DarkStone);
+            mb.Box(new Vector3(px, top, z1 - size), new Vector3(Mathf.Min(px + size, x1), top + size, z1), DarkStone);
+        }
+        for (float pz = z0 + size * 2; pz < z1 - size - 0.01f; pz += size * 2)
+        {
+            mb.Box(new Vector3(x0, top, pz), new Vector3(x0 + size, top + size, Mathf.Min(pz + size, z1)), DarkStone);
+            mb.Box(new Vector3(x1 - size, top, pz), new Vector3(x1, top + size, Mathf.Min(pz + size, z1)), DarkStone);
+        }
+    }
+
+    /// <summary>Arrow slits on the four faces of a block.</summary>
+    private static void Slits(MeshBuilder mb, float x0, float z0, float x1, float z1, float y0, float y1)
+    {
+        float mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+        for (float y = y0; y + 0.25f <= y1; y += 0.7f)
+        {
+            mb.Box(new Vector3(mx - 0.03f, y, z0 - 0.01f), new Vector3(mx + 0.03f, y + 0.22f, z0), Slit);
+            mb.Box(new Vector3(mx - 0.03f, y, z1), new Vector3(mx + 0.03f, y + 0.22f, z1 + 0.01f), Slit);
+            mb.Box(new Vector3(x0 - 0.01f, y, mz - 0.03f), new Vector3(x0, y + 0.22f, mz + 0.03f), Slit);
+            mb.Box(new Vector3(x1, y, mz - 0.03f), new Vector3(x1 + 0.01f, y + 0.22f, mz + 0.03f), Slit);
+        }
+    }
+
+    /// <summary>A wooden watchtower over a palisade: four posts, a railed platform and a small roof.</summary>
+    private static void Watchtower(MeshBuilder mb, int x, int y, float g)
+    {
+        float top = g + 1.5f;
+        foreach (float px in new[] { x + 0.1f, x + 0.8f })
+        foreach (float pz in new[] { y + 0.1f, y + 0.8f })
+            mb.Box(new Vector3(px, g, pz), new Vector3(px + 0.1f, top + 0.5f, pz + 0.1f), Stake);
+        mb.Box(new Vector3(x - 0.05f, top, y - 0.05f), new Vector3(x + 1.05f, top + 0.08f, y + 1.05f), Stake.Lightened(0.08f));
+        // Railing, braces and a ladder.
+        mb.Box(new Vector3(x - 0.05f, top + 0.08f, y - 0.05f), new Vector3(x + 1.05f, top + 0.3f, y + 0.02f), Stake.Darkened(0.1f));
+        mb.Box(new Vector3(x - 0.05f, top + 0.08f, y + 0.98f), new Vector3(x + 1.05f, top + 0.3f, y + 1.05f), Stake.Darkened(0.1f));
+        mb.Box(new Vector3(x - 0.05f, top + 0.08f, y - 0.05f), new Vector3(x + 0.02f, top + 0.3f, y + 1.05f), Stake.Darkened(0.1f));
+        mb.Box(new Vector3(x + 0.98f, top + 0.08f, y - 0.05f), new Vector3(x + 1.05f, top + 0.3f, y + 1.05f), Stake.Darkened(0.1f));
+        mb.Box(new Vector3(x + 0.1f, g + 0.6f, y + 0.12f), new Vector3(x + 0.9f, g + 0.68f, y + 0.18f), Stake.Darkened(0.2f));
+        mb.GableRoof(new Vector3(x - 0.1f, top + 0.5f, y - 0.1f), new Vector3(x + 1.1f, top + 0.5f, y + 1.1f), 0.45f, Roof.Lightened(0.15f));
+    }
+
+    /// <summary>A stone tower rising above the wall-walk: battlements, arrow slits, and on a great tower a capped turret.</summary>
+    private static void StoneTower(MeshBuilder mb, int x, int y, float g, byte tier)
+    {
+        bool great = tier >= 2;
+        float grow = great ? 0.2f : 0.1f;
+        float x0 = x - grow, x1 = x + 1 + grow, z0 = y - grow, z1 = y + 1 + grow;
+        float top = g + StoneHeight(tier) + (great ? 1.4f : 1.0f);
+        var face = WallStone.Darkened(great ? 0.22f : 0.16f);
+        mb.Box(new Vector3(x0, g, z0), new Vector3(x1, top, z1), face, WallStone.Lightened(0.06f));
+        // A string course where the tower rises above the walk.
+        mb.Box(new Vector3(x0 - 0.04f, g + StoneHeight(tier), z0 - 0.04f), new Vector3(x1 + 0.04f, g + StoneHeight(tier) + 0.08f, z1 + 0.04f), DarkStone);
+        Slits(mb, x0, z0, x1, z1, g + 0.5f, top - 0.3f);
+        Crown(mb, x0, z0, x1, z1, top, great ? 0.2f : 0.17f);
+        if (great)
+        {
+            // A corner turret with a slate cap.
+            mb.Box(new Vector3(x1 - 0.45f, top, z0), new Vector3(x1, top + 0.8f, z0 + 0.45f), face.Lightened(0.03f));
+            mb.Cone(new Vector3(x1 - 0.225f, top + 0.8f, z0 + 0.225f), 0.34f, 0.6f, 6, Roof);
+        }
+    }
+
+    /// <summary>
+    /// A gatehouse: two towers flanking the passage, joined above it so the walk crosses over, with a portcullis
+    /// in the arch. In timber over a palisade.
+    /// </summary>
+    private static void Gatehouse(MeshBuilder mb, int x, int y, float g, byte tier, bool alongX)
+    {
+        bool timber = tier == 0;
+        float h = timber ? 1.5f : StoneHeight(tier) + 0.7f;
+        float depth = timber ? 0.45f : StoneHalfWidth(tier) + 0.3f; // how far the towers stand out from the wall line
+        float open = 0.3f;
+        var face = timber ? Stake : WallStone.Darkened(0.2f);
+        var top = timber ? Stake.Lightened(0.1f) : WallStone.Lightened(0.06f);
+        float cx = x + 0.5f, cz = y + 0.5f;
+        // The two flanking towers and the bridge over the passage, laid out along the wall's direction.
+        Vector3 P(float along, float height, float across) => alongX ? new Vector3(x + along, g + height, cz + across) : new Vector3(cx + across, g + height, y + along);
+        void Block(float a0, float a1, float h0, float h1, float c0, float c1, Color c, Color? t = null)
+        {
+            var p0 = P(a0, h0, c0);
+            var p1 = P(a1, h1, c1);
+            mb.Box(new Vector3(Mathf.Min(p0.X, p1.X), p0.Y, Mathf.Min(p0.Z, p1.Z)), new Vector3(Mathf.Max(p0.X, p1.X), p1.Y, Mathf.Max(p0.Z, p1.Z)), c, t);
+        }
+        Block(-0.2f, 0.5f - open, 0, h, -depth, depth, face, top);
+        Block(0.5f + open, 1.2f, 0, h, -depth, depth, face, top);
+        Block(0.5f - open, 0.5f + open, h - (timber ? 0.45f : 0.7f), h - 0.15f, -depth, depth, face, top);
+        // The portcullis (or timber doors) in the passage.
+        for (float a = 0.5f - open + 0.06f; a < 0.5f + open - 0.02f; a += 0.1f)
+            Block(a, a + 0.03f, 0.25f, h - (timber ? 0.45f : 0.7f), -0.02f, 0.02f, Slit);
+        if (timber)
+        {
+            foreach (float a in new[] { -0.2f, 0.85f })
+                mb.GableRoof(P(a, h, -depth - 0.05f), P(a + 0.35f, h, depth + 0.05f), 0.35f, Roof.Lightened(0.15f));
+            return;
+        }
+        // Battlements on each tower and over the arch.
+        foreach (var (a0, a1) in new[] { (-0.2f, 0.5f - open), (0.5f + open, 1.2f) })
+        {
+            var p0 = P(a0, h, -depth);
+            var p1 = P(a1, h, depth);
+            Crown(mb, Mathf.Min(p0.X, p1.X), Mathf.Min(p0.Z, p1.Z), Mathf.Max(p0.X, p1.X), Mathf.Max(p0.Z, p1.Z), g + h);
+            Slits(mb, Mathf.Min(p0.X, p1.X), Mathf.Min(p0.Z, p1.Z), Mathf.Max(p0.X, p1.X), Mathf.Max(p0.Z, p1.Z), g + 0.5f, g + h - 0.4f);
         }
     }
 

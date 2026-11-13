@@ -1,4 +1,5 @@
 using Godot;
+using Sim.Core.Settlements;
 using MedievalClient.Audio;
 using MedievalClient.Ui;
 using Sim.Core.Commands;
@@ -23,7 +24,8 @@ namespace MedievalClient;
 ///   --ledger [TAB]        open the town ledger on start (tab 0-3)
 ///   --ledger-good ID      open the ledger's Goods tab with a good's 30-day charts (e.g. wood)
 ///   --follow-caravan      keep the camera on a caravan on the road (automated checks)
-///   --look-at ID          start with the camera on the town's first building of type ID (e.g. fishing_hut), or "wall"/"gate"
+///   --demo-walls          lay a stone wall and a large wall, each with a tower and gatehouse, near the centre (screenshots)
+///   --look-at ID          start with the camera on the town's first building of type ID (e.g. fishing_hut), or wall/gate/tower/gatehouse
 ///   --territory           open the territory paint tool on start
 ///   --zoom N              start with the camera N units away (6-90)
 ///   --place ID            start placing building ID with the cursor mid-screen (automated checks)
@@ -216,8 +218,10 @@ public partial class Main : Node3D
             _roadTool.Begin(tier);
         };
         _hud.DemolishRequested += StartDemolishTool;
-        _hud.WallRequested += tier => StartWallTool(tier, gate: false);
-        _hud.GateRequested += () => StartWallTool(0, gate: true);
+        _hud.WallRequested += tier => StartWallTool(tier, null);
+        _hud.GateRequested += () => StartWallTool(0, WallPiece.Gate);
+        _hud.TowerRequested += () => StartWallTool(0, WallPiece.Tower);
+        _hud.GatehouseRequested += () => StartWallTool(0, WallPiece.Gatehouse);
         _hud.SpeedRequested += speed =>
         {
             _session.Speed = speed;
@@ -303,10 +307,14 @@ public partial class Main : Node3D
         if (SimSession.UserArg("--territory") != null) StartTerritoryTool();
         if (float.TryParse(SimSession.UserArg("--zoom"), out float zoom)) _camera.SetDistance(zoom);
         _followCaravan = SimSession.UserArg("--follow-caravan") != null;
+        if (SimSession.UserArg("--demo-walls") != null) DemoWalls();
         if (SimSession.UserArg("--look-at") is { Length: > 0 } lookAt)
         {
             var player = _session.PlayerTown;
-            if (lookAt is "wall" or "gate" && player.Walls.FirstOrDefault(w => lookAt == "wall" || w.Value.Gate) is { Value: not null } wall)
+            if (lookAt is "wall" or "gate" or "tower" or "gatehouse" &&
+                player.Walls.FirstOrDefault(w => lookAt == "wall" || (lookAt == "gate" && w.Value.Gate) ||
+                                                 (lookAt == "tower" && w.Value.Piece == WallPiece.Tower) ||
+                                                 (lookAt == "gatehouse" && w.Value.Piece == WallPiece.Gatehouse)) is { Value: not null } wall)
                 _camera.LookAtTile(wall.Key.X, wall.Key.Y);
             else if (player.Buildings.FirstOrDefault(b => b.Def.Id == lookAt) is { } sight)
                 _camera.LookAtTile(sight.CenterX, sight.CenterY);
@@ -524,11 +532,16 @@ public partial class Main : Node3D
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.V }:
-                StartWallTool(_wallTool.Active && !_wallTool.GateMode ? (byte)((_wallTool.Tier + 1) % _session.World.Data.WallTiers.Count) : (byte)0, gate: false);
+                StartWallTool(_wallTool.Active && !_wallTool.GateMode ? (byte)((_wallTool.Tier + 1) % _session.World.Data.WallTiers.Count) : (byte)0, null);
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.G }:
-                StartWallTool(0, gate: true);
+                // G: gate; pressed again, gatehouse.
+                StartWallTool(0, _wallTool.Active && _wallTool.Piece == WallPiece.Gate ? WallPiece.Gatehouse : WallPiece.Gate);
+                break;
+
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.B }:
+                StartWallTool(0, WallPiece.Tower);
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.X }:
@@ -628,11 +641,49 @@ public partial class Main : Node3D
     }
 
     /// <summary>V picks a palisade, and pressing it again moves up to stone and large stone walls.</summary>
-    private void StartWallTool(byte tier, bool gate)
+    private void StartWallTool(byte tier, WallPiece? piece)
     {
         CancelTools();
         ClearSelection();
-        _wallTool.Begin(tier, gate);
+        _wallTool.Begin(tier, piece);
+    }
+
+    /// <summary>
+    /// For screenshots: a stone wall and a large stone wall near the centre, each with a tower and a gatehouse,
+    /// placed with the same commands a player uses and finished at once. The camera looks at the first.
+    /// </summary>
+    private void DemoWalls()
+    {
+        var world = _session.World;
+        var town = _session.PlayerTown;
+        town.Stock.Add("stone", 2000);
+        town.Stock.Add("wood", 500);
+        List<(int X, int Y)>? FreeLine(int length, int fromDy)
+        {
+            for (int dy = fromDy; dy < fromDy + 40; dy++)
+            for (int dx = -30; dx < 30; dx++)
+            {
+                var line = Enumerable.Range(0, length).Select(i => (town.CenterX + dx + i, town.CenterY + dy)).ToList();
+                bool clear = line.All(t => Walls.Check(world, town, t.Item1, t.Item2) == null &&
+                                           world.Map.GetTile(t.Item1, t.Item2) is { IsRoad: false, RoadPlanned: false, WallTier: 0, WallPlanned: false } &&
+                                           world.Map.GetTile(t.Item1, t.Item2 + 1).BuildingId == 0 && world.Map.GetTile(t.Item1, t.Item2 - 1).BuildingId == 0);
+                if (clear) return line;
+            }
+            return null;
+        }
+        (int X, int Y)? first = null;
+        foreach (byte tier in new byte[] { 1, 2 })
+        {
+            if (FreeLine(9, tier == 1 ? 3 : 12) is not { } line) continue;
+            _session.Execute(new PlaceWallCommand(town.Id, line, tier));
+            _session.Execute(new PlaceTowerCommand(town.Id, line[2].X, line[2].Y));
+            _session.Execute(new PlaceGateCommand(town.Id, line[6].X, line[6].Y));
+            Walls.FinishAllPlans(world, town);
+            _session.Execute(new PlaceGatehouseCommand(town.Id, line[6].X, line[6].Y));
+            Walls.FinishAllPlans(world, town);
+            first ??= line[4];
+        }
+        if (first is { } f) _camera.LookAtTile(f.X, f.Y);
     }
 
     private void StartDemolishTool()

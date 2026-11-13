@@ -546,7 +546,7 @@ public static class RoadSystem
             var plan = settlement.WallPlans[0];
             double distance = Math.Abs(plan.X - settlement.CenterX) + Math.Abs(plan.Y - settlement.CenterY);
             double slowdown = 1 + distance / Commands.Roads.WalkHalfDistance;
-            double needed = (Commands.Walls.Def(world, plan.Tier).WorkDays - plan.Progress) * slowdown;
+            double needed = (Commands.Walls.PieceWorkDays(world, plan.Tier, plan.Piece) - plan.Progress) * slowdown;
             if (labour < needed)
             {
                 plan.Progress += labour / slowdown;

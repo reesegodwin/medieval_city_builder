@@ -14,7 +14,7 @@ What works today:
 - **Citizens.** Each person is a real record: name, age, sex, family, traits, skills that improve with work, job, home, hunger, mood and a life history.
 - **Jobs.** People are assigned by settlement rules (job priorities). The rules give priority to food during shortages, to producers of scarce goods, and to builders.
 - **Production chains** defined in JSON: farm → grain, then mill & bakery → bread; vegetable garden → vegetables; fishing hut (by water) → fish; sheep pasture → wool and mutton; smokehouse: mutton or fish (+ firewood) → smoked meat; brewery: grain → ale; woodcutter → wood; firewood hut → firewood; quarry → stone. They respect stock reserves and stock limits (like Dwarf Fortress work orders), and workers are freed once stores are full.
-- **Walls and gates:** draw a palisade, stone wall or large stone wall like a road; walls stop everyone except at gates, homes inside a closed ring feel safe, and towns ring themselves as they grow. Stone walls have a wall-walk behind battlements, reached by stairs and gatehouses, ready for defenders.
+- **Walls and gates:** draw a palisade, stone wall or large stone wall like a road; walls stop everyone except at gates, homes inside a closed ring feel safe, and towns ring themselves as they grow. Stone walls have a wall-walk behind battlements, reached by stairs and gatehouses, ready for defenders; towers and gatehouses add strong points.
 - **Workplace stores:** each workplace keeps some of what it makes (a farm 50 grain, a bakery 30 bread), so full stockpiles don't stop production.
 - **Odd jobs:** adults without a job help at building sites and on roads, or gather berries, firewood and stones, instead of sitting idle.
 - **Seasons:** farms peak at the autumn harvest and slow in winter, when homes burn firewood (gathered at firewood huts). Food rots outside granaries, fastest in summer and not at all in winter. Towns sell food above their winter reserve in autumn. Snow and autumn colours show the time of year.
@@ -91,7 +91,8 @@ dotnet test
 | T | Territory tool: drag to claim land, Shift+drag to give it back, `[` / `]` change the brush size |
 | J | Trade panel: market, your offers, new offer (with a fair-price button), routes and caravans. Needs a Trading Post |
 | V | Walls: palisade, then stone wall, then large stone wall (press again to cycle); click start and end |
-| G | Gate: click a wall to put a gate in it |
+| G | Gate: click a wall to put a gate in it; press again for a gatehouse (fortify a gate) |
+| B | Tower: click a wall to raise a tower on it |
 | L | Town ledger: people and complaints, goods made and used per day (and what will run out, with 30-day charts), coin in and out, jobs |
 | Right-click / Esc | Cancel the current tool or close the inspector |
 | P | Rules panel: job priorities, stock limits, reserves, home upgrades, disasters on/off |
@@ -123,7 +124,8 @@ These go after `--` on Godot's command line:
 | `--trade [TAB]` | Open the trade panel at start (tab 0–4) |
 | `--ledger [TAB]` | Open the town ledger at start (0 Overview, 1 Goods, 2 Treasury, 3 Work) |
 | `--ledger-good ID` | Open the ledger's Goods tab with a good's 30-day charts (e.g. `wood`) |
-| `--look-at ID` | Start with the camera on the town's first building of type ID (e.g. `fishing_hut`) |
+| `--look-at ID` | Start with the camera on the town's first building of type ID (e.g. `fishing_hut`), or `wall`, `gate`, `tower`, `gatehouse` |
+| `--demo-walls` | Lay a stone wall and a large wall, each with a tower and gatehouse, near the centre (screenshots) |
 | `--follow-caravan` | Keep the camera on a caravan on the road |
 | `--territory` | Open the territory tool at start |
 | `--zoom N` | Start with the camera N units away (6–90) |

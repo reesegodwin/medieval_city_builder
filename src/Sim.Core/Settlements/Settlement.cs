@@ -331,13 +331,31 @@ public sealed class Settlement
     public override string ToString() => Name;
 }
 
+/// <summary>What stands on a wall tile.</summary>
+public enum WallPiece : byte
+{
+    Wall = 0,
+    Gate = 1,
+    Tower = 2,
+    Gatehouse = 3,
+}
+
+public static class WallPieces
+{
+    /// <summary>Gates and gatehouses let people, carts and roads through.</summary>
+    public static bool IsOpening(this WallPiece piece) => piece is WallPiece.Gate or WallPiece.Gatehouse;
+}
+
 /// <summary>A finished wall tile.</summary>
 public sealed class WallSegment
 {
     /// <summary>Index into walls.json (0 palisade, 1 stone wall, 2 large stone wall).</summary>
     public byte Tier { get; set; }
 
-    public bool Gate { get; set; }
+    public WallPiece Piece { get; set; }
+
+    /// <summary>A gate or gatehouse: open to traffic.</summary>
+    public bool Gate => Piece.IsOpening();
 
     /// <summary>Strength left, for sieges (not used yet).</summary>
     public int Hp { get; set; }
@@ -352,7 +370,15 @@ public sealed class WallPlan
     /// <summary>Index into walls.json.</summary>
     public byte Tier { get; set; }
 
-    public bool Gate { get; set; }
+    public WallPiece Piece { get; set; }
+
+    /// <summary>A gate or gatehouse. Settable only so that saves from before towers (with a gate flag) still load.</summary>
+    public bool Gate
+    {
+        get => Piece.IsOpening();
+        set { if (value && Piece == WallPiece.Wall) Piece = WallPiece.Gate; }
+    }
+
     public double Progress { get; set; }
 }
 
