@@ -153,6 +153,9 @@ internal static class Report
         Console.WriteLine($"Births {world.TotalBirths}, deaths {world.TotalDeaths}. Storage {s.Stock.Total}/{s.StorageCapacity}, " +
                           $"housing {s.HousingCapacity - s.FreeHousing}/{s.HousingCapacity}, road tiles {s.Roads.Count}.");
         PrintLedger(world, s);
+        double spoiled = world.Data.FoodsByPreference.Sum(f => -s.Ledger.History.Sum(d => d.Get(f.Id, Sim.Core.Economy.LedgerKeys.Spoiled)));
+        Console.WriteLine($"Food: {SeasonSystem.FoodStock(world, s)} stored, granaries keep {s.FoodStoreCapacity} from rot; " +
+                          $"{spoiled:0} rotted in the last {s.Ledger.History.Count} days. Firewood {s.Stock.Get("firewood")}.");
         var mine = world.Events.Where(e => e.SettlementId == s.Id).ToList();
         int Count(string text) => mine.Count(e => e.Kind == Sim.Core.Events.EventKind.Disaster && e.Message.StartsWith(text));
         Console.WriteLine($"Disasters: {Count("Fire")} fires, {Count("Sickness")} outbreaks of sickness, {Count("A poor harvest")} poor harvests. " +

@@ -170,8 +170,13 @@ public partial class LedgerPanel : PanelContainer
         var season = SeasonSystem.Current(World);
         int coldHomes = s.Buildings.Count(b => b.Cold);
         sb.AppendLine($"[b]{season.Name}:[/b] farms and gardens yield {season.OutputOf("farm"):P0}, fishing {season.OutputOf("fishing_hut"):P0}" +
-                      (season.HeatingWoodPerHomeDay > 0 ? $"; homes burn {season.HeatingWoodPerHomeDay:0.#} wood a day" : "") +
+                      (season.HeatingWoodPerHomeDay > 0 ? $"; homes burn {season.HeatingWoodPerHomeDay:0.#} firewood a day" : "") +
                       (coldHomes > 0 ? $"; [color=#ff9070]{coldHomes} homes are cold[/color]" : ""));
+        int food = SeasonSystem.FoodStock(World, s);
+        double rotting = World.Data.FoodsByPreference.Sum(f => -s.Ledger.Average(f.Id, k => k == LedgerKeys.Spoiled, AverageDays));
+        sb.AppendLine($"[b]Food store:[/b] {food} food, granaries keep {Math.Min(food, s.FoodStoreCapacity)} of it fresh" +
+                      (rotting >= 0.5 ? $"; [color=#ffb060]{rotting:0} rotting a day[/color]" : "") +
+                      $"; {s.Stock.Get(SeasonSystem.Firewood)} firewood");
         if (s.PoorHarvestDays > 0)
             sb.AppendLine($"[color=#ffb060]Poor harvest:[/color] farms and gardens yield less for {s.PoorHarvestDays} more days");
         foreach (string warning in s.ShortageWarnings)
@@ -271,7 +276,7 @@ public partial class LedgerPanel : PanelContainer
 
     private static bool IsMade(string k) => LedgerKeys.Category(k) is LedgerKeys.Made or LedgerKeys.Taxes or LedgerKeys.Refunds;
     private static bool IsUsed(string k) => LedgerKeys.Category(k) is LedgerKeys.Inputs or LedgerKeys.Eaten or LedgerKeys.Used
-        or LedgerKeys.Building or LedgerKeys.Upkeep or LedgerKeys.Disaster or LedgerKeys.Heating;
+        or LedgerKeys.Building or LedgerKeys.Upkeep or LedgerKeys.Disaster or LedgerKeys.Heating or LedgerKeys.Spoiled;
     private static bool IsTraded(string k) => LedgerKeys.Category(k) is LedgerKeys.TradeIn or LedgerKeys.TradeOut or LedgerKeys.Offers;
 
     private void FillGoodDetails()
@@ -323,6 +328,7 @@ public partial class LedgerPanel : PanelContainer
             LedgerKeys.Used => "Used up (services, households, tools)",
             LedgerKeys.Disaster => "Lost to disaster",
             LedgerKeys.Heating => "Firewood for homes",
+            LedgerKeys.Spoiled => "Rotted (outside granaries)",
             _ => parts[0],
         };
         return parts.Length > 1 ? $"{what}: {parts[1]}" : what;

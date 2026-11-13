@@ -239,10 +239,8 @@ public static class SettlementGovernor
     /// <summary>Towns this size and up store food in granaries rather than more stockpiles.</summary>
     public const int GranaryPopulation = 60;
 
-    /// <summary>Rough nutrition per stored food item, to turn days of food into storage space.</summary>
-    private const double AverageFoodNutrition = 0.8;
-
-    private static int FoodStock(GameWorld world, Settlement s) => world.Data.FoodsByPreference.Sum(f => s.Stock.Get(f.Id));
+    /// <summary>Towns this size and up gather firewood (the first winter comes at day 271).</summary>
+    public const int FirewoodPopulation = 15;
 
     /// <summary>Build more producers of wood, stone or food when the books say they'd run out within this many days.</summary>
     public const double ForecastDays = 15;
@@ -520,19 +518,28 @@ public static class SettlementGovernor
         }
         if ((bakeries == 0 && population >= 18) || (grainSurplus && bakeries < farms * 0.6 && !Understaffed("bakery")))
             Wish("bakery");
-        // Firewood: lay in wood through autumn so homes stay warm all winter.
-        bool woodForWinter = season == Season.Autumn && s.Stock.Get("wood") < s.LimitOf("wood") / 2;
-        if ((s.Stock.Get("wood") < 40 || RunningOut("wood") || woodForWinter) && s.CountIncludingPlanned("woodcutter") < 1 + population / 15)
+        if ((s.Stock.Get("wood") < 40 || RunningOut("wood")) && s.CountIncludingPlanned("woodcutter") < 1 + population / 15)
             Wish("woodcutter");
         int quarries = s.CountIncludingPlanned("quarry");
         if (quarries == 0 || ((s.Stock.Get("stone") < 20 || RunningOut("stone")) && quarries < 1 + population / 30))
             Wish("quarry");
-        // Storage, and before winter room for a reserve of food: granaries once the town can afford them.
+        // Firewood: gathered all year until stores are full, so homes stay warm through winter.
+        string firewood = SeasonSystem.Firewood;
+        bool firewoodLow = s.Stock.Get(firewood) < (season is Season.Summer or Season.Autumn ? s.LimitOf(firewood) / 2 : 20) ||
+                           RunningOut(firewood);
+        if (population >= FirewoodPopulation && firewoodLow && !Understaffed("firewood_hut") &&
+            s.CountIncludingPlanned("firewood_hut") < 1 + population / 50)
+            Wish("firewood_hut");
+
+        // Storage, and before winter room for a reserve of food: granaries once the town can afford them. Granaries
+        // also keep food from rotting, so one is wanted whenever more food is stored than they hold.
         double reserveRoom = season is Season.Summer or Season.Autumn
-            ? dailyFoodNeed * world.Data.Seasons.WinterReserveDays / AverageFoodNutrition - FoodStock(world, s)
+            ? SeasonSystem.WinterReserve(world, s) - SeasonSystem.FoodStock(world, s)
             : 0;
-        if (s.FreeStorage < 80 || s.FreeStorage < reserveRoom)
-            Wish(population >= GranaryPopulation && s.CountIncludingPlanned("granary") < 1 + population / 60 ? "granary" : "stockpile");
+        bool granaryWanted = population >= GranaryPopulation && s.CountIncludingPlanned("granary") < 1 + population / 60;
+        bool foodRotting = SeasonSystem.FoodStock(world, s) > s.FoodStoreCapacity + 100;
+        if (s.FreeStorage < 80 || s.FreeStorage < reserveRoom || (granaryWanted && foodRotting))
+            Wish(granaryWanted ? "granary" : "stockpile");
         if (population >= TradingPostPopulation && !s.Buildings.Any(b => b.Def.Trade)) Wish("trading_post");
 
         // Production chains (mine -> smithy, pasture -> weaver, carpenter...), from each building's governor hint.

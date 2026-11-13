@@ -26,7 +26,7 @@ public static class Forecast
     public const string Food = "food";
 
     /// <summary>Goods worth warning about, plus all food together.</summary>
-    public static readonly string[] Watched = { Food, "wood", "stone", "tools", Inventory.Coin };
+    public static readonly string[] Watched = { Food, "firewood", "wood", "stone", "tools", Inventory.Coin };
 
     /// <summary>Days of books needed before forecasting; the first days of a town are too uneven.</summary>
     public const int MinHistoryDays = 3;

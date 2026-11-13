@@ -73,6 +73,21 @@ public static class LowPolyMeshes
                     mb.Box(new Vector3(0.2f, i * 0.12f, h - 0.45f + i * 0.04f), new Vector3(w - 0.2f, i * 0.12f + 0.12f, h - 0.33f + i * 0.04f), Wood);
                 break;
 
+            case "firewood_hut":
+                // An open lean-to stacked with split logs, a chopping block and an axe.
+                mb.Box(new Vector3(0.15f, 0, 0.2f), new Vector3(0.25f, 0.75f, 0.3f), Timber);
+                mb.Box(new Vector3(w - 0.25f, 0, 0.2f), new Vector3(w - 0.15f, 0.75f, 0.3f), Timber);
+                mb.Box(new Vector3(0.15f, 0, 1.0f), new Vector3(0.25f, 0.5f, 1.1f), Timber);
+                mb.Box(new Vector3(w - 0.25f, 0, 1.0f), new Vector3(w - 0.15f, 0.5f, 1.1f), Timber);
+                mb.GableRoof(new Vector3(0.1f, 0.62f, 0.15f), new Vector3(w - 0.1f, 0.62f, 1.15f), 0.18f, Thatch.Darkened(0.1f));
+                for (int i = 0; i < 4; i++) // stacked logs, ends showing
+                    mb.Box(new Vector3(0.3f, i * 0.12f, 0.35f), new Vector3(w - 0.3f, i * 0.12f + 0.11f, 0.95f),
+                        i % 2 == 0 ? Wood.Lightened(0.12f) : Wood);
+                mb.Box(new Vector3(w / 2 - 0.15f, 0, h - 0.6f), new Vector3(w / 2 + 0.15f, 0.22f, h - 0.3f), Wood.Darkened(0.2f)); // block
+                mb.Box(new Vector3(w / 2 - 0.02f, 0.22f, h - 0.5f), new Vector3(w / 2 + 0.02f, 0.5f, h - 0.46f), Timber); // axe handle
+                mb.Box(new Vector3(w / 2 - 0.08f, 0.42f, h - 0.52f), new Vector3(w / 2 + 0.03f, 0.5f, h - 0.44f), Slate); // axe head
+                break;
+
             case "stockpile":
                 mb.Box(new Vector3(0.1f, 0, 0.1f), new Vector3(w - 0.1f, 0.06f, h - 0.1f), Wood.Lightened(0.15f));
                 mb.Box(new Vector3(0.3f, 0.06f, 0.3f), new Vector3(0.8f, 0.5f, 0.8f), Wood);

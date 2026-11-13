@@ -18,6 +18,9 @@ public static class LedgerKeys
     public const string Taxes = "taxes";
     public const string Upkeep = "upkeep";
 
+    /// <summary>Food that rotted outside a granary.</summary>
+    public const string Spoiled = "spoiled";
+
     /// <summary>Firewood burned to heat homes in winter.</summary>
     public const string Heating = "heating";
 
@@ -134,7 +137,7 @@ public readonly record struct LedgerRow(double Made, double Used, double Traded)
         static string Cat(string key) => LedgerKeys.Category(key);
         return new LedgerRow(
             ledger.Average(resource, k => Cat(k) is LedgerKeys.Made or LedgerKeys.Taxes or LedgerKeys.Refunds, days),
-            ledger.Average(resource, k => Cat(k) is LedgerKeys.Inputs or LedgerKeys.Eaten or LedgerKeys.Used or LedgerKeys.Building or LedgerKeys.Upkeep or LedgerKeys.Disaster or LedgerKeys.Heating, days),
+            ledger.Average(resource, k => Cat(k) is LedgerKeys.Inputs or LedgerKeys.Eaten or LedgerKeys.Used or LedgerKeys.Building or LedgerKeys.Upkeep or LedgerKeys.Disaster or LedgerKeys.Heating or LedgerKeys.Spoiled, days),
             ledger.Average(resource, k => Cat(k) is LedgerKeys.TradeIn or LedgerKeys.TradeOut or LedgerKeys.Offers, days));
     }
 }

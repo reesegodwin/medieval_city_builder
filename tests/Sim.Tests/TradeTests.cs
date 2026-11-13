@@ -168,7 +168,10 @@ public class TradeTests
         var world = new GameWorld(42);
         world.Execute(new FoundSettlementCommand("a"));
         world.Execute(new FoundSettlementCommand("b"));
-        new Simulator(world).RunDays(220);
+        // Well-stocked towns rarely run short, so they first need each other some time in their first winter.
+        var sim = new Simulator(world);
+        sim.RunDays(200);
+        for (int day = 200; day < 450 && !world.Events.Any(e => e.Message.Contains("accepted your offer")); day++) sim.RunDays(1);
 
         Assert.True(world.Settlements.All(s => Trading.TradingPost(s) != null), "Both towns build a Trading Post");
         Assert.NotNull(Trading.RoadPath(world, world.Settlements[0], world.Settlements[1])); // and a road between them

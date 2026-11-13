@@ -201,20 +201,32 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   Over a year farms make what they always did, so the governor sizes farms on the yearly average (`SeasonRules.AverageOutputOf`).
 - **Storing for winter**
   - Per-citizen food limits went up so a reserve fits: 10 grain, 10 bread, 6 vegetables and 5 fish per person.
-  - In summer and autumn the governor makes room for 30 days of food. It builds **granaries** (storage 1,500, 30 wood and 15 stone) from population 60, about one per 60 people, and stockpiles before that.
+  - In summer and autumn the governor makes room for a 15-day winter reserve. It builds **granaries** (storage 1,500, 30 wood and 15 stone) from population 60, about one per 60 people, and stockpiles before that.
   - It doesn't add farms just because food falls in winter.
+- **Spoilage**
+  - Food beyond what granaries hold rots each day, booked as `spoiled`. Rates: grain 0.3%, vegetables 1.5%, bread 2%, fish 3%.
+  - The season scales the rate: 1× in spring and autumn, 1.5× in summer, and none in winter, when stores freeze.
+  - Granaries (`keepsFood`) protect up to their full storage. The simplification is that the whole granary counts as food store.
+  - The governor adds a granary whenever more food is stored than the granaries hold. Governed towns therefore lose almost nothing; a player who skips granaries loses food all summer.
+- **Firewood (its own good)**
+  - Heating burns firewood, not timber, so winter no longer competes with builders and carpenters. (Furniture coverage had fallen to 7% one winter when heating used wood.)
+  - **Firewood Hut:** 5 wood, near forest. One worker gathers 5 firewood a day.
+  - **Limits:** a flat 200, or 6 per person (a winter's heating).
+  - **Governor:** builds firewood huts from population 15, one per 50 people, when firewood is under half its limit in summer and autumn or running out.
+  - **Sales:** firewood is only for sale in spring.
+  - New towns start with 30 firewood.
 - **Heating**
   - In winter each occupied home burns 0.3 firewood a day, booked as `heating`.
-  - Homes are heated in list order until the wood runs out. The rest are `Cold`, and their people get −12 mood ("Cold"). People without a home are cold all winter.
-  - In autumn the governor lays in wood (up to half its limit, which is now at least one per person).
+  - Homes are heated in list order until the firewood runs out. The rest are `Cold`, and their people get −12 mood ("Cold"). People without a home are cold all winter.
+- **Autumn food sales:** in autumn a town may sell food above 1.25× its winter reserve (`SeasonSystem.SellableFood`), split across foods by stock. This is on top of the usual sale of anything near its stock limit.
 - **Announcements:** each season start is logged as a `Season` event, e.g. "Winter has come: farms yield 60%, fishing 80%, and every home burns firewood".
-- **Saves:** save v12 stores the cold homes and the part-unit of firewood owed. Older saves get the new per-citizen limits.
+- **Saves:** save v12 stores the cold homes and the part-unit of firewood owed; v13 adds the part-units of food rotting. Older saves get the new per-citizen limits.
 - **Look (client, `SeasonLook.cs`):** one shader for terrain, trees and buildings. Snow settles on flat ground over the first days of winter and melts in early spring. Greens turn golden through autumn. The time of year is read from the game clock, so it's purely cosmetic.
 - **Result over 720 days (seeds 42, 7 and 1234):**
   - Food falls slowly through each winter (from about 23 to 18 days' worth), and nobody starves.
   - No home went cold, because the governor stocks firewood.
-  - Populations end at 796/724/662 (707/733/740 before seasons).
-  - Treasuries end lower (2,970 / 9,163 / 2,550), because towns keep food for winter instead of selling it.
+  - With seasons alone, populations ended at 796/724/662 and treasuries at 2,970 / 9,163 / 2,550, because towns kept food for winter instead of selling it.
+  - With firewood, spoilage and autumn sales, populations end at 803/732/717 and treasuries at 5,401 / 6,364 / 6,245. Nothing rots in governed towns, and no home goes cold.
 
 ## Disasters (`Systems/DisasterSystem.cs`, `disasters.json`)
 - **Mild:** nothing is lost for good except some goods in a burning stockpile. Each settlement can switch disasters off in the Rules panel (`SetDisastersCommand`). The setting is on by default and saved (save v11).

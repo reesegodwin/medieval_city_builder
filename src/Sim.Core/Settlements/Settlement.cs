@@ -16,6 +16,7 @@ public sealed class SettlementRules
         ["fisher"] = 4,
         ["priest"] = 4,
         ["woodcutter"] = 3,
+        ["firewood"] = 3,
         ["barkeep"] = 3,
         ["trader"] = 3,
         ["smith"] = 3,
@@ -47,6 +48,7 @@ public sealed class SettlementRules
         ["fish"] = 200,
         ["ale"] = 150,
         ["wood"] = 250,
+        ["firewood"] = 200,
         ["stone"] = 200,
         ["iron_ore"] = 80,
         ["tools"] = 60,
@@ -64,7 +66,7 @@ public sealed class SettlementRules
         ["vegetables"] = 6,
         ["fish"] = 5,
         ["ale"] = 1,
-        ["wood"] = 1, // firewood for winter
+        ["firewood"] = 6, // a winter's heating
     };
 
     /// <summary>Below this stock a resource counts as scarce and its producers get extra job priority.</summary>
@@ -247,6 +249,12 @@ public sealed class Settlement
 
     /// <summary>Firewood burned but not yet taken from stock (less than one unit).</summary>
     public double HeatingOwed { get; set; }
+
+    /// <summary>Food rotted but not yet taken from stock (less than one unit per food).</summary>
+    public SortedDictionary<string, double> SpoilageOwed { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Food granaries can hold safe from rot.</summary>
+    public int FoodStoreCapacity => Buildings.Where(b => b.IsOperational && b.Def.KeepsFood).Sum(b => b.Def.Storage);
 
     /// <summary>Household goods used but not yet amounting to a whole unit, per resource.</summary>
     public SortedDictionary<string, double> GoodsUse { get; } = new(StringComparer.Ordinal);
