@@ -25,6 +25,16 @@ public sealed class WorldHost
         public double SpeedRequest { get; set; } = 1;
     }
 
+    /// <summary>Someone who said hello and was asked to prove who they are.</summary>
+    private sealed class Pending
+    {
+        public required string Name { get; init; }
+        public required byte[] Salt { get; init; }
+        public required byte[] Nonce { get; init; }
+        public required bool Register { get; init; }
+    }
+
+    private readonly Dictionary<IPeer, Pending> _pending = new();
     private readonly ConcurrentQueue<(IPeer Peer, string? Line)> _inbox = new();
     private readonly List<Player> _players = new();
     private readonly Simulator _simulator;
@@ -40,9 +50,13 @@ public sealed class WorldHost
 
     public event Action<string>? Log;
 
-    public WorldHost(GameWorld world, string? hostName = null, DateTimeOffset? nowUtc = null)
+    /// <summary>Player accounts (null: names are trusted, as between friends).</summary>
+    public AccountBook? Accounts { get; }
+
+    public WorldHost(GameWorld world, string? hostName = null, DateTimeOffset? nowUtc = null, AccountBook? accounts = null)
     {
         World = world;
+        Accounts = accounts;
         HostName = hostName;
         _simulator = new Simulator(world);
         _lastHashDay = world.Time.Day;
@@ -129,7 +143,12 @@ public sealed class WorldHost
 
         if (type == "hello")
         {
-            if (player == null) Join(peer, msg);
+            if (player == null) Hello(peer, msg);
+            return;
+        }
+        if (type == "auth")
+        {
+            if (player == null && _pending.Remove(peer, out var pending)) Authenticate(peer, pending, msg);
             return;
         }
         if (player == null) return; // must say hello first
@@ -149,20 +168,70 @@ public sealed class WorldHost
         }
     }
 
-    private void Join(IPeer peer, JsonObject hello)
+    private void Refuse(IPeer peer, string problem)
+    {
+        peer.Send(Protocol.Line(Protocol.Message("error", ("msg", problem))));
+        peer.Close();
+    }
+
+    private void Hello(IPeer peer, JsonObject hello)
     {
         string name = (hello["name"]?.GetValue<string>() ?? "").Trim();
         int version = hello["version"]?.GetValue<int>() ?? 0;
         string? problem =
             version != Protocol.Version ? $"Version mismatch: server {Protocol.Version}, client {version}" :
             name.Length == 0 || name.Length > Protocol.MaxNameLength ? $"Names must be 1-{Protocol.MaxNameLength} characters" :
-            _players.Any(p => p.Name == name) ? $"{name} is already playing" : null;
+            _players.Any(p => p.Name == name) ? $"{name} is already playing" :
+            Accounts?.IsLocked(name, _now) == true ? "Too many wrong passwords: try again in a minute" : null;
         if (problem != null)
         {
-            peer.Send(Protocol.Line(Protocol.Message("error", ("msg", problem))));
-            peer.Close();
+            Refuse(peer, problem);
             return;
         }
+        if (Accounts == null)
+        {
+            Join(peer, name);
+            return;
+        }
+
+        // Prove who you are: the account's salt (or a new one to register with) and a fresh nonce.
+        var account = Accounts.Accounts.GetValueOrDefault(name);
+        var pending = new Pending
+        {
+            Name = name,
+            Salt = account != null ? Convert.FromBase64String(account.Salt) : AccountBook.NewRandom(AccountBook.SaltBytes),
+            Nonce = AccountBook.NewRandom(AccountBook.NonceBytes),
+            Register = account == null,
+        };
+        _pending[peer] = pending;
+        peer.Send(Protocol.Line(Protocol.Message("auth",
+            ("salt", Convert.ToBase64String(pending.Salt)), ("nonce", Convert.ToBase64String(pending.Nonce)),
+            ("iterations", account?.Iterations ?? AccountBook.Iterations), ("register", pending.Register))));
+    }
+
+    private void Authenticate(IPeer peer, Pending pending, JsonObject msg)
+    {
+        string name = pending.Name;
+        if (_players.Any(p => p.Name == name))
+        {
+            Refuse(peer, $"{name} is already playing");
+            return;
+        }
+        bool ok = pending.Register
+            ? Accounts!.Register(name, pending.Salt, msg["key"]?.GetValue<string>() ?? "", _now)
+            : Accounts!.Verify(name, pending.Nonce, msg["proof"]?.GetValue<string>() ?? "", _now);
+        if (!ok)
+        {
+            Log?.Invoke($"Failed login for {name} from {peer.Address}");
+            Refuse(peer, pending.Register ? "Couldn't register that name" : "Wrong password");
+            return;
+        }
+        if (pending.Register) Log?.Invoke($"Registered {name}");
+        Join(peer, name);
+    }
+
+    private void Join(IPeer peer, string name)
+    {
 
         // Coming back to an empty world: catch up on the time away first (the new player watches it happen).
         if (_players.Count == 0 && World.Settings.WhenEmpty == EmptyWorldPolicy.CatchUp)
@@ -254,6 +323,7 @@ public sealed class WorldHost
 
     private void Leave(IPeer peer)
     {
+        _pending.Remove(peer);
         var player = _players.FirstOrDefault(p => p.Peer == peer);
         if (player == null) return;
         _players.Remove(player);

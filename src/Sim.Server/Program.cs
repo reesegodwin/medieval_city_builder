@@ -18,6 +18,9 @@ using Sim.Net;
 //   --max-speed <x>        fastest players may speed the world up to (default 8)
 //   --admin <name>         the player who controls speed under the "host" policy
 //   --autosave-minutes <n> (default 5)
+//   --accounts <open|off>  open (default): the first join with a name registers it with that player's password,
+//                          later joins must prove it. off: names are trusted (only for private servers).
+//   --reset-password <name> forget a player's account, so they can register again with a new password
 
 var options = ParseArgs(args);
 string path = options.GetValueOrDefault("world", "world.json");
@@ -48,7 +51,17 @@ var settings = world.Settings;
 Console.WriteLine($"Speed: 1 game day = {settings.SecondsPerGameDay:0.#} real seconds; speed control: {settings.SpeedPolicy}; " +
                   $"when empty: {settings.WhenEmpty} (catch up at most {settings.CatchUpCapDays:0.#} days).");
 
-var host = new WorldHost(world, options.GetValueOrDefault("admin"));
+AccountBook? accounts = null;
+if (options.GetValueOrDefault("accounts", "open") != "off")
+{
+    accounts = AccountBook.Load(path + ".accounts.json");
+    if (options.TryGetValue("reset-password", out var forget))
+        Console.WriteLine(accounts.Forget(forget) ? $"Forgot {forget}'s account; they can register again." : $"No account named {forget}.");
+    Console.WriteLine($"Accounts: {accounts.Accounts.Count} registered in {accounts.Path}.");
+}
+else Console.WriteLine("Accounts are off: anyone may join under any name.");
+
+var host = new WorldHost(world, options.GetValueOrDefault("admin"), accounts: accounts);
 host.Log += message => Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}");
 if (host.CatchUpTicksLeft >= Sim.Core.Time.TimeScale.TicksPerDay / 10) Console.WriteLine($"Catching up {host.CatchUpTicksLeft / (double)Sim.Core.Time.TimeScale.TicksPerDay:0.#} game days of downtime...");
 

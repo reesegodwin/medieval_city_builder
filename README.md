@@ -172,7 +172,9 @@ From the start menu (or the command line):
 dotnet run -c Release --project src/Sim.Server -- --world myworld.json --speed persistent --when-empty run
 ```
 
-It creates `myworld.json` if it doesn't exist, listens on port 7777, autosaves every 5 minutes, and saves when stopped (Ctrl+C, `docker stop` or systemd). Options: `--port`, `--seed`, `--speed persistent|weekend|evening|sprint|<seconds per day>`, `--speed-policy fixed|host|unanimous`, `--when-empty pause|catchup|run`, `--catch-up-days N`, `--max-speed X`, `--admin NAME`, `--autosave-minutes N`. Players are identified by name only for now, so use it with friends rather than as a public server.
+It creates `myworld.json` if it doesn't exist, listens on port 7777, autosaves every 5 minutes, and saves when stopped (Ctrl+C, `docker stop` or systemd). Options: `--port`, `--seed`, `--speed persistent|weekend|evening|sprint|<seconds per day>`, `--speed-policy fixed|host|unanimous`, `--when-empty pause|catchup|run`, `--catch-up-days N`, `--max-speed X`, `--admin NAME`, `--autosave-minutes N`, `--accounts open|off`, `--reset-password NAME`.
+
+Accounts are on by default. The first time a name joins, the player's password claims it; after that, they must prove they know it. The password never crosses the network: the server sends a salt and a one-time challenge, and the game answers with a key derived from the password. Accounts live in `myworld.json.accounts.json`, beside the world and never inside it. Five wrong passwords lock a name for a minute. `--reset-password NAME` frees a name whose player forgot their password. Connections aren't encrypted yet, so the very first join could be watched; use a password you don't use anywhere else.
 
 ### Sound and art
 

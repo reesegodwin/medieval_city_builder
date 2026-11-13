@@ -13,9 +13,16 @@ internal sealed class LoopbackPeer : IPeer
     public bool Closed { get; private set; }
     public string Address => "loopback";
 
-    public LoopbackPeer(WorldHost host, string name)
+    /// <summary>Everything the client sent, to check what goes over the wire.</summary>
+    public List<string> Sent { get; } = new();
+
+    public LoopbackPeer(WorldHost host, string name, string? password = null)
     {
-        Client = new NetClient(name, line => host.Receive(this, line));
+        Client = new NetClient(name, line =>
+        {
+            Sent.Add(line);
+            host.Receive(this, line);
+        }, password);
     }
 
     public void Send(string line)

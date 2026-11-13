@@ -19,6 +19,7 @@ public partial class StartMenu : CanvasLayer
     private LineEdit _seed = null!;
     private LineEdit _port = null!;
     private LineEdit _address = null!;
+    private LineEdit _password = null!;
     private Label _status = null!;
 
     public override void _Ready()
@@ -54,6 +55,9 @@ public partial class StartMenu : CanvasLayer
 
         _name = (LineEdit)Row("Your name", new LineEdit { Text = System.Environment.UserName, MaxLength = Protocol.MaxNameLength },
             "Your name in shared worlds; it's how the world knows which town is yours.");
+        _password = (LineEdit)Row("Password", new LineEdit { Secret = true, PlaceholderText = "for dedicated servers" },
+            "Dedicated servers keep accounts: the first time you join, this password claims your name there. " +
+            "It is never sent over the network; the game proves you know it.");
         _speed = (OptionButton)Row("World speed", new OptionButton(),
             "How fast the world runs. Balance is the same at every speed; only the clock changes.");
         foreach (var (name, secondsPerDay, description) in WorldSpeeds.Presets)
@@ -132,7 +136,8 @@ public partial class StartMenu : CanvasLayer
             port = p;
             text = text[..colon];
         }
-        Start(() => SimSession.JoinGame(_name.Text.Trim(), text, port));
+        string password = _password.Text;
+        Start(() => SimSession.JoinGame(_name.Text.Trim(), text, port, password));
     }
 
     private void Start(Func<SimSession> create)

@@ -107,4 +107,4 @@ The plan is also copied to `docs/AUTONOMOUS_PLAN.md` with a progress log, so the
 - [x] 6–7. Fog of war in the client (warbands drawn only within watch radius; rough-to-exact descriptions), army panel (K), alert banner, warband and soldier rendering. PR after #14.
 - [x] 11. Household economy: wages by job tier and skill, family purses, cost of living, going without, relief, income tax, city wages for builders/haulers, soldiers paid by gear, gear by affordability (also in the muster), inheritance, four governments, Rules picker, 5,000-citizen performance test.
 - [x] 8. Herbalist (healing), bathhouse (hygiene), guardhouse (law) and crime (thefts by the troubled, from the richest unguarded homes), crime rule; governor builds a few of each.
-- [ ] 9. Server accounts.
+- [x] 9. Server accounts: salted PBKDF2 keys in a file beside the world, challenge-response joins (the password never crosses the network), lockout after 5 failures, `--accounts`, `--reset-password`, password field in the start menu. Interest management skipped: lockstep clients need the whole world.

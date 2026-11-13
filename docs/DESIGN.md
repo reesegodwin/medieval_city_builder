@@ -134,7 +134,16 @@ Grows the way Minecraft does, from single-player up to a 24/7 server, with the s
 
 **Protocol (`src/Sim.Net`, engine-free):** JSON lines over TCP. The server is the authority. A joining player gets a snapshot (the save format), then a stream of "advance to tick T" and "apply command C at tick T" messages. Every client runs the same deterministic simulation, so they stay identical with very little traffic; a daily state hash detects drift and triggers a fresh snapshot. Commands carry a settlement id, and the server only accepts them from that settlement's owner (`Settlement.OwnerId`, the player name). New players get a settlement founded on a ring of spots 260 tiles apart (`FoundSettlementCommand`); the first player into a single-player world takes over its town.
 
-**Not yet:** accounts and authentication (names are trusted, so this suits friends' servers, not public ones), Steam relay, interaction between towns, and PostgreSQL persistence. For public servers, run on a separate rented machine, never a home network.
+**Accounts (`Sim.Net/Accounts.cs`, protocol v2):**
+- Dedicated servers keep player accounts in a file beside the world, so they never reach clients in snapshots.
+- The server stores PBKDF2-SHA256(password, salt) at 100,000 iterations.
+- **Joining:** after `hello` the server sends the salt and a random nonce (`auth`). The client derives the key and answers with HMAC-SHA256(key, nonce). On a name's first join it sends the key itself to register.
+- The password never leaves the player's machine.
+- Five failures lock a name for a minute.
+- `--accounts off` restores name trust. Host-and-play sessions don't use accounts (friends only).
+- **Still to do:** TLS for the connection (the first, registering join can be observed).
+
+**Not yet:** Steam relay, interaction between towns, and PostgreSQL persistence. For public servers, run on a separate rented machine, never a home network.
 
 ## Trade (Phase 2)
 One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair values are `value` in `resources.json`.
