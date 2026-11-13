@@ -118,7 +118,12 @@ public sealed class GameWorld
                 foreach (var (kind, skill) in c.Skills) h.Add(kind).Add(skill);
             }
         }
-        foreach (var w in War.Warbands) h.Add(w.Id).Add(w.TargetId).Add(w.X).Add(w.Y).Add(w.Raiders).Add(w.Archers);
+        foreach (var w in War.Warbands)
+        {
+            h.Add(w.Id).Add(w.TargetId).Add(w.X).Add(w.Y).Add(w.Raiders).Add(w.Archers)
+                .Add(w.Siege).Add(w.SiegeDays).Add(w.HasTarget).Add(w.TargetX).Add(w.TargetY).Add(w.LastSallyDay);
+            foreach (var e in w.Engines) h.Add(e.Kind).Add(e.Progress);
+        }
         h.Add(War.Reports.Count);
         var trade = Trade;
         h.Add(trade.CompletedTrades).Add(trade.MerchantVisits);

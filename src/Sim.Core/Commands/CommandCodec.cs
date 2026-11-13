@@ -21,6 +21,7 @@ public static class CommandCodec
         typeof(War.RecruitSquadCommand), typeof(War.DisbandSquadCommand), typeof(War.PromoteGeneralCommand),
         typeof(War.SetRaidsCommand), typeof(War.SetMusterCommand),
         typeof(Economy.SetGovernmentCommand), typeof(Systems.SetCrimeCommand),
+        typeof(War.SallyCommand), typeof(War.PayTributeCommand),
         typeof(Trade.PostOfferCommand), typeof(Trade.CancelOfferCommand), typeof(Trade.AcceptOfferCommand),
         typeof(Trade.ProposeRouteCommand), typeof(Trade.AcceptRouteCommand), typeof(Trade.EndRouteCommand),
     };

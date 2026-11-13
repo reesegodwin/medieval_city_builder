@@ -76,7 +76,8 @@ public partial class ArmyPanel : PanelContainer
             string.Join(",", s.Squads.Select(q => $"{q.Id}:{q.SoldierIds.Count}:{(int)q.Xp}")),
             string.Join(",", war.Units.SelectMany(u => u.Gear.Keys).Distinct().Select(g => s.Stock.Get(g))),
             string.Join(",", World.War.Warbands.Where(w => InSight(s, w)).Select(w => Raids.Describe(s, w) + (int)Raids.Distance(s, w))),
-            World.War.Reports.Count, Armies.SquadCapacity(World, s), Armies.SpareHands(s));
+            World.War.Reports.Count, Armies.SquadCapacity(World, s), Armies.SpareHands(s), SiegeSignature(s),
+            s.Stock.Get(Sim.Core.Economy.Inventory.Coin) / 50);
         if (signature == _shown) return;
         _shown = signature;
         Build();
@@ -92,9 +93,13 @@ public partial class ArmyPanel : PanelContainer
         var war = World.Data.War;
 
         // --- Alert and threats ---
-        Section(AlertText(s.Alert), AlertHelp(s.Alert), AlertColor(s.Alert));
-        foreach (var band in World.War.Warbands.Where(w => InSight(s, w)))
-            Line($"• {Capitalize(Raids.Describe(s, band))}, {Raids.Distance(s, band):0} tiles out");
+        if (Siege.BandAt(World, s) is { } besiegers) BuildSiege(s, besiegers);
+        else
+        {
+            Section(AlertText(s.Alert), AlertHelp(s.Alert), AlertColor(s.Alert));
+            foreach (var band in World.War.Warbands.Where(w => InSight(s, w)))
+                Line($"• {Capitalize(Raids.Describe(s, band))}, {Raids.Distance(s, band):0} tiles out");
+        }
 
         // --- General ---
         Section("General", "Leads the town's soldiers. Traits shape battles; skill grows with every battle fought.");
@@ -168,6 +173,40 @@ public partial class ArmyPanel : PanelContainer
             foreach (var r in reports)
                 Line($"Day {r.Day}: {r.Summary}", r.DefendersWon ? new Color(0.7f, 0.95f, 0.7f) : new Color(1f, 0.6f, 0.55f));
         }
+    }
+
+    private string SiegeSignature(Settlement s) => Siege.BandAt(World, s) is { } b
+        ? $"{b.SiegeDays}:{b.Size}:{string.Join(",", b.Engines.Select(e => $"{e.Kind}{(int)(e.Progress * 10)}"))}:" +
+          (b.HasTarget && s.Walls.TryGetValue((b.TargetX, b.TargetY), out var w) ? w.Hp : -1) + $":{b.LastSallyDay}"
+        : "";
+
+    /// <summary>The siege: how long, the engines, the wall under attack, and what the town can do about it.</summary>
+    private void BuildSiege(Settlement s, Warband band)
+    {
+        var rules = World.Data.War.Siege;
+        Section($"Under siege: day {band.SiegeDays} of at most {rules.MaxDays}",
+            "The raiders are building siege engines to break the walls. Outside the walls work runs at half pace, no caravans " +
+            "get through, and the militia stay armed. Hold out until they give up, ride out against their engines, or pay them to go.",
+            AlertColor(Alert.CallToArms));
+        Line($"• {Capitalize(Raids.Describe(s, band))} are camped before the walls");
+        foreach (var engine in band.Engines)
+        {
+            string name = rules.Engine(engine.Kind)?.Name ?? engine.Kind;
+            Line(engine.Built ? $"• {name}: battering the walls" : $"• {name}: being built ({engine.Progress:P0})");
+        }
+        if (band.Engines.Count == 0) Line("• No engines yet");
+        if (band.HasTarget && s.Walls.TryGetValue((band.TargetX, band.TargetY), out var wall))
+        {
+            int max = Sim.Core.Commands.Walls.PieceHitPoints(World, wall.Tier, wall.Piece);
+            Line($"• The wall under attack has {wall.Hp} of {max} strength left", wall.Hp < max / 3 ? new Color(1f, 0.6f, 0.55f) : null);
+        }
+
+        ActionButton($"Sally out with {Armies.Soldiers(s)} soldiers", "Ride out against the besiegers: a battle without the walls' help. " +
+            "Win, and their engines burn. Once a day.", () => Report(_session.Execute(new SallyCommand(s.Id)), "The soldiers sallied out"));
+        int price = Siege.Tribute(World, band);
+        ActionButton($"Pay them {price} coin to leave (treasury {s.Stock.Get(Sim.Core.Economy.Inventory.Coin)})",
+            "The raiders take the coin and lift the siege.",
+            () => Report(_session.Execute(new PayTributeCommand(s.Id)), "The raiders took the coin and left"));
     }
 
     private void Report(Sim.Core.Commands.CommandResult result, string ok)

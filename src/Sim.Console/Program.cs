@@ -173,6 +173,10 @@ internal static class Report
                           $"wall-walk {WallSystem.WalkwayTiles(world, s)} tiles for {WallSystem.DefenderCapacity(world, s)} defenders; " +
                           $"{s.Buildings.Count(b => b.NoRoute)} buildings cut off.");
         var units = world.Data.War;
+        int Said(string start) => world.Events.Count(e => e.SettlementId == s.Id && e.Message.StartsWith(start, StringComparison.Ordinal));
+        Console.WriteLine($"Sieges: {Said("Siege:")} laid, {Said("Breach!")} breaches, {Said("Sally:")} sallies, " +
+                          $"{Said("The town paid the raiders")} paid off, {Said("The raiders gave up") + Said("Too few raiders")} given up; " +
+                          $"walls damaged now: {s.Walls.Values.Count(w => w.Hp < Sim.Core.Commands.Walls.PieceHitPoints(world, w.Tier, w.Piece))}.");
         Console.WriteLine($"Army: {Sim.Core.War.Armies.Soldiers(s)} soldiers in {s.Squads.Count} squads (" +
                           string.Join(", ", s.Squads.GroupBy(q => q.UnitId).Select(g => $"{g.Sum(q => q.SoldierIds.Count)} {g.Key}")) + ")" +
                           (s.General is { } gen ? $"; general {s.FindCitizen(gen.CitizenId)?.FullName} (skill {gen.Skill:0}, {gen.Battles} battles)" : "; no general") +

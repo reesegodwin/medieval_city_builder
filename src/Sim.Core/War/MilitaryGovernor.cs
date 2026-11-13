@@ -23,8 +23,26 @@ public static class MilitaryGovernor
         s.Citizens.Where(c => c.IsAdult && c.SquadId == null && c.AgeYears < 50 && c.Id != s.General?.CitizenId)
             .OrderByDescending(c => c.AgeDays).ThenBy(c => c.Id).FirstOrDefault();
 
+    /// <summary>Under siege, a governed town sallies if it clearly outnumbers the band, or pays it off if that's cheap.</summary>
+    private static void Besieged(GameWorld world, Settlement s)
+    {
+        // Once the band starts on its engines: ride out if clearly stronger, else buy it off if that's cheap.
+        if (Siege.BandAt(world, s) is not { } band || band.Engines.Count == 0) return;
+        if (Armies.Soldiers(s) >= band.Size * SallyOdds && band.LastSallyDay != world.Time.Day)
+            world.Execute(new SallyCommand(s.Id));
+        else if (Siege.Tribute(world, band) <= s.Stock.Get(Economy.Inventory.Coin) * TributeShare)
+            world.Execute(new PayTributeCommand(s.Id));
+    }
+
+    /// <summary>Pays tribute when it costs at most this share of the treasury.</summary>
+    public const double TributeShare = 0.3;
+
+    /// <summary>Sallies when its soldiers outnumber the band this many times.</summary>
+    public const double SallyOdds = 1.25;
+
     public static void Daily(GameWorld world, Settlement s)
     {
+        Besieged(world, s);
         var war = world.Data.War;
         if (s.Citizens.Count < war.GarrisonPopulation) return;
 

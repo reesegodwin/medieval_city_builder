@@ -137,6 +137,22 @@
     "squadXpPerBattle": 15,
     "generalXpPerBattle": 20
   },
+  "siege": {
+    "minSize": 20,
+    "maxDays": 30,
+    "raidersPerEngine": 20,
+    "maxEngines": 4,
+    "tributePerRaider": 6,
+    "giveUpShare": 0.5,
+    "outsideOutput": 0.5,
+    "siegeMood": -3,
+    "repairHpPerDay": 40,
+    "engines": [
+      {"id": "ram", "name": "Battering ram", "buildDays": 2, "damage": 60, "vsTier": [3, 1, 0.5], "vsGate": 2},
+      {"id": "catapult", "name": "Catapult", "buildDays": 5, "damage": 45, "vsTier": [1, 1.5, 0.8], "vsGate": 1},
+      {"id": "trebuchet", "name": "Trebuchet", "buildDays": 8, "damage": 80, "vsTier": [1, 1.5, 2], "vsGate": 1}
+    ]
+  },
   "garrisonShare": 0.03,
   "garrisonPopulation": 150
 }

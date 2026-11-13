@@ -46,6 +46,7 @@ public sealed class WarRules
     public List<GeneralTraitDef> GeneralTraits { get; set; } = new();
     public RaidRules Raids { get; set; } = new();
     public BattleRules Battle { get; set; } = new();
+    public SiegeRules Siege { get; set; } = new();
 
     /// <summary>Governed towns keep this share of their people as a standing garrison...</summary>
     public double GarrisonShare { get; set; } = 0.04;

@@ -466,6 +466,70 @@ public static class LowPolyMeshes
         return mb.Commit();
     }
 
+    private static readonly Color EngineWood = new(0.45f, 0.32f, 0.2f);
+    private static readonly Color Hide = new(0.5f, 0.4f, 0.3f);
+
+    /// <summary>Siege engines and the besiegers' tents; facing +Z (towards the wall), origin at ground centre.</summary>
+    public static readonly ArrayMesh SiegeRam = BuildRam();
+    public static readonly ArrayMesh Catapult = BuildCatapult();
+    public static readonly ArrayMesh Trebuchet = BuildTrebuchet();
+    public static readonly ArrayMesh Tent = BuildTent();
+
+    private static ArrayMesh BuildRam()
+    {
+        var mb = new MeshBuilder { Center = new Vector3(0, 0.4f, 0) };
+        foreach (float x in new[] { -0.42f, 0.36f })
+        foreach (float z in new[] { -0.6f, 0.5f })
+            mb.Box(new Vector3(x, 0, z), new Vector3(x + 0.06f, 0.26f, z + 0.26f), Timber.Darkened(0.3f)); // wheels
+        mb.Box(new Vector3(-0.38f, 0.2f, -0.7f), new Vector3(0.38f, 0.28f, 0.75f), EngineWood); // bed
+        foreach (float x in new[] { -0.38f, 0.32f })
+        foreach (float z in new[] { -0.7f, 0.69f })
+            mb.Box(new Vector3(x, 0.28f, z), new Vector3(x + 0.06f, 0.75f, z + 0.06f), EngineWood); // posts
+        mb.GableRoof(new Vector3(-0.45f, 0.75f, -0.75f), new Vector3(0.45f, 0.75f, 0.8f), 0.3f, Hide); // hide roof
+        mb.Box(new Vector3(-0.08f, 0.42f, -0.6f), new Vector3(0.08f, 0.58f, 1.05f), Timber); // the ram log
+        mb.Box(new Vector3(-0.1f, 0.4f, 1.0f), new Vector3(0.1f, 0.6f, 1.12f), new Color(0.35f, 0.35f, 0.38f)); // iron head
+        return mb.Commit();
+    }
+
+    private static ArrayMesh BuildCatapult()
+    {
+        var mb = new MeshBuilder { Center = new Vector3(0, 0.4f, 0) };
+        mb.Box(new Vector3(-0.4f, 0, -0.6f), new Vector3(-0.3f, 0.12f, 0.6f), EngineWood); // frame rails
+        mb.Box(new Vector3(0.3f, 0, -0.6f), new Vector3(0.4f, 0.12f, 0.6f), EngineWood);
+        mb.Box(new Vector3(-0.4f, 0, 0.45f), new Vector3(0.4f, 0.12f, 0.55f), EngineWood);
+        mb.Box(new Vector3(-0.4f, 0, -0.55f), new Vector3(0.4f, 0.12f, -0.45f), EngineWood);
+        foreach (float x in new[] { -0.38f, 0.3f })
+            mb.Box(new Vector3(x, 0.12f, 0.1f), new Vector3(x + 0.08f, 0.6f, 0.2f), EngineWood); // uprights
+        mb.Box(new Vector3(-0.38f, 0.55f, 0.1f), new Vector3(0.38f, 0.63f, 0.2f), Timber); // cross bar
+        mb.Box(new Vector3(-0.05f, 0.15f, -0.5f), new Vector3(0.05f, 0.25f, 0.2f), Timber); // arm, cocked back
+        mb.Box(new Vector3(-0.12f, 0.2f, -0.62f), new Vector3(0.12f, 0.3f, -0.42f), Hide); // bucket
+        mb.Box(new Vector3(-0.07f, 0.28f, -0.58f), new Vector3(0.07f, 0.4f, -0.46f), new Color(0.55f, 0.55f, 0.52f)); // stone
+        return mb.Commit();
+    }
+
+    private static ArrayMesh BuildTrebuchet()
+    {
+        var mb = new MeshBuilder { Center = new Vector3(0, 1f, 0) };
+        mb.Box(new Vector3(-0.5f, 0, -0.7f), new Vector3(0.5f, 0.12f, 0.7f), EngineWood); // base
+        foreach (float x in new[] { -0.4f, 0.32f })
+        {
+            mb.Box(new Vector3(x, 0.12f, -0.35f), new Vector3(x + 0.08f, 1.6f, -0.27f), EngineWood); // A-frame
+            mb.Box(new Vector3(x, 0.12f, 0.27f), new Vector3(x + 0.08f, 1.6f, 0.35f), EngineWood);
+        }
+        mb.Box(new Vector3(-0.4f, 1.55f, -0.35f), new Vector3(0.4f, 1.65f, 0.35f), Timber); // axle
+        mb.Box(new Vector3(-0.05f, 1.0f, -1.3f), new Vector3(0.05f, 1.7f, 0.5f), Timber); // long arm (slanted look)
+        mb.Box(new Vector3(-0.25f, 0.9f, 0.4f), new Vector3(0.25f, 1.35f, 0.75f), new Color(0.4f, 0.4f, 0.42f)); // counterweight
+        mb.Box(new Vector3(-0.08f, 0.15f, -1.4f), new Vector3(0.08f, 0.3f, -1.2f), Hide); // sling
+        return mb.Commit();
+    }
+
+    private static ArrayMesh BuildTent()
+    {
+        var mb = new MeshBuilder { Center = new Vector3(0, 0.3f, 0) };
+        mb.GableRoof(new Vector3(-0.45f, 0, -0.55f), new Vector3(0.45f, 0, 0.55f), 0.65f, Colors.White);
+        return mb.Commit();
+    }
+
     public static readonly ArrayMesh Tree = BuildTree();
     public static readonly ArrayMesh Rock = BuildRock();
     public static readonly ArrayMesh CitizenBody = BuildCitizenBody();

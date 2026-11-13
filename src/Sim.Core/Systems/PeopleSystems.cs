@@ -116,6 +116,7 @@ public static class Needs
             Add("Safe behind walls", WallSystem.SafetyMood(world, settlement, walledHome));
         if (c.HomeBuildingId is int homeId && settlement.FindBuilding(homeId)?.Def is { Home.Mood: > 0 } fine)
             Add(labels != null ? $"Lives in a {fine.Name.ToLowerInvariant()}" : "", fine.Home!.Mood);
+        if (War.Siege.Besieged(world, settlement)) Add("Under siege", world.Data.War.Siege.SiegeMood);
         if (settlement.CrimeDays > 0 && !c.CoveredNeeds.Contains("law")) Add("Thieves about", world.Data.Disasters.CrimeMood);
         if (c.IsSick) Add("Sick", world.Data.Disasters.SickMood);
         else if (c.SquadId != null) Add("Serving in the army", 1);

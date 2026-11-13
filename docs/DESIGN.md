@@ -87,7 +87,7 @@ Each phase ends with something you can play.
 2. **Phase 1, Visual settlement:** Godot client that renders a procedural map chunk, lets you place buildings and shows animated workers. *(In progress: client done; roads, demolition, services and food variety added in Phase 1b.)* Decision: the simulation runs in-process inside the client through `SimSession` until Phase 2, which swaps it for a connection to the dedicated server without changing the renderers.
 3. **Phase 2, Persistence & multiplayer:** PostgreSQL saves, accounts, several players, interest management, running on a cheap Linux VPS.
 4. **Phase 3, War:** armies from population, the formation battle resolver, generals, fog of war and scouting. *(In progress: military economy, squads, generals, the aggregate resolver, raids and the call to arms are in; see "War (Phase 3a)".)*
-5. **Phase 4, Sieges & walls:** walls and towers, siege engines, multi-day sieges, Discord/email alerts.
+5. **Phase 4, Sieges & walls:** walls and towers, siege engines, multi-day sieges, Discord/email alerts. *(In progress: walls, towers, gatehouses and bandit sieges with rams, catapults and trebuchets are in; see "Sieges".)*
 6. **Phase 5, NPC factions & diplomacy:** utility AI, proposals with expiry, vassals and tribute.
 7. **Phase 6, Trade & sea:** roads, caravans, ports, ships, blockades.
 8. **Phase 7, Depth:** tech tree, instability and civil war, balance passes, content and art.
@@ -536,6 +536,40 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   | 1234 | 58 | 682 | 15 |
 
   No starvation, and every raid was beaten.
+
+## Sieges (`War/Siege.cs`, `units.json` "siege")
+- **When:** a warband of 20 or more reaches a town with a closed ring of walls and digs in; smaller bands, or towns without a closed ring, are attacked at once as before.
+- **Engines** take game days to build, one at a time, up to 1 + size/20 (at most 4). That gives offline players real time to react.
+
+  | Engine | Build days | Damage a day | Best against |
+  |---|---|---|---|
+  | Battering ram | 2 | 60 | ×3 against palisade, ×2 against gates |
+  | Catapult | 5 | 45 | ×1.5 against stone walls |
+  | Trebuchet | 8 | 80 | ×2 against large stone walls |
+
+  The band builds whichever engine would bring down some wall tile soonest for its build time.
+- **Battering:** built engines batter the wall tile they can bring down soonest. Only tiles with outside ground on one side and walled-in ground on the other count, so a corner is never wasted on.
+- **Breach:** when a tile reaches 0 hit points it is knocked down (nothing to salvage), the ring opens and the band storms in. Everyone eligible is called up, and the walls now help less.
+- **Siege length:** after 30 days the band gives up; it also gives up if fewer than 10 are left.
+- **What the town can do:**
+  - **Sally out** (once a day): a battle without the walls' help. A win burns every engine.
+  - **Pay the band to leave:** 6 coin per raider.
+  - **Hold out.**
+- **Mild pressure while besieged:**
+  - Work outside the walls runs at half output.
+  - No trade offers, routes or caravans.
+  - "Under siege" costs 3 mood.
+  - The normal muster stays armed. The full call-up only comes for the assault.
+- **Repairs:** afterwards, damaged walls regain 40 hit points a tile a day, paid in their own materials. Breached tiles are rebuilt by the governor's ring planner.
+- **AI towns:** once the band starts on its engines, the AI sallies if it has 1.25× the band's numbers, or pays if the price is under 30% of the treasury; otherwise it holds out.
+- **Client:**
+  - Army panel (K): day, engines, the wall under attack, and Sally and Pay buttons.
+  - A banner: "Under siege, day N: …".
+  - The camp is drawn with tents, and the engines before the wall (half-built ones drawn short).
+  - Battered walls show soot cracks and fallen stones.
+  - `--demo-siege` sets up a siege for screenshots.
+- **720 days:** each seed had several sieges: seed 42 paid off all 6; seed 7 paid off 3 of 3; seed 1234 paid off 2 of 5, with 1 breach that was beaten back. No starvation.
+- **Later:** player-vs-player sieges, archers on walls shooting at engines, fire, mining, starving a town out.
 
 ## Battles: individual units + destructible structures (hybrid LOD simulation)
 

@@ -88,7 +88,7 @@ public static class TradeGovernor
 
     public static void Daily(GameWorld world, Settlement s)
     {
-        if (Trading.TradingPost(s) == null) return;
+        if (Trading.TradingPost(s) == null || War.Siege.Besieged(world, s)) return;
         ConnectToPartner(world, s);
         var rules = world.Data.Trade;
         var offers = world.Trade.Offers;

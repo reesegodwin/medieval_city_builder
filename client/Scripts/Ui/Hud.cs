@@ -359,7 +359,16 @@ public partial class Hud : CanvasLayer
         // Alert banner: the nearest warband in sight, as well as the watch can tell.
         var band = world.War.Warbands.Where(w => ArmyPanel.InSight(town, w)).OrderBy(w => Raids.Distance(town, w)).FirstOrDefault();
         _alert.Visible = town.Alert != Alert.None && band != null;
-        if (_alert.Visible)
+        if (_alert.Visible && Siege.BandAt(world, town) is { } siege)
+        {
+            var batter = siege.Engines.FirstOrDefault(e => e.Built);
+            string doing = batter != null
+                ? $"{(world.Data.War.Siege.Engine(batter.Kind)?.Name ?? batter.Kind).ToLowerInvariant()} is battering the walls"
+                : "they are building siege engines";
+            _alert.Text = $"Under siege, day {siege.SiegeDays}: {doing} (K)";
+            _alert.AddThemeColorOverride("font_color", ArmyPanel.AlertColor(Alert.CallToArms));
+        }
+        else if (_alert.Visible)
         {
             _alert.Text = $"{ArmyPanel.AlertText(town.Alert)}: {Raids.Describe(town, band!)}, {Raids.Distance(town, band!):0} tiles out (K)";
             _alert.AddThemeColorOverride("font_color", ArmyPanel.AlertColor(town.Alert));

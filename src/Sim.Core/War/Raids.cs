@@ -34,6 +34,19 @@ public sealed class Warband
     public int Raiders { get; set; }
     public int Archers { get; set; }
     public int Size => Raiders + Archers;
+
+    /// <summary>Dug in before the town's walls (see <see cref="War.Siege"/>).</summary>
+    public bool Siege { get; set; }
+    public int SiegeDays { get; set; }
+    public List<SiegeEngine> Engines { get; set; } = new();
+
+    /// <summary>The wall tile being battered.</summary>
+    public bool HasTarget { get; set; }
+    public int TargetX { get; set; }
+    public int TargetY { get; set; }
+
+    /// <summary>Day the town last sallied against this band (one sally a day).</summary>
+    public long LastSallyDay { get; set; } = -1;
 }
 
 /// <summary>A battle that was fought, for reports.</summary>
@@ -115,7 +128,11 @@ public static class Raids
             if (length > 0) { w.X += dx / length * step; w.Y += dy / length * step; }
         }
 
-        foreach (var s in world.Settlements) UpdateAlert(world, s);
+        foreach (var s in world.Settlements)
+        {
+            UpdateAlert(world, s);
+            Siege.Repair(world, s);
+        }
     }
 
     private static void Spawn(GameWorld world, Settlement s, RaidRules rules)
@@ -177,16 +194,24 @@ public static class Raids
                 _ => $"Call to arms: {what} is at the walls!",
             });
         }
-        if (level >= Alert.Muster) Muster(world, s, level);
+        // Behind walls under a siege, the normal muster keeps watch; everyone is called up only for the assault.
+        bool besieging = band != null && (band.Siege || level == Alert.CallToArms && Siege.WillBesiege(world, s, band));
+        if (level >= Alert.Muster) Muster(world, s, besieging ? Alert.Muster : level);
         s.Alert = level;
         s.QuietDays = level == Alert.None ? s.QuietDays + 1 : 0;
 
-        if (level == Alert.CallToArms && band != null) Fight(world, s, band);
+        if (level == Alert.CallToArms && band != null)
+        {
+            // A big band at a walled town digs in; otherwise it attacks at once.
+            if (!band.Siege && Siege.WillBesiege(world, s, band)) Siege.Begin(world, s, band);
+            if (band.Siege) Siege.Daily(world, s, band);
+            else Fight(world, s, band);
+        }
         if (s.QuietDays >= world.Data.War.Raids.StandDownDays) StandDown(world, s);
     }
 
     /// <summary>Raises militia up to the muster share of adults (twice that at a call to arms).</summary>
-    private static void Muster(GameWorld world, Settlement s, Alert level)
+    internal static void Muster(GameWorld world, Settlement s, Alert level)
     {
         int adults = s.Citizens.Count(c => c.IsAdult);
         double share = s.Rules.MusterPercent / 100.0 * (level == Alert.CallToArms ? 2 : 1);
@@ -212,22 +237,56 @@ public static class Raids
     }
 
     /// <summary>The warband attacks: a battle with every squad behind the town's walls; the band is gone afterwards.</summary>
+    public static List<Block> AttackerBlocks(GameWorld world, Warband band) => new()
+    {
+        new() { Unit = world.Data.War.Unit("raider")!, Count = band.Raiders },
+        new() { Unit = world.Data.War.Unit("raider_archer")!, Count = band.Archers },
+    };
+
+    public static List<Block> DefenderBlocks(GameWorld world, Settlement s) => s.Squads.Select(q => new Block
+    {
+        Unit = world.Data.War.Unit(q.UnitId) ?? world.Data.War.Units[0], Count = q.SoldierIds.Count, Xp = q.Xp, Citizens = q.SoldierIds.ToList(),
+    }).ToList();
+
+    /// <summary>The townsfolk who fell are dead; survivors and the general learn from the battle.</summary>
+    public static void Bury(GameWorld world, Settlement s, BattleResult result, string how)
+    {
+        foreach (int id in result.Fallen)
+            if (s.FindCitizen(id) is { } c) LifeSystem.Kill(world, s, c, how);
+        var units = world.Data.War;
+        foreach (var q in s.Squads) q.Xp += units.Battle.SquadXpPerBattle;
+        if (s.General is { } g)
+        {
+            g.Xp += units.Battle.GeneralXpPerBattle;
+            g.Battles++;
+            g.Skill = Math.Min(100, 10 + Math.Sqrt(g.Xp) * 3);
+        }
+    }
+
+    /// <summary>Takes losses from a band, archers in proportion.</summary>
+    public static void TakeLosses(Warband band, int losses)
+    {
+        losses = Math.Min(losses, band.Size);
+        int archers = band.Size == 0 ? 0 : (int)Math.Round(losses * (double)band.Archers / band.Size);
+        band.Archers -= archers;
+        band.Raiders = Math.Max(0, band.Raiders - (losses - archers));
+    }
+
+    public static void Report(GameWorld world, Settlement s, BattleResult result, string summary)
+    {
+        world.War.Reports.Add(new BattleReport
+        {
+            Day = world.Time.Day, SettlementId = s.Id, DefendersWon = result.DefendersWon, Attackers = result.AttackersStart,
+            Defenders = result.DefendersStart, AttackerLosses = result.AttackerLosses, DefenderLosses = result.DefenderLosses, Summary = summary,
+        });
+        if (world.War.Reports.Count > 20) world.War.Reports.RemoveAt(0);
+    }
+
     public static BattleResult Fight(GameWorld world, Settlement s, Warband band)
     {
         var units = world.Data.War;
-        var attackers = new List<Block>
-        {
-            new() { Unit = units.Unit("raider")!, Count = band.Raiders },
-            new() { Unit = units.Unit("raider_archer")!, Count = band.Archers },
-        };
-        var defenders = s.Squads.Select(q => new Block
-        {
-            Unit = units.Unit(q.UnitId) ?? units.Units[0], Count = q.SoldierIds.Count, Xp = q.Xp, Citizens = q.SoldierIds.ToList(),
-        }).ToList();
-        var result = BattleResolver.Resolve(world, attackers, defenders, Fortification.Of(world, s), s.General);
-
-        foreach (int id in result.Fallen)
-            if (s.FindCitizen(id) is { } c) LifeSystem.Kill(world, s, c, "fell defending the town");
+        var result = BattleResolver.Resolve(world, AttackerBlocks(world, band), DefenderBlocks(world, s), Fortification.Of(world, s), s.General);
+        Bury(world, s, result, "fell defending the town");
 
         var rules = units.Raids;
         string loot = "";
@@ -244,27 +303,13 @@ public static class Raids
             loot = taken.Count > 0 ? $"; they carried off {string.Join(", ", taken)}" + (s.Stock.Items.Count() > 4 ? " and more" : "") : "";
         }
 
-        // Survivors learn; the general gains experience.
-        foreach (var q in s.Squads) q.Xp += units.Battle.SquadXpPerBattle;
-        if (s.General is { } g)
-        {
-            g.Xp += units.Battle.GeneralXpPerBattle;
-            g.Battles++;
-            g.Skill = Math.Min(100, 10 + Math.Sqrt(g.Xp) * 3);
-        }
-
         string summary = result.DefendersWon
             ? $"The raiders were beaten off: {result.AttackerLosses} of {result.AttackersStart} fell; {result.DefenderLosses} of our {result.DefendersStart} defenders died"
             : result.DefendersStart == 0
                 ? $"Raiders sacked the town unopposed{loot}"
                 : $"The raiders broke our {result.DefendersStart} defenders ({result.DefenderLosses} died){loot}";
         world.Log(EventKind.Battle, s, summary);
-        world.War.Reports.Add(new BattleReport
-        {
-            Day = world.Time.Day, SettlementId = s.Id, DefendersWon = result.DefendersWon, Attackers = result.AttackersStart,
-            Defenders = result.DefendersStart, AttackerLosses = result.AttackerLosses, DefenderLosses = result.DefenderLosses, Summary = summary,
-        });
-        if (world.War.Reports.Count > 20) world.War.Reports.RemoveAt(0);
+        Report(world, s, result, summary);
         world.War.Warbands.Remove(band);
         s.Alert = Alert.None;
         return result;

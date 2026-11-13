@@ -15,6 +15,7 @@ internal static class TradeChecks
         var s = world.FindSettlement(settlementId);
         if (s == null) return (null, "Unknown settlement");
         if (Trading.TradingPost(s) == null) return (null, "Build a Trading Post first");
+        if (War.Siege.Besieged(world, s)) return (null, "The town is under siege: no caravans can get through");
         return (s, null);
     }
 
@@ -88,6 +89,7 @@ public sealed record AcceptOfferCommand(int SettlementId, int OfferId) : ISettle
         if (offer.SettlementId == buyer.Id) return CommandResult.Fail("That's your own offer");
         var seller = world.FindSettlement(offer.SettlementId);
         if (seller == null) return CommandResult.Fail("That town is gone");
+        if (War.Siege.Besieged(world, seller)) return CommandResult.Fail($"{seller.Name} is under siege: no caravans can get through");
         var path = Trading.RoadPath(world, seller, buyer);
         if (path == null) return CommandResult.Fail(Trading.NoRoadMessage(seller, buyer));
         if (!buyer.Stock.TryTakeAll(offer.Want)) return CommandResult.Fail($"You need {Trading.Describe(offer.Want)}");

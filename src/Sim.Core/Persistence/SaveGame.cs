@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 18;
+    public const int CurrentVersion = 19; // 19: sieges (warband engines)
 
     private static readonly JsonSerializerOptions Options = new()
     {
