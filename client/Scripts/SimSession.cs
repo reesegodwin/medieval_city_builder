@@ -104,7 +104,7 @@ public sealed class SimSession : IDisposable
     }
 
     private SimSession(SessionMode mode, string playerName, string address, int port, WorldHost? host,
-        TcpHostListener? listener, HostRunner? runner)
+        TcpHostListener? listener, HostRunner? runner, string? password = null)
     {
         Mode = mode;
         _host = host;
@@ -112,7 +112,7 @@ public sealed class SimSession : IDisposable
         _runner = runner;
         NetClient? client = null;
         _connection = TcpLineConnection.Connect(address, port, line => client!.Receive(line), () => client!.Disconnected());
-        _net = client = new NetClient(playerName, _connection.Send);
+        _net = client = new NetClient(playerName, _connection.Send, password);
         _net.Info += message => Notice?.Invoke(message);
         _net.CommandFinished += (_, result) =>
         {
@@ -176,9 +176,9 @@ public sealed class SimSession : IDisposable
         }
     }
 
-    /// <summary>Joins a friend's game or a dedicated server.</summary>
-    public static SimSession JoinGame(string playerName, string address, int port) =>
-        new(SessionMode.Join, playerName, address, port, null, null, null);
+    /// <summary>Joins a friend's game or a dedicated server (whose accounts need a password).</summary>
+    public static SimSession JoinGame(string playerName, string address, int port, string? password = null) =>
+        new(SessionMode.Join, playerName, address, port, null, null, null, password);
 
     private static void SaveAtomically(GameWorld world, string path)
     {

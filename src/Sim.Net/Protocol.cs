@@ -15,7 +15,7 @@ namespace Sim.Net;
 /// </summary>
 public static class Protocol
 {
-    public const int Version = 1;
+    public const int Version = 2; // 2: accounts (the "auth" exchange)
     public const int DefaultPort = 7777;
     public const int MaxNameLength = 24;
 

@@ -21,10 +21,14 @@ public sealed class NetClient
     private long _advanceTo = -1;
     private int _nextSeq;
 
-    public NetClient(string name, Action<string> send)
+    private readonly string? _password;
+
+    /// <param name="password">For servers with accounts: never sent, only used to answer the server's challenge.</param>
+    public NetClient(string name, Action<string> send, string? password = null)
     {
         Name = name;
         _send = send;
+        _password = password;
     }
 
     public string Name { get; }
@@ -54,6 +58,29 @@ public sealed class NetClient
 
     /// <summary>Server notices (players joining or leaving...).</summary>
     public event Action<string>? Info;
+
+    /// <summary>
+    /// The server wants proof of who we are: derive the key from our password and its salt, then either register
+    /// it (a new name) or answer its nonce with an HMAC. The password itself never leaves this machine.
+    /// </summary>
+    private void Authenticate(JsonObject msg)
+    {
+        if (string.IsNullOrEmpty(_password))
+        {
+            Error = "This server needs a password";
+            return;
+        }
+        var salt = Convert.FromBase64String(msg["salt"]!.GetValue<string>());
+        int iterations = Math.Clamp(msg["iterations"]?.GetValue<int>() ?? AccountBook.Iterations, 10_000, 1_000_000);
+        var key = AccountBook.DeriveKey(_password, salt, iterations);
+        if (msg["register"]?.GetValue<bool>() == true)
+            _send(Protocol.Line(Protocol.Message("auth", ("key", Convert.ToBase64String(key)))));
+        else
+        {
+            var nonce = Convert.FromBase64String(msg["nonce"]!.GetValue<string>());
+            _send(Protocol.Line(Protocol.Message("auth", ("proof", Convert.ToBase64String(AccountBook.Proof(key, nonce))))));
+        }
+    }
 
     public void Hello() => _send(Protocol.Line(Protocol.Message("hello", ("name", Name), ("version", Protocol.Version))));
 
@@ -98,6 +125,10 @@ public sealed class NetClient
     {
         switch (msg["t"]?.GetValue<string>())
         {
+            case "auth":
+                Authenticate(msg);
+                break;
+
             case "welcome":
                 World = SaveGame.FromJson(msg["save"]!.GetValue<string>());
                 _simulator = new Simulator(World);
