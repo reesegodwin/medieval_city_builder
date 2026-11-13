@@ -13,8 +13,8 @@ What works today:
 - **Time.** One game day is one real hour (240 ticks of 6 game minutes each), with seasons and years. Every duration is written in game days, so the time scale is one constant.
 - **Citizens.** Each person is a real record: name, age, sex, family, traits, skills that improve with work, job, home, hunger, mood and a life history.
 - **Jobs.** People are assigned by settlement rules (job priorities). The rules give priority to food during shortages, to producers of scarce goods, and to builders.
-- **Production chains** defined in JSON: farm → grain, then mill & bakery → bread; vegetable garden → vegetables; fishing hut (by water) → fish; brewery: grain → ale; woodcutter → wood; quarry → stone. They respect stock reserves and stock limits (like Dwarf Fortress work orders), and workers are freed once stores are full.
-- **Seasons:** farms peak at the autumn harvest and slow in winter, when homes burn firewood. Granaries hold the winter reserve; snow and autumn colours show the time of year.
+- **Production chains** defined in JSON: farm → grain, then mill & bakery → bread; vegetable garden → vegetables; fishing hut (by water) → fish; brewery: grain → ale; woodcutter → wood; firewood hut → firewood; quarry → stone. They respect stock reserves and stock limits (like Dwarf Fortress work orders), and workers are freed once stores are full.
+- **Seasons:** farms peak at the autumn harvest and slow in winter, when homes burn firewood (gathered at firewood huts). Food rots outside granaries, fastest in summer and not at all in winter. Towns sell food above their winter reserve in autumn. Snow and autumn colours show the time of year.
 - **Construction.** Buildings wait for materials, then builders put them up. Placement rules check terrain and nearby forest or rock.
 - **Roads and logistics.** Each workplace loses time to hauling, based on the real walking cost to the nearest stockpile. Roads make that cheaper; rivers and buildings make people go around. Buildings with no walkable route are flagged.
 - **Bridges.** Roads can cross water as wooden bridges (4 wood per tile). The governor builds them to reach land across rivers.
@@ -141,7 +141,7 @@ dotnet build client/MedievalClient.csproj
 
 ### Trading
 
-The year turns through four seasons. Farms and gardens yield most at the autumn harvest and little in winter, when every home also burns firewood (people in unheated homes are cold and unhappy), so fill granaries and woodpiles before the snow. The ledger (L) shows what the season is doing to your town.
+The year turns through four seasons. Farms and gardens yield most at the autumn harvest and little in winter, when every home also burns firewood (people in unheated homes are cold and unhappy), so fill granaries and gather firewood before the snow. Food left outside granaries rots, fastest in summer; in winter it freezes and keeps. The ledger (L) shows what the season is doing to your town.
 
 Build a **Trading Post** and connect it to a road, then open the trade panel (J). Caravans only travel on roads, so to trade with another town, build a road towards it (it may leave your territory). Hovels become cottages and then townhouses once their people have the services they need (water, market and faith, then clothing, furniture and a tavern), and better-housed people pay more tax. Buildings cost upkeep in coin each day; if the treasury runs dry, buildings with upkeep work at half speed. Sell goods for coin, buy with coin, or barter goods for goods; **Fair price** fills in what merchants pay or charge, and you can raise it for anything you'd rather keep. Deals happen instantly, but the goods and coin travel by ox cart and arrive days later. Merchants visit every 10 days and buy anything listed at a fair price; in shared worlds you can also take other players' offers and set up standing trade routes.
 

@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 12;
+    public const int CurrentVersion = 13;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -151,6 +151,7 @@ public static class SaveGame
         ShortageWarnings = s.ShortageWarnings.ToList(),
         PoorHarvestDays = s.PoorHarvestDays,
         HeatingOwed = s.HeatingOwed,
+        SpoilageOwed = new(s.SpoilageOwed),
         ToolWear = new(s.ToolWear),
         GoodsUse = new(s.GoodsUse),
         FailedSiteSearches = new(s.FailedSiteSearches),
@@ -285,6 +286,7 @@ public static class SaveGame
         foreach (string warning in save.ShortageWarnings ?? new()) s.ShortageWarnings.Add(warning);
         s.PoorHarvestDays = save.PoorHarvestDays;
         s.HeatingOwed = save.HeatingOwed; // version 11 and older had no heating
+        foreach (var (food, owed) in save.SpoilageOwed ?? new()) s.SpoilageOwed[food] = owed; // version 12 and older: no rot
         // Version 3 and older had no tools or household goods; both start with nothing carried over.
         CopyInto(save.ToolWear, s.ToolWear);
         CopyInto(save.GoodsUse, s.GoodsUse);
@@ -358,6 +360,7 @@ public static class SaveGame
         public List<string>? ShortageWarnings { get; set; }
         public int PoorHarvestDays { get; set; }
         public double HeatingOwed { get; set; }
+        public SortedDictionary<string, double>? SpoilageOwed { get; set; }
         public SortedDictionary<string, double> ToolWear { get; set; } = new(StringComparer.Ordinal);
         public SortedDictionary<string, double> GoodsUse { get; set; } = new(StringComparer.Ordinal);
         public Dictionary<string, long> FailedSiteSearches { get; set; } = new();

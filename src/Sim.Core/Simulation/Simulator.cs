@@ -91,6 +91,7 @@ public static class SettlementFounder
         settlement.Stock.Add("stone", 30);
         settlement.Stock.Add("grain", 120);
         settlement.Stock.Add("bread", 20);
+        settlement.Stock.Add("firewood", 30);
         settlement.Stock.Add(Economy.Inventory.Coin, world.Data.Trade.StartingCoin);
 
         // Territory: the starting town centre's cap, claimed evenly around the centre.

@@ -78,6 +78,7 @@ public sealed class GameWorld
                 .Add(s.Ledger.History.Count).Add(s.Ledger.Today.Flows.Sum(f => f.Value.Values.Sum()))
                 .Add(s.Rules.Disasters).Add(s.PoorHarvestDays).Add(s.HeatingOwed);
             foreach (string warning in s.ShortageWarnings) h.Add(warning);
+            foreach (var (food, owed) in s.SpoilageOwed) h.Add(food).Add(owed);
             foreach (var plan in s.RoadPlans) h.Add(plan.X).Add(plan.Y).Add(plan.Progress).Add(plan.Tier);
             foreach (var (x, y) in s.Roads)
                 if (Map.GetTile(x, y).RoadTier > 0) h.Add(x).Add(y).Add(Map.GetTile(x, y).RoadTier);

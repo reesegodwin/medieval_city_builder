@@ -17,6 +17,9 @@ public sealed class ResourceDef
 
     public bool IsFood => Nutrition > 0;
 
+    /// <summary>Share of the stock that rots per day outside a granary (scaled by season; see seasons.json).</summary>
+    public double SpoilPerDay { get; set; }
+
     /// <summary>
     /// Tools: while the settlement has any in stock, workers at workplaces and building sites get this much
     /// extra output (0.25 = +25%).
@@ -210,6 +213,9 @@ public sealed class BuildingDef
 
     public Dictionary<string, int> Cost { get; set; } = new();
     public int Storage { get; set; }
+
+    /// <summary>Food held here (up to <see cref="Storage"/>) doesn't spoil.</summary>
+    public bool KeepsFood { get; set; }
     public int Housing { get; set; }
     public int Jobs { get; set; }
     public string? JobKind { get; set; }
@@ -446,6 +452,9 @@ public sealed class SeasonDef
     /// <summary>Firewood each occupied home burns per day.</summary>
     public double HeatingWoodPerHomeDay { get; set; }
 
+    /// <summary>How fast food rots outside granaries (1 = each food's own rate; 0 in winter, when it freezes).</summary>
+    public double Spoilage { get; set; } = 1;
+
     public double OutputOf(string buildingId) => Output.TryGetValue(buildingId, out double f) ? f : 1;
 }
 
@@ -459,7 +468,7 @@ public sealed class SeasonRules
     public double ColdMood { get; set; } = -12;
 
     /// <summary>Days of food the governor makes room for before winter.</summary>
-    public int WinterReserveDays { get; set; } = 30;
+    public int WinterReserveDays { get; set; } = 15;
 
     public SeasonDef Of(Time.Season season) =>
         (int)season < Seasons.Count ? Seasons[(int)season] : new SeasonDef { Name = season.ToString() };

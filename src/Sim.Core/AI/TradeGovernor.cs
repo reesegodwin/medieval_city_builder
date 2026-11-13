@@ -1,3 +1,4 @@
+using Sim.Core.Systems;
 using Sim.Core.Commands;
 using Sim.Core.Economy;
 using Sim.Core.World;
@@ -22,6 +23,9 @@ public static class TradeGovernor
 
     /// <summary>A surplus is stock at or above this share of the stock limit.</summary>
     public const double SurplusShare = 0.9;
+
+    /// <summary>Smallest autumn food sale worth posting.</summary>
+    public const int MinFoodSale = 20;
 
     /// <summary>Days between attempts to plan a road to the same trading partner.</summary>
     public const int RoadRetryDays = 10;
@@ -98,10 +102,20 @@ public static class TradeGovernor
                    s.Buildings.Any(b => b.Def.Recipe?.Inputs.ContainsKey(r) == true);
         }
         bool Short(string r) => Used(r) && s.Stock.Get(r) < s.Rules.LowStockThreshold;
+        // In autumn, food above the winter reserve is a surplus too: sell it before it rots.
         bool Surplus(string r)
         {
+            // Firewood is laid in for winter: only what's left over in spring is for sale.
+            if (r == SeasonSystem.Firewood && world.Time.Season != Time.Season.Spring) return false;
             int limit = s.LimitOf(r);
-            return r != Inventory.Coin && limit != int.MaxValue && s.Stock.Get(r) >= limit * SurplusShare;
+            return r != Inventory.Coin && limit != int.MaxValue && s.Stock.Get(r) >= limit * SurplusShare ||
+                   SeasonSystem.SellableFood(world, s, r) >= MinFoodSale;
+        }
+        int SaleAmount(string r)
+        {
+            int sellable = SeasonSystem.SellableFood(world, s, r);
+            int usual = Math.Max(10, s.Stock.Get(r) / 5);
+            return sellable >= MinFoodSale ? Math.Min(sellable, Math.Max(usual, sellable / 2)) : usual;
         }
 
         // 1. Take one other town's offer that brings something we're short of, at a fair price.
@@ -130,7 +144,7 @@ public static class TradeGovernor
             if (open >= rules.MaxOpenOffers - 2) break;
             string r = def.Id;
             if (def.Value <= 0 || !Surplus(r) || HasOffer(r)) continue;
-            var give = new Dictionary<string, int> { [r] = Math.Max(10, s.Stock.Get(r) / 5) };
+            var give = new Dictionary<string, int> { [r] = SaleAmount(r) };
             var want = new Dictionary<string, int> { [Inventory.Coin] = Trading.FairSellPrice(world, give) };
             if (world.Execute(new PostOfferCommand(s.Id, give, want)).Ok) open++;
         }

@@ -80,6 +80,7 @@
       "stone": 15
     },
     "storage": 1500,
+    "keepsFood": true,
     "jobs": 4,
     "jobKind": "hauler"
   },
@@ -183,6 +184,29 @@
     "recipe": {
       "outputs": {
         "wood": 6
+      },
+      "workDays": 1
+    },
+    "nearTerrain": {
+      "terrain": "forest",
+      "radius": 7,
+      "min": 10
+    }
+  },
+  {
+    "id": "firewood_hut",
+    "name": "Firewood Hut",
+    "width": 2,
+    "height": 2,
+    "buildDays": 0.15,
+    "cost": {
+      "wood": 5
+    },
+    "jobs": 1,
+    "jobKind": "firewood",
+    "recipe": {
+      "outputs": {
+        "firewood": 5
       },
       "workDays": 1
     },
