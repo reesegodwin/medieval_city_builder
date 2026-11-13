@@ -473,11 +473,12 @@
     "cost": {
       "wood": 12
     },
-    "jobs": 1,
+    "jobs": 2,
     "jobKind": "shepherd",
     "recipe": {
       "outputs": {
-        "wool": 3
+        "wool": 2,
+        "mutton": 3
       },
       "workDays": 1
     },

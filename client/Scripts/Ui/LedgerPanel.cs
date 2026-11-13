@@ -240,7 +240,7 @@ public partial class LedgerPanel : PanelContainer
             int limit = Town.LimitOf(r.Id);
             if (stock == 0 && Math.Abs(row.Made) + Math.Abs(row.Used) + Math.Abs(row.Traded) < 0.05) continue;
             double daysLeft = Forecast.DaysLeft(World, Town, r.Id);
-            string runsOut = double.IsPositiveInfinity(daysLeft) ? "-" : $"{daysLeft:0} days";
+            string runsOut = double.IsPositiveInfinity(daysLeft) ? "-" : stock == 0 ? "none left" : $"{daysLeft:0} days";
             Color? warn = daysLeft < Forecast.WarnDays ? new Color(1f, 0.55f, 0.45f) : null;
             GoodButton(r.Id, r.Name);
             Cell(_goods, stock.ToString());

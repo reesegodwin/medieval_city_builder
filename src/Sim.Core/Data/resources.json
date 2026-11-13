@@ -3,6 +3,7 @@
   {"id": "bread", "name": "Bread", "nutrition": 1.0, "mealMood": 6, "value": 2, "spoilPerDay": 0.02},
   {"id": "vegetables", "name": "Vegetables", "nutrition": 0.7, "mealMood": 2, "value": 2, "spoilPerDay": 0.015},
   {"id": "fish", "name": "Fish", "nutrition": 0.8, "mealMood": 3, "value": 2, "spoilPerDay": 0.03},
+  {"id": "mutton", "name": "Mutton", "nutrition": 1.0, "mealMood": 5, "value": 3, "spoilPerDay": 0.025},
   {"id": "ale", "name": "Ale", "value": 3},
   {"id": "wood", "name": "Wood", "value": 1},
   {"id": "firewood", "name": "Firewood", "value": 1},

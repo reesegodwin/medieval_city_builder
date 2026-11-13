@@ -228,6 +228,20 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - With seasons alone, populations ended at 796/724/662 and treasuries at 2,970 / 9,163 / 2,550, because towns kept food for winter instead of selling it.
   - With firewood, spoilage and autumn sales, populations end at 803/732/717 and treasuries at 5,401 / 6,364 / 6,245. Nothing rots in governed towns, and no home goes cold.
 
+## Mutton
+- **Sheep Pasture** now has two shepherds and makes wool 2 and mutton 3 per cycle. Mutton is food: nutrition 1.0, meal mood +5 (bread is +6), rotting at 2.5% a day outside granaries.
+- **Seasons:** pastures yield 110% in spring (lambs), 105% in summer and autumn, and 80% in winter.
+- **Several products:** a workplace that makes more than one good only makes those still below their stock limit. A full wool store therefore doesn't stop the mutton, and doesn't overflow.
+- **Governor**
+  - Keeps one pasture per 70 people from population 40, while mutton is under half its limit.
+  - Counts pastures in its food estimate.
+  - The shepherd job priority is now 4, like other food jobs.
+- **Limits:** flat 150, or 4 per person.
+- **Result over 720 days:**
+  - Populations end at 778/822/735 and treasuries at 5,465 / 8,204 / 9,694.
+  - Mutton is eaten as fast as it's made (80–97 a day).
+  - Food now takes fewer workers, so towns build fewer farms (seed 42: 61 instead of 79) and bakeries. Late in the run about 55–70 adults are idle on two seeds; before, that spare labour sat "on standby" at farms that had hit their stock limit. Mood is about the same (87–91).
+
 ## Disasters (`Systems/DisasterSystem.cs`, `disasters.json`)
 - **Mild:** nothing is lost for good except some goods in a burning stockpile. Each settlement can switch disasters off in the Rules panel (`SetDisastersCommand`). The setting is on by default and saved (save v11).
 - **Fire:** each working building has a 0.01% daily chance, halved within reach of a well. A burning building drops back to half-built: builders repair it with labour only, its workers and residents leave, and its work in progress is lost. A stockpile fire burns a quarter of its share of the stored goods (booked as `disaster:fire`). The town centre never burns.

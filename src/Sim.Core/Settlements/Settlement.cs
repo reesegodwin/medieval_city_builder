@@ -23,7 +23,7 @@ public sealed class SettlementRules
         ["quarrier"] = 2,
         ["brewer"] = 2,
         ["miner"] = 2,
-        ["shepherd"] = 2,
+        ["shepherd"] = 4, // mutton is food
         ["weaver"] = 2,
         ["carpenter"] = 2,
         [JobKinds.Roadworker] = 4,
@@ -46,6 +46,7 @@ public sealed class SettlementRules
         ["bread"] = 300,
         ["vegetables"] = 200,
         ["fish"] = 200,
+        ["mutton"] = 150,
         ["ale"] = 150,
         ["wood"] = 250,
         ["firewood"] = 200,
@@ -65,6 +66,7 @@ public sealed class SettlementRules
         ["bread"] = 10,
         ["vegetables"] = 6,
         ["fish"] = 5,
+        ["mutton"] = 4,
         ["ale"] = 1,
         ["firewood"] = 6, // a winter's heating
     };
