@@ -567,14 +567,24 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - "Under siege" costs 3 mood.
   - The normal muster stays armed. The full call-up only comes for the assault.
 - **Repairs:** afterwards, damaged walls regain 40 hit points a tile a day, paid in their own materials. Breached tiles are rebuilt by the governor's ring planner.
-- **AI towns:** once the band starts on its engines, the AI sallies if it has 1.25× the band's numbers, or pays if the price is under 30% of the treasury; otherwise it holds out.
+- **AI towns hold out:**
+  - They only act once an engine is finished.
+  - They ride out if they have 1.25× the band's numbers.
+  - Otherwise they hold out and let the archers work. They pay tribute (only if it's under 30% of the treasury) when the siege has lasted 15 days, or when a breach is imminent (the wall is below 35%, or the finished engines would knock a tile down within a day) and the fight at the breach looks risky (everyone called up wouldn't outnumber the band 1.5:1).
+- **Engines are rolled into place:** a finished engine spends its first day being moved up, when archers in range can already shoot it, and only batters from the next day.
 - **Client:**
   - Army panel (K): day, engines, the wall under attack, and Sally and Pay buttons.
   - A banner: "Under siege, day N: …".
   - The camp is drawn with tents, and the engines before the wall (half-built ones drawn short).
   - Battered walls show soot cracks and fallen stones.
   - `--demo-siege` sets up a siege for screenshots.
-- **720 days:** each seed had several sieges: seed 42 paid off all 6; seed 7 paid off 3 of 3; seed 1234 paid off 2 of 5, with 1 breach that was beaten back. No starvation.
+- **720 days:** each seed had several sieges; every battle was won and nobody starved.
+
+  | Seed | Sieges | Paid off | Breaches (all beaten back) |
+  |---|---|---|---|
+  | 42 | 6 | 5 | 1 |
+  | 7 | 11 | 1 | 9 |
+  | 1234 | 5 | 0 | 3 |
 - **Later:** player-vs-player sieges, fire, mining, starving a town out.
 
 ## Battles: individual units + destructible structures (hybrid LOD simulation)

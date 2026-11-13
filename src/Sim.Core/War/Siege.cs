@@ -88,6 +88,9 @@ public sealed class SiegeEngine
 
     /// <summary>Strength left against arrows (set when it's finished and rolled up into range).</summary>
     public int Hp { get; set; }
+
+    /// <summary>Rolled into place and working: a finished engine spends its first day being moved up.</summary>
+    public bool InPlace { get; set; }
 }
 
 /// <summary>
@@ -191,6 +194,10 @@ public static class Siege
             return;
         }
 
+        // Engines finished yesterday have been rolled into place overnight.
+        foreach (var e in band.Engines)
+            if (e.Built) e.InPlace = true;
+
         // 1. Build: the engine in progress, else start the best kind for these walls.
         var building = band.Engines.FirstOrDefault(e => !e.Built);
         if (building == null && band.Engines.Count < MaxEngines(rules, band) && BestEngine(world, s, outer) is { } next)
@@ -203,7 +210,7 @@ public static class Siege
             {
                 building.Hp = def.Hp;
                 world.Log(EventKind.Battle, s, $"Siege, day {band.SiegeDays}: the raiders finished a {def.Name.ToLowerInvariant()} and " +
-                    (InArcherRange(rules, def) ? "rolled it up to the walls" : "set it up beyond bowshot"));
+                    (InArcherRange(rules, def) ? "began rolling it up to the walls, within bowshot" : "began setting it up beyond bowshot"));
             }
         }
 
@@ -211,7 +218,7 @@ public static class Siege
         ShootAtEngines(world, s, band);
 
         // 3. Batter the outer wall tile the built engines bring down soonest.
-        var engines = band.Engines.Where(e => e.Built).Select(e => rules.Engine(e.Kind)).OfType<EngineDef>().ToList();
+        var engines = band.Engines.Where(e => e.InPlace).Select(e => rules.Engine(e.Kind)).OfType<EngineDef>().ToList();
         if (engines.Count == 0) return;
         (int X, int Y)? target = null;
         double soonest = double.MaxValue;
