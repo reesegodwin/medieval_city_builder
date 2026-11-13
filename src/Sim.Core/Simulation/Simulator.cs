@@ -51,6 +51,7 @@ public sealed class Simulator
         {
             foreach (var s in World.Settlements)
             {
+                s.Ledger.EndDay(World.Time.Day);
                 LifeSystem.Daily(World, s);
                 ServiceSystem.Daily(World, s);
                 HomeSystem.Daily(World, s);

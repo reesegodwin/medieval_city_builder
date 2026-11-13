@@ -74,7 +74,8 @@ public sealed class GameWorld
         foreach (var s in Settlements)
         {
             h.Add(s.Id).Add(s.Territory.Count).Add(s.TerritoryCap).Add(s.HaulCoverage).Add(s.Roads.Count)
-                .Add(s.TaxAccrued).Add(s.UpkeepOwed).Add(s.UpkeepUnpaid);
+                .Add(s.TaxAccrued).Add(s.UpkeepOwed).Add(s.UpkeepUnpaid)
+                .Add(s.Ledger.History.Count).Add(s.Ledger.Today.Flows.Sum(f => f.Value.Values.Sum()));
             foreach (var plan in s.RoadPlans) h.Add(plan.X).Add(plan.Y).Add(plan.Progress).Add(plan.Tier);
             foreach (var (x, y) in s.Roads)
                 if (Map.GetTile(x, y).RoadTier > 0) h.Add(x).Add(y).Add(Map.GetTile(x, y).RoadTier);

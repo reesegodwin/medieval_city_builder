@@ -173,6 +173,7 @@ public static class ConstructionSystem
             {
                 if (settlement.Stock.TryTakeAll(b.Def.Cost))
                 {
+                    settlement.Ledger.RecordAll(b.Def.Cost, -1, Economy.LedgerKeys.Building);
                     b.State = BuildingState.UnderConstruction;
                     b.Problem = null;
                 }
@@ -244,6 +245,7 @@ public static class ProductionSystem
                     continue;
                 }
                 settlement.Stock.TryTakeAll(recipe.Inputs);
+                settlement.Ledger.RecordAll(recipe.Inputs, -1, Economy.LedgerKeys.Inputs);
                 b.InputsLoaded = true;
             }
 
@@ -269,7 +271,11 @@ public static class ProductionSystem
             }
 
             foreach (var (resource, amount) in recipe.Outputs)
-                settlement.Stock.Add(resource, (int)Math.Round(amount * b.TerrainMultiplier));
+            {
+                int made = (int)Math.Round(amount * b.TerrainMultiplier);
+                settlement.Stock.Add(resource, made);
+                settlement.Ledger.Record(resource, made, Economy.LedgerKeys.Made);
+            }
             freeStorage -= total;
             b.CycleProgress -= recipe.WorkDays;
             b.InputsLoaded = false;
@@ -464,6 +470,7 @@ public static class Tools
             double wear = settlement.ToolWear.GetValueOrDefault(tool.Id) + workers * tool.WearPerWorkerDay / TimeScale.TicksPerDay;
             int used = Math.Min(stock, (int)wear);
             if (used > 0) settlement.Stock.TryTake(tool.Id, used);
+            settlement.Ledger.Record(tool.Id, -used, Economy.LedgerKeys.Used);
             settlement.ToolWear[tool.Id] = wear - (int)wear;
         }
     }
@@ -531,6 +538,33 @@ public static class EconomySystem
     public static double OutputFactor(GameWorld world, Settlement s, Building b) =>
         s.UpkeepUnpaid && b.Def.Upkeep > 0 ? world.Data.Trade.UnpaidOutput : 1;
 
+    /// <summary>Books the taxes collected, split by class in proportion to what each class owes.</summary>
+    private static void RecordTaxes(GameWorld world, Settlement s, int collected)
+    {
+        if (collected == 0) return;
+        var byClass = new SortedDictionary<string, double>(StringComparer.Ordinal);
+        foreach (var c in s.Citizens)
+        {
+            if (!c.IsAdult) continue;
+            var cls = HomeSystem.ClassOf(world, s, c);
+            byClass[cls.Name] = byClass.GetValueOrDefault(cls.Name) + cls.TaxPerAdultDay;
+        }
+        double total = byClass.Values.Sum();
+        foreach (var (name, owed) in byClass)
+            s.Ledger.Record(Economy.Inventory.Coin, collected * owed / total, Economy.LedgerKeys.Taxes_(name));
+    }
+
+    /// <summary>Books upkeep paid, split by building type in proportion to each type's upkeep.</summary>
+    private static void RecordUpkeep(Settlement s, int paid, double total)
+    {
+        if (paid == 0 || total <= 0) return;
+        var byType = new SortedDictionary<string, double>(StringComparer.Ordinal);
+        foreach (var b in s.Buildings)
+            if (b.IsOperational && b.Def.Upkeep > 0) byType[b.Def.Name] = byType.GetValueOrDefault(b.Def.Name) + b.Def.Upkeep;
+        foreach (var (name, upkeep) in byType)
+            s.Ledger.Record(Economy.Inventory.Coin, -paid * upkeep / total, Economy.LedgerKeys.Upkeep_(name));
+    }
+
     public static void Daily(GameWorld world, Settlement s)
     {
         const string coin = Economy.Inventory.Coin;
@@ -538,6 +572,7 @@ public static class EconomySystem
         int taxes = (int)s.TaxAccrued;
         s.TaxAccrued -= taxes;
         s.Stock.Add(coin, taxes);
+        RecordTaxes(world, s, taxes);
 
         double upkeep = DailyUpkeep(s);
         // Debt doesn't pile up beyond a day's upkeep: unpaid buildings simply run at reduced output.
@@ -546,6 +581,7 @@ public static class EconomySystem
         int paid = Math.Min(due, s.Stock.Get(coin));
         s.Stock.TryTake(coin, paid);
         s.UpkeepOwed -= paid;
+        RecordUpkeep(s, paid, upkeep);
 
         bool unpaid = paid < due;
         if (unpaid != s.UpkeepUnpaid)

@@ -47,7 +47,7 @@ public partial class TradePanel : PanelContainer
         OffsetLeft = 10;
         OffsetRight = 520;
         OffsetTop = 108;
-        OffsetBottom = -120;
+        OffsetBottom = -180;
         Visible = false;
 
         _resources = World.Data.Resources.Values.Where(r => r.Value > 0 && r.Id != Inventory.Coin)

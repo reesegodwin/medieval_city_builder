@@ -98,6 +98,9 @@ public sealed class Settlement
     public int CenterY { get; }
 
     public Inventory Stock { get; } = new();
+
+    /// <summary>Daily books of what came in and went out, by source (see <see cref="Ledger"/>).</summary>
+    public Ledger Ledger { get; set; } = new();
     public SettlementRules Rules { get; } = new();
 
     private readonly List<Building> _buildings = new();

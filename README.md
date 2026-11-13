@@ -86,6 +86,7 @@ dotnet test
 | X | Demolish tool: click a building or road tile |
 | T | Territory tool: drag to claim land, Shift+drag to give it back, `[` / `]` change the brush size |
 | J | Trade panel: market, your offers, new offer (with a fair-price button), routes and caravans. Needs a Trading Post |
+| L | Town ledger: people and complaints, goods made and used per day (and what will run out), coin in and out, jobs |
 | Right-click / Esc | Cancel the current tool or close the inspector |
 | P | Rules panel: job priorities, stock limits, reserves |
 | F5 / F9 | Quick-save / load (saved in Godot's user data folder) |
@@ -114,6 +115,7 @@ These go after `--` on Godot's command line:
 | `--menu` | Show the start menu even with other options (for screenshots) |
 | `--rules` | Open the rules panel at start |
 | `--trade [TAB]` | Open the trade panel at start (tab 0–4) |
+| `--ledger [TAB]` | Open the town ledger at start (0 Overview, 1 Goods, 2 Treasury, 3 Work) |
 | `--follow-caravan` | Keep the camera on a caravan on the road |
 | `--territory` | Open the territory tool at start |
 | `--zoom N` | Start with the camera N units away (6–90) |

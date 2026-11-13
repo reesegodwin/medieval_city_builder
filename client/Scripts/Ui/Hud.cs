@@ -34,6 +34,7 @@ public partial class Hud : CanvasLayer
     public event Action? ExpandTerritoryRequested;
     public event Action? RulesRequested;
     public event Action? TradeRequested;
+    public event Action? LedgerRequested;
     public event Action? SaveRequested;
     public event Action? LoadRequested;
     public event Action? SoundToggled;
@@ -106,6 +107,7 @@ public partial class Hud : CanvasLayer
                  {
                      ("Rules", "Job priorities, stock limits and reserves (P)", () => RulesRequested?.Invoke()),
                      ("Trade", "Offers, trade routes and caravans (J). Needs a Trading Post.", () => TradeRequested?.Invoke()),
+                     ("Ledger", "The town's books: people and complaints, goods made and used, coin in and out, jobs (L)", () => LedgerRequested?.Invoke()),
                      ("Save", "Quick-save (F5)", () => SaveRequested?.Invoke()),
                      ("Load", "Load the quick-save (F9)", () => LoadRequested?.Invoke()),
                      ("Sound", "Sound on/off (M)", () => SoundToggled?.Invoke()),
@@ -205,7 +207,7 @@ public partial class Hud : CanvasLayer
         // --- Controls help (top-right, under the bar) ---
         var help = new Label
         {
-            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   X: demolish   T: territory   P: rules   J: trade\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
+            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   X: demolish   T: territory   P: rules   J: trade   L: ledger\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
             HorizontalAlignment = HorizontalAlignment.Right,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };

@@ -155,16 +155,18 @@ public static class Trading
         return points;
     }
 
-    public static void AddAll(Settlement s, IReadOnlyDictionary<string, int> goods)
+    /// <summary>Adds goods to a town's stock and books them under <paramref name="ledgerKey"/>.</summary>
+    public static void AddAll(Settlement s, IReadOnlyDictionary<string, int> goods, string ledgerKey)
     {
         foreach (var (resource, amount) in goods) s.Stock.Add(resource, amount);
+        s.Ledger.RecordAll(goods, +1, ledgerKey);
     }
 
     /// <summary>Ends an offer that wasn't taken: its set-aside goods go back to the town.</summary>
     public static void Withdraw(GameWorld world, TradeOffer offer)
     {
         world.Trade.Offers.Remove(offer);
-        if (world.FindSettlement(offer.SettlementId) is { } owner) AddAll(owner, offer.Give);
+        if (world.FindSettlement(offer.SettlementId) is { } owner) AddAll(owner, offer.Give, LedgerKeys.Offers);
     }
 
     /// <summary>Where merchants come from for a town: outside its land, in a direction fixed by its id.</summary>
@@ -217,7 +219,7 @@ public static class TradeSystem
             case CaravanKind.Delivery:
                 if (world.FindSettlement(caravan.ToId) is { } to)
                 {
-                    Trading.AddAll(to, caravan.Cargo);
+                    Trading.AddAll(to, caravan.Cargo, LedgerKeys.TradeIn);
                     world.Log(EventKind.Trade, to, $"Caravan arrived with {Trading.Describe(caravan.Cargo)}");
                 }
                 break;
@@ -253,6 +255,8 @@ public static class TradeSystem
         }
         from.Stock.TryTakeAll(route.Give);
         to.Stock.TryTakeAll(route.Want);
+        from.Ledger.RecordAll(route.Give, -1, LedgerKeys.TradeOut);
+        to.Ledger.RecordAll(route.Want, -1, LedgerKeys.TradeOut);
         Trading.Send(world, from, to, route.Give, path);
         Trading.Send(world, to, from, route.Want, path.AsEnumerable().Reverse().ToList());
         route.Rounds++;
@@ -313,6 +317,10 @@ public static class TradeSystem
                 if (price > Trading.FairSellPrice(world, offer.Give) || price > purse) continue;
                 purse -= price;
                 town.Stock.Add(Inventory.Coin, price);
+                town.Ledger.Record(Inventory.Coin, price, LedgerKeys.TradeIn);
+                // The goods were set aside when the offer was posted; now they're sold for good.
+                town.Ledger.RecordAll(offer.Give, -1, LedgerKeys.TradeOut);
+                town.Ledger.RecordAll(offer.Give, +1, LedgerKeys.Offers);
                 foreach (var (r, n) in offer.Give) bought[r] = bought.GetValueOrDefault(r) + n;
                 world.Trade.Offers.Remove(offer);
                 deals.Add($"bought {Trading.Describe(offer.Give)} for {price} coin");
@@ -323,7 +331,9 @@ public static class TradeSystem
                 int units = offer.Want.Values.Sum();
                 if (paid < Trading.FairBuyPrice(world, offer.Want) || units > cargo) continue;
                 cargo -= units;
-                Trading.AddAll(town, offer.Want);
+                Trading.AddAll(town, offer.Want, LedgerKeys.TradeIn);
+                town.Ledger.RecordAll(offer.Give, -1, LedgerKeys.TradeOut);
+                town.Ledger.RecordAll(offer.Give, +1, LedgerKeys.Offers);
                 bought[Inventory.Coin] = bought.GetValueOrDefault(Inventory.Coin) + paid;
                 world.Trade.Offers.Remove(offer);
                 deals.Add($"sold {Trading.Describe(offer.Want)} for {paid} coin");
