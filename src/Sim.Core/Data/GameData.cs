@@ -272,9 +272,14 @@ public sealed class GameData
     /// <summary>Road surfaces from dirt (tier 0) upwards.</summary>
     public IReadOnlyList<RoadTierDef> RoadTiers { get; }
 
+    /// <summary>Fires, sickness and poor harvests.</summary>
+    public DisasterRules Disasters { get; }
+
     public GameData(IEnumerable<ResourceDef> resources, IEnumerable<BuildingDef> buildings, IEnumerable<NeedDef>? needs = null,
-        TradeRules? trade = null, IEnumerable<RoadTierDef>? roadTiers = null, IEnumerable<SocialClassDef>? classes = null)
+        TradeRules? trade = null, IEnumerable<RoadTierDef>? roadTiers = null, IEnumerable<SocialClassDef>? classes = null,
+        DisasterRules? disasters = null)
     {
+        Disasters = disasters ?? new DisasterRules();
         Classes = classes?.ToList() ?? new List<SocialClassDef> { new() { Id = "peasant", Name = "Peasants", TaxPerAdultDay = 0.06 } };
         Trade = trade ?? new TradeRules();
         RoadTiers = roadTiers?.ToList() ?? new List<RoadTierDef> { new() { Id = "dirt", Name = "Dirt road" } };
@@ -307,7 +312,8 @@ public sealed class GameData
         var trade = LoadEmbedded<TradeRules>("trade.json");
         var roads = LoadEmbedded<List<RoadTierDef>>("roads.json");
         var classes = LoadEmbedded<List<SocialClassDef>>("classes.json");
-        return new GameData(resources, buildings, needs, trade, roads, classes);
+        var disasters = LoadEmbedded<DisasterRules>("disasters.json");
+        return new GameData(resources, buildings, needs, trade, roads, classes, disasters);
     }
 
     private static T LoadEmbedded<T>(string fileName)
@@ -383,4 +389,43 @@ public sealed class GameData
             }
         }
     }
+}
+
+/// <summary>Chances and effects of disasters (disasters.json). They are mild: nothing is lost for good.</summary>
+public sealed class DisasterRules
+{
+    /// <summary>Daily chance that a working building catches fire.</summary>
+    public double FireChancePerBuildingDay { get; set; } = 0.0001;
+
+    /// <summary>Fire chance multiplier for buildings within reach of a working well.</summary>
+    public double WellFireFactor { get; set; } = 0.5;
+
+    /// <summary>Share of the building's construction work needed to repair it after a fire.</summary>
+    public double RepairShare { get; set; } = 0.5;
+
+    /// <summary>Share of the goods a burning stockpile holds (its part of the town's storage) that is lost.</summary>
+    public double StockpileFireLoss { get; set; } = 0.25;
+
+    /// <summary>Daily chance of an outbreak in a town at normal crowding with no water or faith.</summary>
+    public double SicknessChancePerDay { get; set; } = 0.012;
+
+    public int SicknessMinPopulation { get; set; } = 30;
+
+    /// <summary>How much full water coverage lowers the chance of sickness (0.5 = halves it).</summary>
+    public double WaterProtection { get; set; } = 0.5;
+
+    public double FaithProtection { get; set; } = 0.3;
+    public double SickShareMin { get; set; } = 0.02;
+    public double SickShareMax { get; set; } = 0.05;
+    public int SickDaysMin { get; set; } = 5;
+    public int SickDaysMax { get; set; } = 10;
+    public double SickMood { get; set; } = -10;
+
+    /// <summary>Chance, at the start of each autumn, that the harvest is poor.</summary>
+    public double PoorHarvestChance { get; set; } = 0.15;
+
+    public int PoorHarvestDays { get; set; } = 30;
+
+    /// <summary>Output of farms and gardens (buildings with a fertile bonus) during a poor harvest.</summary>
+    public double PoorHarvestOutput { get; set; } = 0.7;
 }

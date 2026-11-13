@@ -16,6 +16,7 @@ public enum EventKind
     Starvation,
     Shortage,
     Trade,
+    Disaster,
 }
 
 /// <summary>

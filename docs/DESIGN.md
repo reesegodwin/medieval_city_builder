@@ -167,15 +167,38 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
 - Result over 720 days (three seeds, with housing classes): treasuries end around 5,000–11,000 coin, taxes roughly match upkeep, and upkeep goes unpaid at most once, briefly, in the early game.
 
 ## Town ledger
-- Each settlement keeps books (`Economy/Ledger.cs`): every change to stock or coin is recorded by good under a category key. The keys are `made`, `inputs`, `eaten`, `used`, `building`, `trade-in`, `trade-out`, `offers`, `refunds`, `taxes:<class>` and `upkeep:<building>`.
+- Each settlement keeps books (`Economy/Ledger.cs`): every change to stock or coin is recorded by good under a category key. The keys are `made`, `inputs`, `eaten`, `used`, `building`, `trade-in`, `trade-out`, `offers`, `refunds`, `taxes:<class>`, `upkeep:<building>` and `disaster:<what>`.
 - **Books:** today plus the last 30 days. They are saved (save v10) and hashed, so a joining player sees the same history.
-- **Observer only:** the ledger never changes the simulation. A test checks that the books exactly explain every stock change over 30 days.
+- **The books never change stock themselves.** A test checks that they exactly explain every stock change over 30 days. Forecasts read them (see Shortage warnings).
 - **Ledger screen (L or the HUD button):**
   - **Overview:** people by class, homes, adults working, on standby, hauling or idle, needs met, and the top complaints (negative mood factors added up).
-  - **Goods:** stock, limit, made, used, traded and net per day (7-day average), plus "runs out in N days".
-  - **Treasury:** income and spending by source, and the daily balance.
+  - **Goods:** stock, limit, made, used, traded and net per day (7-day average), plus "runs out in N days". Click a good for 30-day charts of its stock and of what was made, used and traded each day, plus its full breakdown by key.
+  - **Treasury:** 30-day charts of the treasury and of daily income and spending, then income and spending by source, and the daily balance.
   - **Work:** workers and slots for each job, standby workers, and problems.
-- The console summary prints the same goods and coin tables.
+- The console summary prints the same goods and coin tables, plus a count of disasters and shortage warnings.
+- The charts are the client's first custom drawing (`Ui/LineChart.cs`). Stock history is worked back from today's stock using each day's net flow (`Ledger.StockSeries`).
+
+## Shortage warnings (`Economy/Forecast.cs`)
+- `Forecast.DaysLeft` is stock divided by the average net loss over the last 7 days. It's infinite when stock isn't falling, and needs at least 3 days of books.
+- **Watched:** food (all foods together, weighted by nutrition), wood, stone, tools and coin.
+- **Warnings:** under 10 days left logs a `Shortage` event ("Wood runs out in 8 days at the current rate") that shows in the feed. A good isn't warned about again until it recovers past 20 days. The warned goods are saved and hashed (`Settlement.ShortageWarnings`).
+- **Governor:** it also wants a woodcutter, quarry or farm when that good would run out within 15 days, alongside the fixed stock checks.
+
+## Fish
+- **Fishing Hut:** 2×2 and 10 wood. It must have water within 3 tiles (the same `nearTerrain` rule as woodcutters near forest). Two fishers, 3 fish per cycle.
+- **Fish:** nutrition 0.8 and meal mood +3. That's better than grain (−6) or vegetables (+2) and below bread (+6). A third or fourth food adds to the existing variety bonus.
+- **Governor:** builds fishing huts from population 25, one per 80 people, and counts them in its food estimate.
+
+## Disasters (`Systems/DisasterSystem.cs`, `disasters.json`)
+- **Mild:** nothing is lost for good except some goods in a burning stockpile. Each settlement can switch disasters off in the Rules panel (`SetDisastersCommand`). The setting is on by default and saved (save v11).
+- **Fire:** each working building has a 0.01% daily chance, halved within reach of a well. A burning building drops back to half-built: builders repair it with labour only, its workers and residents leave, and its work in progress is lost. A stockpile fire burns a quarter of its share of the stored goods (booked as `disaster:fire`). The town centre never burns.
+- **Sickness:** from 30 people, a 1.2% daily chance scaled by crowding (people per housing place). Full water coverage halves it and faith lowers it by 30%. 2–5% of people fall sick for 5–10 days. Sick people don't work and get −10 mood. There's one outbreak at a time and nobody dies.
+- **Poor harvest:** at the start of each autumn there's a 15% chance. Farms and gardens produce 30% less for 30 days.
+- **Result over 720 days (seeds 42, 7 and 1234):** big towns see about 2–6 fires and 1–2 outbreaks a year. Populations end at 707/733/740 with disasters and 697/739/732 without, with no starvation.
+- **Governor fix found while testing:** on seed 42, nearly all free land near the centre lay across a lake, too wide to bridge. The site search spent all its route checks there and the town stopped building homes. Now it:
+  - tries sites reachable without a new bridge first;
+  - skips sites next to one that couldn't be connected;
+  - maps larger cut-off areas.
 
 ## Colony Simulation (Dwarf Fortress / Songs of Syx-inspired depth, Stronghold look)
 
@@ -215,7 +238,7 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
 - **Terrain shape is cosmetic:** the client draws the land as a low-poly heightfield (heights on tile corners, blended between neighbouring tiles), so riverbanks slope and rock forms hills. Buildable ground stays nearly flat, and buildings get an earthen footing. The territory border is smoothed with marching squares. The simulation still works on tiles.
 - **Walking stays cosmetic:** the client draws townsfolk following roads using the same pathfinder, but the simulation never depends on their drawn position.
 - **Sound:** all audio is synthesized in code (no third-party files), so there are no licences to track. Any future internet asset must have its licence verified at the source and be recorded in `CREDITS.md`.
-- **Bridges and territory (Phase 1c):** roads over water become bridges (4 wood per tile, up to 8 tiles per governor-built crossing). The governor plans each building's connecting road before placing it, so it never builds somewhere it can't reach. Planned roads stay inside the territory, as placed roads must. When a candidate site turns out to be on land that can only be reached by a bridge longer than the limit, the governor skips that whole patch of land for the rest of the day, so it doesn't use up its route checks there.
+- **Bridges and territory (Phase 1c):** roads over water become bridges (4 wood per tile, up to 8 tiles per governor-built crossing). The governor plans each building's connecting road before placing it, so it never builds somewhere it can't reach. Planned roads stay inside the territory, as placed roads must. When a candidate site turns out to be on land that can only be reached by a bridge longer than the limit, the governor skips that whole patch of land for the rest of the day, so it doesn't use up its route checks there. It also tries sites reachable without any new bridge first, and skips sites next to one that couldn't be connected (see Disasters for the case that prompted this).
 - **Governor food sizing:** the governor adds farms until the estimated food supply covers 1.2 × daily need. The estimate uses recipes and nutrition from the data files, assumes 1.2 labour per worker-day, counts grain baked into bread as far as bakeries can take it, subtracts grain for breweries and includes garden vegetables. It also adds a farm whenever food falls below 3 days. Before this, each farm was counted as 6 nutrition of raw grain, so towns built about 1.7× the food they needed and whole sectors stopped at their stock limits together.
 - **Territory is painted, not a radius (Phase 1d).** Territory is a set of claimed tiles (each tile records its owner, so settlements can't overlap). Buildings need every footprint tile inside it; roads need every tile inside it. The player paints it with a brush, so a town can grow along one side of a river or stop at a mountain. New land must touch existing territory, and nothing beyond 160 tiles from the centre can be claimed. Land without buildings or roads can be given back.
 - **Allowance, gated by the town centre.** The tiles a settlement may hold = the area of a diamond of radius 44 + population / 8, capped by its town-centre tier: Keep 7,321 (radius 60), Town Hall 12,961 (radius 80, needs 90 people), Castle 20,201 (radius 100, needs 240 people). Tiers live in `buildings.json` (`townCentre`). Each settlement has exactly one centre. It's placed at founding, can't be built or demolished by command, and is upgraded in place (`UpgradeTownCentreCommand`) as a normal construction site. The cap rises when the new tier is finished and never drops while it's being built.

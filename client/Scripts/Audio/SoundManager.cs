@@ -86,6 +86,7 @@ public partial class SoundManager : Node3D
                     break;
                 case EventKind.Death:
                 case EventKind.Starvation:
+                case EventKind.Disaster:
                     Play(_bells, "bell", minGap: 4.0);
                     break;
             }

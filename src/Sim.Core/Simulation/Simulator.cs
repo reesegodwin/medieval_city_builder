@@ -57,6 +57,8 @@ public sealed class Simulator
                 HomeSystem.Daily(World, s);
                 MigrationSystem.Daily(World, s);
                 EconomySystem.Daily(World, s);
+                DisasterSystem.Daily(World, s);
+                Economy.Forecast.Daily(World, s);
                 Commands.TerritorySystem.Daily(World, s);
                 SettlementGovernor.Daily(World, s);
             }

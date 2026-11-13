@@ -1,0 +1,18 @@
+{
+  "fireChancePerBuildingDay": 0.0001,
+  "wellFireFactor": 0.5,
+  "repairShare": 0.5,
+  "stockpileFireLoss": 0.25,
+  "sicknessChancePerDay": 0.012,
+  "sicknessMinPopulation": 30,
+  "waterProtection": 0.5,
+  "faithProtection": 0.3,
+  "sickShareMin": 0.02,
+  "sickShareMax": 0.05,
+  "sickDaysMin": 5,
+  "sickDaysMax": 10,
+  "sickMood": -10,
+  "poorHarvestChance": 0.15,
+  "poorHarvestDays": 30,
+  "poorHarvestOutput": 0.7
+}

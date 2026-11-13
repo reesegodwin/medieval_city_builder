@@ -16,10 +16,12 @@ using Sim.Core.World;
 //   --map              print the town map at start and end
 //   --citizens         print every citizen at the end
 //   --realtime [x]     run at real speed (1 game day = 1 real hour), optionally sped up x times
+//   --no-disasters     switch off fires, sickness and poor harvests
 
 var options = Options.Parse(args);
 var world = new GameWorld(options.Seed);
 var settlement = SettlementFounder.Found(world);
+settlement.Rules.Disasters = !options.NoDisasters;
 var sim = new Simulator(world);
 
 Console.WriteLine($"World seed {options.Seed}. {settlement.Name} founded at ({settlement.CenterX},{settlement.CenterY}) " +
@@ -80,14 +82,15 @@ if (options.ShowMap) Report.PrintMap(world, settlement);
 if (options.ShowCitizens) Report.PrintCitizens(settlement);
 Console.WriteLine($"State hash: {world.ComputeStateHash():X16}");
 
-internal sealed record Options(ulong Seed, int Days, string ReportMode, bool ShowMap, bool ShowCitizens, double? RealtimeSpeed)
+internal sealed record Options(ulong Seed, int Days, string ReportMode, bool ShowMap, bool ShowCitizens, double? RealtimeSpeed,
+    bool NoDisasters)
 {
     public static Options Parse(string[] args)
     {
         ulong seed = 42;
         int days = 100;
         string report = "weekly";
-        bool map = false, citizens = false;
+        bool map = false, citizens = false, noDisasters = false;
         double? realtime = null;
 
         for (int i = 0; i < args.Length; i++)
@@ -100,6 +103,7 @@ internal sealed record Options(ulong Seed, int Days, string ReportMode, bool Sho
                 case "--report": report = Next(); break;
                 case "--map": map = true; break;
                 case "--citizens": citizens = true; break;
+                case "--no-disasters": noDisasters = true; break;
                 case "--realtime":
                     realtime = i + 1 < args.Length && double.TryParse(args[i + 1], out double x) ? x : 1;
                     if (i + 1 < args.Length && double.TryParse(args[i + 1], out _)) i++;
@@ -107,7 +111,7 @@ internal sealed record Options(ulong Seed, int Days, string ReportMode, bool Sho
                 default: throw new ArgumentException($"Unknown option {args[i]}");
             }
         }
-        return new Options(seed, days, report, map, citizens, realtime);
+        return new Options(seed, days, report, map, citizens, realtime, noDisasters);
     }
 }
 
@@ -149,6 +153,11 @@ internal static class Report
         Console.WriteLine($"Births {world.TotalBirths}, deaths {world.TotalDeaths}. Storage {s.Stock.Total}/{s.StorageCapacity}, " +
                           $"housing {s.HousingCapacity - s.FreeHousing}/{s.HousingCapacity}, road tiles {s.Roads.Count}.");
         PrintLedger(world, s);
+        var mine = world.Events.Where(e => e.SettlementId == s.Id).ToList();
+        int Count(string text) => mine.Count(e => e.Kind == Sim.Core.Events.EventKind.Disaster && e.Message.StartsWith(text));
+        Console.WriteLine($"Disasters: {Count("Fire")} fires, {Count("Sickness")} outbreaks of sickness, {Count("A poor harvest")} poor harvests. " +
+                          "Shortage warnings: " + string.Join(", ", mine.Where(e => e.Kind == Sim.Core.Events.EventKind.Shortage && e.Message.Contains("runs out"))
+                              .GroupBy(e => e.Message.Split(' ')[0]).Select(g => $"{g.Key} x{g.Count()}")) + ".");
         var homes = s.Buildings.Where(b => b.Def.Home != null && b.IsOperational).GroupBy(b => b.Def.Name)
             .Select(g => $"{g.Count()} {g.Key.ToLowerInvariant()}s");
         var classes = s.Citizens.GroupBy(c => HomeSystem.ClassOf(world, s, c).Name).Select(g => $"{g.Count()} {g.Key.ToLowerInvariant()}");

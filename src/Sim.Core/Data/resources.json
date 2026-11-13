@@ -2,6 +2,7 @@
   {"id": "grain", "name": "Grain", "nutrition": 0.6, "mealMood": -6, "value": 1},
   {"id": "bread", "name": "Bread", "nutrition": 1.0, "mealMood": 6, "value": 2},
   {"id": "vegetables", "name": "Vegetables", "nutrition": 0.7, "mealMood": 2, "value": 2},
+  {"id": "fish", "name": "Fish", "nutrition": 0.8, "mealMood": 3, "value": 2},
   {"id": "ale", "name": "Ale", "value": 3},
   {"id": "wood", "name": "Wood", "value": 1},
   {"id": "stone", "name": "Stone", "value": 2},

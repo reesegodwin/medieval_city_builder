@@ -13,7 +13,7 @@ What works today:
 - **Time.** One game day is one real hour (240 ticks of 6 game minutes each), with seasons and years. Every duration is written in game days, so the time scale is one constant.
 - **Citizens.** Each person is a real record: name, age, sex, family, traits, skills that improve with work, job, home, hunger, mood and a life history.
 - **Jobs.** People are assigned by settlement rules (job priorities). The rules give priority to food during shortages, to producers of scarce goods, and to builders.
-- **Production chains** defined in JSON: farm → grain, then mill & bakery → bread; vegetable garden → vegetables; brewery: grain → ale; woodcutter → wood; quarry → stone. They respect stock reserves and stock limits (like Dwarf Fortress work orders), and workers are freed once stores are full.
+- **Production chains** defined in JSON: farm → grain, then mill & bakery → bread; vegetable garden → vegetables; fishing hut (by water) → fish; brewery: grain → ale; woodcutter → wood; quarry → stone. They respect stock reserves and stock limits (like Dwarf Fortress work orders), and workers are freed once stores are full.
 - **Construction.** Buildings wait for materials, then builders put them up. Placement rules check terrain and nearby forest or rock.
 - **Roads and logistics.** Each workplace loses time to hauling, based on the real walking cost to the nearest stockpile. Roads make that cheaper; rivers and buildings make people go around. Buildings with no walkable route are flagged.
 - **Bridges.** Roads can cross water as wooden bridges (4 wood per tile). The governor builds them to reach land across rivers.
@@ -86,9 +86,9 @@ dotnet test
 | X | Demolish tool: click a building or road tile |
 | T | Territory tool: drag to claim land, Shift+drag to give it back, `[` / `]` change the brush size |
 | J | Trade panel: market, your offers, new offer (with a fair-price button), routes and caravans. Needs a Trading Post |
-| L | Town ledger: people and complaints, goods made and used per day (and what will run out), coin in and out, jobs |
+| L | Town ledger: people and complaints, goods made and used per day (and what will run out, with 30-day charts), coin in and out, jobs |
 | Right-click / Esc | Cancel the current tool or close the inspector |
-| P | Rules panel: job priorities, stock limits, reserves |
+| P | Rules panel: job priorities, stock limits, reserves, home upgrades, disasters on/off |
 | F5 / F9 | Quick-save / load (saved in Godot's user data folder) |
 | M | Sound on/off |
 | Space | Pause |
@@ -116,6 +116,8 @@ These go after `--` on Godot's command line:
 | `--rules` | Open the rules panel at start |
 | `--trade [TAB]` | Open the trade panel at start (tab 0–4) |
 | `--ledger [TAB]` | Open the town ledger at start (0 Overview, 1 Goods, 2 Treasury, 3 Work) |
+| `--ledger-good ID` | Open the ledger's Goods tab with a good's 30-day charts (e.g. `wood`) |
+| `--look-at ID` | Start with the camera on the town's first building of type ID (e.g. `fishing_hut`) |
 | `--follow-caravan` | Keep the camera on a caravan on the road |
 | `--territory` | Open the territory tool at start |
 | `--zoom N` | Start with the camera N units away (6–90) |
@@ -186,6 +188,6 @@ Every sound (wind and birdsong, hammering from nearby construction, clicks, thud
 
 ## Next steps
 
-1. **Phase 1 depth:** housing upgrades and social classes, seasons, a town ledger screen.
+1. **Phase 1 depth:** seasons (winter food), more food chains (meat, dairy), and disasters with lasting consequences (spreading fires, deadly disease) as an option.
 2. **Phase 2, continuing:** player accounts and authentication, Steam relay for hosting without port forwarding, a Docker image for the server, and interaction between towns (trade first).
 3. **Phase 3:** armies raised from townsfolk, squad battles, and generals.
