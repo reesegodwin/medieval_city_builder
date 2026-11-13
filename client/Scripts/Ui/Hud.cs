@@ -26,6 +26,8 @@ public partial class Hud : CanvasLayer
     public event Action? RoadRequested;
     public event Action<byte>? RoadTierRequested;
     public event Action? DemolishRequested;
+    public event Action<byte>? WallRequested;
+    public event Action? GateRequested;
     public event Action<double>? SpeedRequested;
     public event Action? PauseToggled;
     public event Action<bool>? AutoBuildToggled;
@@ -151,7 +153,18 @@ public partial class Hud : CanvasLayer
             ToolButton($"{tier.Name}\n{price}/tile", $"Lay a {tier.Name.ToLowerInvariant()} or resurface roads ({price} per tile). " +
                 "Walkers and haulers move faster on it, and caravans travel faster.", () => RoadTierRequested?.Invoke(index));
         }
-        ToolButton("Demolish\nrefund", "Tear down buildings or roads (X). Refunds part of the cost.", () => DemolishRequested?.Invoke());
+        for (int t = 0; t < data.WallTiers.Count; t++)
+        {
+            var wall = data.WallTiers[t];
+            byte index = (byte)t;
+            string price = string.Join(", ", wall.Cost.Select(kv => $"{kv.Value} {kv.Key}"));
+            ToolButton($"{wall.Name}\n{price}/tile", $"Build a {wall.Name.ToLowerInvariant()} (V), or upgrade walls to it ({price} per tile). " +
+                "Walls stop everyone except at gates; homes inside a closed ring feel safe" +
+                $" (+{wall.SafetyMood:0} mood). Strength {wall.HitPoints} per tile.", () => WallRequested?.Invoke(index));
+        }
+        ToolButton("Gate\nin a wall", "Put a gate in a wall (G): people, carts and roads pass through. Walls drawn across roads get gates by themselves.",
+            () => GateRequested?.Invoke());
+        ToolButton("Demolish\nrefund", "Tear down buildings, roads or walls (X). Refunds part of the cost.", () => DemolishRequested?.Invoke());
         ToolButton("Territory\npaint", "Paint where your territory goes (T): drag to claim, Shift+drag to give land back, [ ] brush size.\n" +
             "Your allowance grows with population, up to the cap of your town centre (upgrade it to raise the cap).",
             () => TerritoryRequested?.Invoke());
@@ -207,7 +220,7 @@ public partial class Hud : CanvasLayer
         // --- Controls help (top-right, under the bar) ---
         var help = new Label
         {
-            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   X: demolish   T: territory   P: rules   J: trade   L: ledger\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
+            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   V: walls   G: gate   X: demolish   T: territory   P: rules   J: trade   L: ledger\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
             HorizontalAlignment = HorizontalAlignment.Right,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };

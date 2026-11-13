@@ -112,6 +112,8 @@ public static class Needs
         Add(c.HomeBuildingId != null ? "Has a home" : "Homeless", c.HomeBuildingId != null ? 5 : -20);
         if (c.HomeBuildingId is int warmId ? settlement.FindBuilding(warmId)?.Cold == true : SeasonSystem.HeatingSeason(world))
             Add("Cold", world.Data.Seasons.ColdMood);
+        if (c.HomeBuildingId is int safeId && settlement.Walls.Count > 0 && settlement.FindBuilding(safeId) is { } walledHome)
+            Add("Safe behind walls", WallSystem.SafetyMood(world, settlement, walledHome));
         if (c.HomeBuildingId is int homeId && settlement.FindBuilding(homeId)?.Def is { Home.Mood: > 0 } fine)
             Add(labels != null ? $"Lives in a {fine.Name.ToLowerInvariant()}" : "", fine.Home!.Mood);
         if (c.IsSick) Add("Sick", world.Data.Disasters.SickMood);

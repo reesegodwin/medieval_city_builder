@@ -264,6 +264,40 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - Idle adults are near 0. When people are free (e.g. 41 on seed 7 at day 500) they gather berries, firewood and stones.
   - Late in the game, storage is often full, which limits what can be gathered.
 
+## Walls and gates (`walls.json`, `Commands/Walls.cs`, `Systems/WallSystem.cs`)
+- **Three kinds, drawn like roads** (click start and end, L-shaped) and built by the town-centre crew after its road work:
+
+  | Kind | Cost per tile | Work days | Hit points | Safety mood | Gate cost |
+  |---|---|---|---|---|---|
+  | Palisade | 4 wood | 0.4 | 100 | +2 | 10 wood |
+  | Stone wall | 6 stone | 1.2 | 400 | +4 | 20 stone, 5 wood |
+  | Large stone wall | 12 stone, 2 wood | 2.5 | 1,000 | +6 | 40 stone, 10 wood |
+
+  Odd-jobbers help. Walls are paid when planned. Drawing a better kind over a wall upgrades it in place.
+- **Where they go:** inside your own territory, on any land but water, not on buildings.
+- **Blocking:** a finished wall (`Tile.BlocksPassage`) stops walking, hauling, road planning and caravans in `Pathfinder.StepCost`, the one place every path goes through.
+  - Gates let everyone through.
+  - A wall drawn across a road becomes a gate by itself, so roads and caravans keep working.
+  - Buildings can't go on walls. Roads only cross at gates.
+  - Planned walls don't block until built.
+- **Gates:** the gate tool turns a wall (finished or planned) into a gate for the gate's cost. On a finished wall the gate opens once built.
+- **Demolishing:** a planned wall is fully refunded; a finished one gives a quarter back.
+- **Safety:** one flood fill from outside the territory's bounding box. Walls (gates count as closed, being guarded), buildings and water stop it, and open ground it can't reach is enclosed.
+  - A home whose doorstep is enclosed gets "Safe behind walls", the mood of the weakest wall facing outside.
+  - The result is cached by wall, territory and building versions, so it's derived and identical after a load.
+- **Hit points** are stored and saved per tile for the future siege phase; nothing uses them yet.
+- **Governor:**
+  - At population 150 it lays out a ring once: the edge of the town's territory cut to its buildings' extent plus 4 tiles. Being the edge of a region it closes on itself.
+  - The ring is ordered around the centre with whole-number maths, so every machine agrees. Gates go where it crosses roads, plus one every 24 tiles.
+  - It's built in batches of 30 while materials are at 75% of their limit (keeping half). Upgrades go to stone at 400 people and to a large stone wall at 700.
+- **Saves:** v14.
+- **Result over 720 days:**
+  - Each town has a closed palisade by about day 260, mostly stone by day 720, and the first large wall sections.
+  - 40–47 homes are safe behind the walls (homes built later sit outside the ring).
+  - No building is cut off; caravans still trade.
+  - Populations end at 727/749/799.
+- **Bug found while testing:** buildings stop the flood, so their own tiles always looked walled in and every home counted as safe. A home now counts by its doorstep.
+
 ## Winter life (`seasons.json`)
 - **Short days:** outdoor work speed (`daylight`) is 100% in spring, 105% in summer, 95% in autumn and 80% in winter.
   - It slows building sites, road work, and workplaces marked `"outdoor": true`: woodcutters, quarries, mines and firewood huts.

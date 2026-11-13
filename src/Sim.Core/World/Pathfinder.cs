@@ -49,9 +49,9 @@ public static class Pathfinder
     /// <summary>Cost to step onto a tile, or null if it can't be entered.</summary>
     public static double? StepCost(in Tile tile, Mode mode)
     {
-        if (tile.BuildingId != 0) return null;
+        if (tile.BuildingId != 0 || tile.BlocksPassage) return null; // walls stop everyone except at gates
         if (mode == Mode.BuildRoad)
-            return tile.IsRoad || tile.RoadPlanned ? 0.5 : tile.IsBuildable ? 1.0 : tile.Terrain == Terrain.Water ? BridgePlanCost : null;
+            return tile.IsRoad || tile.RoadPlanned ? 0.5 : tile.IsBuildable || tile.IsGate ? 1.0 : tile.Terrain == Terrain.Water ? BridgePlanCost : null;
         if (mode == Mode.RoadOnly) return tile.IsRoad ? RoadTravelCost(tile) : null;
 
         if (tile.IsRoad) return RoadWalkCost(tile); // includes bridges over water

@@ -143,6 +143,21 @@ public sealed class Settlement
     /// <summary>Bumped whenever roads change, so renderers know to rebuild.</summary>
     public int RoadVersion { get; set; }
 
+    /// <summary>Finished walls and gates by tile.</summary>
+    public SortedDictionary<(int X, int Y), WallSegment> Walls { get; } = new();
+
+    /// <summary>Wall tiles (new walls, upgrades, gates) waiting to be built, in build order.</summary>
+    public List<WallPlan> WallPlans { get; } = new();
+
+    /// <summary>Bumped whenever walls change (renderers and the enclosure check rebuild on it).</summary>
+    public int WallVersion { get; set; }
+
+    /// <summary>The ring of walls the governor has laid out for this town (tile, gate?), built in batches.</summary>
+    public List<(int X, int Y, bool Gate)> WallRing { get; } = new();
+
+    /// <summary>Derived enclosure (see Systems.WallSystem); never saved, rebuilt when walls or territory change.</summary>
+    internal Systems.WallSystem.Enclosure? EnclosureCache { get; set; }
+
     public Settlement(int id, string name, int centerX, int centerY)
     {
         Id = id;
@@ -213,10 +228,15 @@ public sealed class Settlement
     {
         _buildings.Add(b);
         _buildingsById.Add(b.Id, b);
+        BuildingsVersion++;
     }
+
+    /// <summary>Bumped when buildings are added or removed (only to invalidate derived caches; not saved).</summary>
+    internal int BuildingsVersion { get; private set; }
 
     public bool RemoveBuilding(Building b)
     {
+        BuildingsVersion++;
         _buildingsById.Remove(b.Id);
         return _buildings.Remove(b);
     }
@@ -300,7 +320,8 @@ public sealed class Settlement
     {
         JobKinds.Hauler => Math.Min(b.JobSlots, HaulerQuota.GetValueOrDefault(b.Id)),
         // About one roadworker per ten planned tiles, none when there's nothing to build.
-        JobKinds.Roadworker => RoadPlans.Count == 0 ? 0 : Math.Min(b.JobSlots, 1 + RoadPlans.Count / 10),
+        // Roadworkers also build walls.
+        JobKinds.Roadworker => RoadPlans.Count + WallPlans.Count == 0 ? 0 : Math.Min(b.JobSlots, 1 + (RoadPlans.Count + WallPlans.Count) / 10),
         _ => b.JobSlots,
     };
 
@@ -308,6 +329,31 @@ public sealed class Settlement
     public bool IsOnStandby(Building b) => IsAtProductionLimit(b) && !b.InputsLoaded;
 
     public override string ToString() => Name;
+}
+
+/// <summary>A finished wall tile.</summary>
+public sealed class WallSegment
+{
+    /// <summary>Index into walls.json (0 palisade, 1 stone wall, 2 large stone wall).</summary>
+    public byte Tier { get; set; }
+
+    public bool Gate { get; set; }
+
+    /// <summary>Strength left, for sieges (not used yet).</summary>
+    public int Hp { get; set; }
+}
+
+/// <summary>A wall tile waiting to be built (new, upgraded or turned into a gate) and the work done so far.</summary>
+public sealed class WallPlan
+{
+    public int X { get; set; }
+    public int Y { get; set; }
+
+    /// <summary>Index into walls.json.</summary>
+    public byte Tier { get; set; }
+
+    public bool Gate { get; set; }
+    public double Progress { get; set; }
 }
 
 /// <summary>A road tile waiting to be built, and the roadworker-days spent on it so far.</summary>

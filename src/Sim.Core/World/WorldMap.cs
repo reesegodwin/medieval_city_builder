@@ -31,7 +31,20 @@ public struct Tile
     /// <summary>Id of the settlement whose territory this tile is in, or 0 for unclaimed land.</summary>
     public int TerritoryId;
 
-    public readonly bool IsBuildable => BuildingId == 0 && (Terrain == Terrain.Grass || Terrain == Terrain.Fertile);
+    /// <summary>A finished wall: 0 for none, otherwise 1 + its index in walls.json (1 palisade, 2 stone, 3 large).</summary>
+    public byte WallTier;
+
+    /// <summary>A wall (or an upgrade or gate) is planned here and waiting for the crew.</summary>
+    public bool WallPlanned;
+
+    /// <summary>The wall here is (or will be) a gate: people, carts and roads pass through.</summary>
+    public bool IsGate;
+
+    /// <summary>A finished wall that isn't a gate: nothing gets through.</summary>
+    public readonly bool BlocksPassage => WallTier > 0 && !IsGate;
+
+    public readonly bool IsBuildable => BuildingId == 0 && WallTier == 0 && !WallPlanned &&
+                                        (Terrain == Terrain.Grass || Terrain == Terrain.Fertile);
 }
 
 public sealed class Chunk

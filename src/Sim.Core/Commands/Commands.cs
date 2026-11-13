@@ -107,6 +107,7 @@ public static class Placement
             var tile = world.Map.GetTile(x + dx, y + dy);
             if (tile.TerritoryId != settlement.Id) return "Outside the settlement's territory";
             if (tile.BuildingId != 0) return "Blocked by another building";
+            if (tile.WallTier > 0 || tile.WallPlanned) return "Blocked by a wall";
             if (!tile.IsBuildable) return $"Cannot build on {tile.Terrain}";
         }
 
@@ -169,7 +170,8 @@ public static class Roads
         if (tile.TerritoryId != settlement.Id && tile.TerritoryId != 0) return "Inside another settlement's territory";
         if (Math.Max(Math.Abs(x - settlement.CenterX), Math.Abs(y - settlement.CenterY)) > MaxRoadDistance) return "Too far from the town";
         if (tile.BuildingId != 0) return "Blocked by a building";
-        if (!tile.IsBuildable && tile.Terrain != Terrain.Water) return $"Cannot build a road on {tile.Terrain}";
+        if (tile.BlocksPassage || (tile.WallPlanned && !tile.IsGate)) return "Blocked by a wall: roads go through gates";
+        if (!tile.IsBuildable && !tile.IsGate && tile.Terrain != Terrain.Water) return $"Cannot build a road on {tile.Terrain}";
         return null;
     }
 

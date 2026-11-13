@@ -177,6 +177,15 @@ public partial class LedgerPanel : PanelContainer
         sb.AppendLine($"[b]Food store:[/b] {food} food, granaries keep {Math.Min(food, s.FoodStoreCapacity)} of it fresh" +
                       (rotting >= 0.5 ? $"; [color=#ffb060]{rotting:0} rotting a day[/color]" : "") +
                       $"; {s.Stock.Get(SeasonSystem.Firewood)} firewood");
+        if (s.Walls.Count > 0 || s.WallPlans.Count > 0)
+        {
+            int safe = s.Buildings.Count(b => b.Def.Housing > 0 && b.IsOperational && WallSystem.IsInside(World, s, b));
+            var ring = WallSystem.Enclose(World, s).RingTier;
+            sb.AppendLine("[b]Walls:[/b] " + string.Join(", ", s.Walls.Values.GroupBy(w => w.Tier).OrderBy(g => g.Key)
+                              .Select(g => $"{g.Count()} {World.Data.WallTiers[g.Key].Name.ToLowerInvariant()}")) +
+                          $", {s.Walls.Values.Count(w => w.Gate)} gates" + (s.WallPlans.Count > 0 ? $", {s.WallPlans.Count} planned" : "") +
+                          (ring >= 0 ? $"; {safe} homes safe behind the {World.Data.WallTiers[ring].Name.ToLowerInvariant()}" : "; no closed ring yet"));
+        }
         if (s.PoorHarvestDays > 0)
             sb.AppendLine($"[color=#ffb060]Poor harvest:[/color] farms and gardens yield less for {s.PoorHarvestDays} more days");
         foreach (string warning in s.ShortageWarnings)
