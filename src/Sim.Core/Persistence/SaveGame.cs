@@ -212,6 +212,7 @@ public static class SaveGame
         foreach (var (k, v) in defaults.PerCitizenLimits)
             s.Rules.PerCitizenLimits[k] = Math.Max(v, s.Rules.PerCitizenLimits.GetValueOrDefault(k));
         foreach (var (k, v) in defaults.JobPriority) s.Rules.JobPriority.TryAdd(k, v);
+        foreach (var (k, v) in defaults.Reserves) s.Rules.Reserves.TryAdd(k, v);
 
         foreach (var b in save.Buildings)
         {

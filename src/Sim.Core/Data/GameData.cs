@@ -124,6 +124,18 @@ public sealed class RecipeDef
     public Dictionary<string, int> Inputs { get; set; } = new();
     public Dictionary<string, int> Outputs { get; set; } = new();
 
+    /// <summary>
+    /// Alternative sets of inputs, any one of which makes the outputs (a smokehouse smokes mutton or fish).
+    /// When given, they replace <see cref="Inputs"/>.
+    /// </summary>
+    public List<Dictionary<string, int>> InputChoices { get; set; } = new();
+
+    /// <summary>Every set of inputs this recipe accepts (just <see cref="Inputs"/> unless there are choices).</summary>
+    public IReadOnlyList<Dictionary<string, int>> InputOptions => InputChoices.Count > 0 ? InputChoices : new[] { Inputs };
+
+    /// <summary>Whether a good is an input in any of the recipe's options.</summary>
+    public bool Uses(string resource) => InputOptions.Any(o => o.ContainsKey(resource));
+
     /// <summary>Worker-days of labour per production cycle (at average skill and mood).</summary>
     public double WorkDays { get; set; } = 1;
 }
@@ -397,7 +409,7 @@ public sealed class GameData
         foreach (var b in Buildings.Values)
         {
             var referenced = b.Cost.Keys
-                .Concat(b.Recipe?.Inputs.Keys ?? Enumerable.Empty<string>())
+                .Concat(b.Recipe?.InputOptions.SelectMany(o => o.Keys) ?? Enumerable.Empty<string>())
                 .Concat(b.Recipe?.Outputs.Keys ?? Enumerable.Empty<string>());
             foreach (var id in referenced)
             {

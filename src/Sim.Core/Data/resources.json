@@ -4,6 +4,7 @@
   {"id": "vegetables", "name": "Vegetables", "nutrition": 0.7, "mealMood": 2, "value": 2, "spoilPerDay": 0.015},
   {"id": "fish", "name": "Fish", "nutrition": 0.8, "mealMood": 3, "value": 2, "spoilPerDay": 0.03},
   {"id": "berries", "name": "Berries", "nutrition": 0.5, "mealMood": 1, "value": 1, "spoilPerDay": 0.04},
+  {"id": "smoked_meat", "name": "Smoked meat", "nutrition": 1.1, "mealMood": 7, "value": 4, "spoilPerDay": 0.002},
   {"id": "mutton", "name": "Mutton", "nutrition": 1.0, "mealMood": 5, "value": 3, "spoilPerDay": 0.025},
   {"id": "ale", "name": "Ale", "value": 3},
   {"id": "wood", "name": "Wood", "value": 1},

@@ -560,9 +560,9 @@ public static class SettlementGovernor
             if (count >= 1 + population / hint.PopulationPerBuilding) continue;
             if (count > 0 && recipe.Outputs.Keys.Any(r => s.Stock.Get(r) >= hint.LowStock)) continue;
             // A converter is only worth building once its inputs are in stock or something makes them.
-            bool inputsAvailable = recipe.Inputs.All(kv =>
+            bool inputsAvailable = recipe.InputOptions.Any(option => option.All(kv =>
                 s.Stock.Get(kv.Key) >= kv.Value ||
-                s.Buildings.Any(b => b.Def.Recipe?.Outputs.ContainsKey(kv.Key) == true));
+                s.Buildings.Any(b => b.Def.Recipe?.Outputs.ContainsKey(kv.Key) == true)));
             if (inputsAvailable) Wish(def.Id);
         }
 

@@ -241,16 +241,23 @@ public static class ProductionSystem
 
             if (!b.InputsLoaded)
             {
-                string? missing = recipe.Inputs
-                    .Where(kv => settlement.Stock.Get(kv.Key) - kv.Value < settlement.Rules.ReserveOf(kv.Key))
-                    .Select(kv => kv.Key).FirstOrDefault();
-                if (missing != null)
+                // With several possible inputs (mutton or fish), use whichever the town has most of.
+                bool Available(KeyValuePair<string, int> kv) => settlement.Stock.Get(kv.Key) - kv.Value >= settlement.Rules.ReserveOf(kv.Key);
+                var inputs = recipe.InputOptions
+                    .Where(o => o.All(Available))
+                    .OrderByDescending(o => o.Count == 0 ? 0 : settlement.Stock.Get(o.Keys.First()))
+                    .FirstOrDefault();
+                if (inputs == null)
                 {
+                    var first = recipe.InputOptions[0];
+                    string missing = recipe.InputOptions.Count > 1
+                        ? string.Join(" or ", recipe.InputOptions.Select(o => o.Keys.First()))
+                        : first.First(kv => !Available(kv)).Key;
                     b.Problem = $"Needs {missing}";
                     continue;
                 }
-                settlement.Stock.TryTakeAll(recipe.Inputs);
-                settlement.Ledger.RecordAll(recipe.Inputs, -1, Economy.LedgerKeys.Inputs);
+                settlement.Stock.TryTakeAll(inputs);
+                settlement.Ledger.RecordAll(inputs, -1, Economy.LedgerKeys.Inputs);
                 b.InputsLoaded = true;
             }
 

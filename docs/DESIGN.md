@@ -264,6 +264,23 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - Idle adults are near 0. When people are free (e.g. 41 on seed 7 at day 500) they gather berries, firewood and stones.
   - Late in the game, storage is often full, which limits what can be gathered.
 
+## Smokehouse
+- **Smokehouse:** 3×3, 20 wood and 10 stone, two smokers. It turns 3 mutton **or** 3 fish, plus 1 firewood, into 3 smoked meat.
+- **Smoked meat:** nutrition 1.1, meal mood +7 (the tastiest food), rotting at only 0.2% a day, so it keeps for months.
+- **Input choices:** recipes can now list `inputChoices`, alternative input sets.
+  - Production uses whichever available option's main good is most in stock.
+  - When none is available, the problem reads "Needs mutton or fish".
+  - Once inputs are loaded the output is the same, so nothing new is saved.
+  - The governor, trade governor, data validation and recipe text all understand choices.
+- **No fresh-meat reserve:** a first version kept 30 mutton and fish back for meals. Both are eaten as fast as they're made, so smokehouses never had anything to smoke. Smoking adds food value and mood, so it may compete with meals.
+- **Governor:** builds one smokehouse per 150 people from population 100 (data hint), while smoked meat is under 150.
+- **Limits:** a flat 300, or 6 per person.
+- **Result over 720 days:**
+  - Smokehouses make 50–60 smoked meat a day, all eaten.
+  - They burn about 17 extra firewood a day, but no home ever went cold.
+  - Populations end at 730/669/805 and treasuries at 4,962 / 11,246 / 5,796.
+  - Seed 7 grows steadily (mood 92, no homelessness), just slower in this run.
+
 ## Workplace stores
 - **Problem:** late in the game, storage filled completely. At day 500 on seed 42 it was 18,499 / 18,500. Farms, bakeries, fishing huts and pastures stalled with "Storage full", and gatherers had no room. Per-person stock limits (winter food, firewood, mutton) had outgrown the stockpiles and granaries.
 - **Fix:** each workplace keeps some of its own products on site, outside the stockpiles.
