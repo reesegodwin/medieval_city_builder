@@ -44,9 +44,9 @@ public class LedgerTests
         var (world, town, sim) = Scenario.NewTown();
         var market = Scenario.Place(world, town, "market");
         Scenario.Finish(world, town, market);
-        sim.RunDays(6);
+        sim.RunDays(16); // income tax is a small share of wages: a whole coin takes some days
 
-        var coin = town.Ledger.Breakdown(Inventory.Coin, 5);
+        var coin = town.Ledger.Breakdown(Inventory.Coin, 15);
         Assert.Contains(coin.Keys, k => k == LedgerKeys.Taxes_("Peasants"));
         Assert.Contains(coin.Keys, k => k == LedgerKeys.Upkeep_("Market"));
         Assert.True(coin[LedgerKeys.Taxes_("Peasants")] > 0);

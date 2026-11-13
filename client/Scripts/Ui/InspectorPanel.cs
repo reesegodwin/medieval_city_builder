@@ -150,7 +150,11 @@ public partial class InspectorPanel : PanelContainer
     private static void DescribeHome(GameWorld world, Settlement town, Building b, Sim.Core.Data.HomeDef home, StringBuilder sb)
     {
         var cls = world.Data.ClassOf(home.Class);
-        sb.AppendLine($"[b]Home of {cls.Name.ToLowerInvariant()}[/b] (tax {cls.TaxPerAdultDay:0.##} coin per adult a day)");
+        sb.AppendLine($"[b]Home of {cls.Name.ToLowerInvariant()}[/b]; the family has {Sim.Core.Economy.HouseholdSystem.Purse(town, b):0.#} coin saved");
+        double earned = b.ResidentIds.Select(town.FindCitizen).OfType<Sim.Core.Citizens.Citizen>()
+            .Sum(c => Sim.Core.Economy.HouseholdSystem.Wage(world, town, c).Pay);
+        sb.AppendLine($"[b]Earns:[/b] {earned:0.##} coin a day before tax. Families pay for food, warmth and the services they use, " +
+                      "and go without what they can't afford.");
         if (home.Requires.Count > 0 && !HomeSystem.NeedsMet(town, b, home.Requires))
             sb.AppendLine($"[color=#ffb060]Needs unmet for {b.NeedsUnmetDays} days; slips back after {HomeSystem.DowngradeAfterDays}.[/color]");
         if (home.UpgradeTo is not { } nextId)
@@ -176,8 +180,10 @@ public partial class InspectorPanel : PanelContainer
                       $"(population allows {TerritoryRules.PopulationAllowance(town.Citizens.Count)}, cap {town.TerritoryCap})");
         sb.AppendLine("Paint territory with the Territory tool (T), or tick \"Auto land\" to grow it evenly.");
         sb.AppendLine($"[b]Roads:[/b] {town.RoadPlans.Count} tiles planned; roadworkers here build them (free, but they take time).");
-        sb.AppendLine($"[b]Treasury:[/b] {town.Stock.Get("coin")} coin, taxes {EconomySystem.DailyTax(world, town):0.#} and upkeep " +
-                      $"{EconomySystem.DailyUpkeep(world, town):0.#} a day.");
+        sb.AppendLine($"[b]Treasury:[/b] {town.Stock.Get("coin")} coin, income tax {EconomySystem.DailyTax(world, town):0.#} and upkeep " +
+                      $"(with city wages and soldiers' pay) {EconomySystem.DailyUpkeep(world, town):0.#} a day, plus what families spend.");
+        sb.AppendLine($"[b]Government:[/b] {world.Data.Households.Government(town.Rules.Government).Name} (change it in the rules, P). " +
+                      $"{town.ReliefHouseholds} homes on relief, {town.PoorHouseholds} going without something.");
 
         if (b.Def.TownCentre!.UpgradeTo is not { } nextId)
         {
@@ -213,6 +219,9 @@ public partial class InspectorPanel : PanelContainer
             ? $"{jb.CurrentJobKind} at {jb.Def.Name}"
             : c.IsAdult ? "idle" : "too young to work";
         sb.AppendLine($"[b]Job:[/b] {job}");
+        var (pay, city) = Sim.Core.Economy.HouseholdSystem.Wage(world, town, c);
+        if (c.IsAdult)
+            sb.AppendLine($"[b]Purse:[/b] {c.Coin:0.#} coin; earns {pay:0.##} a day{(city ? " from the treasury" : "")}");
         string home = c.HomeBuildingId is int h && town.FindBuilding(h) is { } hb ? $"{hb.Def.Name} at ({hb.X}, {hb.Y})" : "[color=#ff6060]homeless[/color]";
         sb.AppendLine($"[b]Home:[/b] {home}");
 

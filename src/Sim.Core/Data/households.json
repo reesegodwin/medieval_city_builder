@@ -1,0 +1,48 @@
+{
+  "_comment": "The household economy: families earn wages, pay income tax, and buy what they use. Coin per day.",
+  "tierWages": [0.12, 0.18, 0.26],
+  "skillSpread": 0.4,
+  "standbyShare": 0.5,
+  "oddJobWage": 0.04,
+  "generalPay": 0.4,
+  "childShare": 0.5,
+  "startingCoin": 4,
+  "gearAffordShare": 0.4,
+  "cityJobs": ["builder", "hauler", "roadworker"],
+  "jobTiers": {
+    "baker": 2, "brewer": 2, "barkeep": 2, "weaver": 2, "smoker": 2, "priest": 2, "trader": 2, "smith": 2, "bowyer": 2,
+    "carpenter": 3, "weaponsmith": 3, "armourer": 3
+  },
+  "prices": [
+    {"need": "food", "price": 0.025},
+    {"need": "heating", "price": 0.04, "perHome": true},
+    {"need": "water", "price": 0},
+    {"need": "faith", "price": 0.008},
+    {"need": "market", "price": 0.012},
+    {"need": "clothing", "price": 0.012},
+    {"need": "drink", "price": 0.016},
+    {"need": "furniture", "price": 0.008}
+  ],
+  "governments": [
+    {
+      "id": "free_traders", "name": "Free Traders",
+      "description": "Low taxes and pay by skill: craftsmen and masters prosper, labourers get by, and only bread is given to those who can't pay.",
+      "taxRate": 0.1, "wageSpread": 1.0, "priceFactor": 1.0, "soldierPay": 1.0, "relief": ["food"]
+    },
+    {
+      "id": "common_weal", "name": "Common Weal",
+      "description": "Higher taxes pay for the poor: food, warmth, faith and the market are free to those who can't afford them. Pay is evened out somewhat.",
+      "taxRate": 0.25, "wageSpread": 0.6, "priceFactor": 1.0, "soldierPay": 1.0, "relief": ["food", "heating", "water", "faith", "market"]
+    },
+    {
+      "id": "commune", "name": "Commune",
+      "description": "Everyone is paid the same and the common stores sell cheaply, but most of the pay goes back to the commune.",
+      "taxRate": 0.5, "wageSpread": 0.0, "priceFactor": 0.75, "soldierPay": 1.0, "relief": ["food", "heating", "water", "faith", "market"]
+    },
+    {
+      "id": "iron_rule", "name": "Iron Rule",
+      "description": "The army comes first: soldiers are paid half as much again, and taxes are high to pay them. Only bread for the poor.",
+      "taxRate": 0.2, "wageSpread": 0.8, "priceFactor": 1.0, "soldierPay": 1.5, "relief": ["food"]
+    }
+  ]
+}

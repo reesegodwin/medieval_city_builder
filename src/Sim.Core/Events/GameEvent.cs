@@ -20,6 +20,7 @@ public enum EventKind
     Season,
     Military,
     Battle,
+    Government,
 }
 
 /// <summary>

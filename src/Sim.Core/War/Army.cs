@@ -16,8 +16,8 @@ public sealed class UnitDef
     /// <summary>Shoots from behind the line (and gains most from walls and towers).</summary>
     public bool Ranged { get; set; }
 
-    /// <summary>Coin per soldier per day.</summary>
-    public double UpkeepPerSoldierDay { get; set; }
+    /// <summary>A soldier's pay a day (from the treasury, into their family's purse); dearer gear, better pay.</summary>
+    public double PayPerSoldierDay { get; set; }
 
     /// <summary>Raiders' kinds: not recruited by towns.</summary>
     public bool Raider { get; set; }

@@ -139,7 +139,7 @@ public partial class ArmyPanel : PanelContainer
         {
             string gear = unit.Gear.Count == 0 ? "no gear" : string.Join(" + ", unit.Gear.Select(kv => $"{kv.Value * war.SquadSize} {kv.Key}"));
             string id = unit.Id;
-            ActionButton($"{unit.Name} ({gear}, {unit.UpkeepPerSoldierDay * war.SquadSize:0.#} coin/day)",
+            ActionButton($"{unit.Name} ({gear}, {unit.PayPerSoldierDay * war.SquadSize:0.#} coin/day)",
                 $"{unit.Description}\nAttack {unit.Attack:0.#}, defence {unit.Defence:0.#}{(unit.Ranged ? ", ranged" : "")}.",
                 () => Report(_session.Execute(new RecruitSquadCommand(s.Id, id)), $"Raised a squad of {unit.Name.ToLowerInvariant()}"));
         }

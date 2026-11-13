@@ -326,6 +326,7 @@ public static class LifeSystem
     /// <summary>Removes a citizen from the settlement, freeing their job and home.</summary>
     public static void Remove(Settlement settlement, Citizen c)
     {
+        Economy.HouseholdSystem.Inherit(settlement, c);
         if (c.JobBuildingId is int job) settlement.FindBuilding(job)?.WorkerIds.Remove(c.Id);
         if (c.HomeBuildingId is int home) settlement.FindBuilding(home)?.ResidentIds.Remove(c.Id);
         c.JobBuildingId = null;
@@ -472,6 +473,7 @@ public static class CitizenFactory
         var rng = world.Rng;
         var s = sex ?? (rng.Chance(0.5) ? Sex.Female : Sex.Male);
         var c = new Citizen(world.NextId(), Names.First(rng, s), familyName, s, ageDays);
+        if (c.IsAdult) c.Coin = world.Data.Households.StartingCoin; // settlers and newcomers bring some savings
 
         int traitCount = rng.Next(3);
         for (int i = 0; i < traitCount; i++)

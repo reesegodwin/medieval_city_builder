@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 17;
+    public const int CurrentVersion = 18;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -94,6 +94,7 @@ public static class SaveGame
             Disasters = s.Rules.Disasters,
             Raids = s.Rules.Raids,
             MusterPercent = s.Rules.MusterPercent,
+            Government = s.Rules.Government,
         },
         Buildings = s.Buildings.Select(b => new BuildingSave
         {
@@ -139,6 +140,7 @@ public static class SaveGame
             UnhappyDays = c.UnhappyDays,
             SickDays = c.SickDays,
             SquadId = c.SquadId,
+            Coin = c.Coin,
             History = c.History.ToList(),
         }).ToList(),
         Roads = s.Roads.Select(r => new[] { r.X, r.Y, (int)tierOf(r) }).ToList(),
@@ -160,6 +162,9 @@ public static class SaveGame
         HaulCoverage = s.HaulCoverage,
         Ledger = s.Ledger,
         TaxAccrued = s.TaxAccrued,
+        SalesAccrued = s.SalesAccrued,
+        ReliefHouseholds = s.ReliefHouseholds,
+        PoorHouseholds = s.PoorHouseholds,
         UpkeepOwed = s.UpkeepOwed,
         UpkeepUnpaid = s.UpkeepUnpaid,
         ShortageWarnings = s.ShortageWarnings.ToList(),
@@ -222,6 +227,7 @@ public static class SaveGame
         s.Rules.Disasters = save.Rules.Disasters ?? true; // version 10 and older had none
         s.Rules.Raids = save.Rules.Raids ?? true;
         s.Rules.MusterPercent = save.Rules.MusterPercent ?? 10;
+        s.Rules.Government = save.Rules.Government ?? "free_traders"; // version 17 and older: free traders
         // Goods added since the save was made (e.g. fish) get the default limits.
         var defaults = new SettlementRules();
         foreach (var (k, v) in defaults.ProductionLimits) s.Rules.ProductionLimits.TryAdd(k, v);
@@ -272,6 +278,8 @@ public static class SaveGame
                 SickDays = c.SickDays,
                 SquadId = c.SquadId,
             };
+            // Version 17 and older had no household purses: adults start with a newcomer's savings.
+            citizen.Coin = c.Coin ?? (citizen.IsAdult ? world.Data.Households.StartingCoin : 0);
             citizen.Traits.AddRange(c.Traits);
             CopyInto(c.Skills, citizen.Skills);
             citizen.ChildIds.AddRange(c.ChildIds);
@@ -322,6 +330,9 @@ public static class SaveGame
         s.HaulCoverage = save.HaulCoverage;
         s.Ledger = save.Ledger ?? new Economy.Ledger(); // version 9 and older kept no books
         s.TaxAccrued = save.TaxAccrued;
+        s.SalesAccrued = save.SalesAccrued;
+        s.ReliefHouseholds = save.ReliefHouseholds;
+        s.PoorHouseholds = save.PoorHouseholds;
         s.UpkeepOwed = save.UpkeepOwed;
         s.UpkeepUnpaid = save.UpkeepUnpaid;
         foreach (string warning in save.ShortageWarnings ?? new()) s.ShortageWarnings.Add(warning);
@@ -405,6 +416,9 @@ public static class SaveGame
         public double HaulCoverage { get; set; }
         public Economy.Ledger? Ledger { get; set; }
         public double TaxAccrued { get; set; }
+        public double SalesAccrued { get; set; }
+        public int ReliefHouseholds { get; set; }
+        public int PoorHouseholds { get; set; }
         public double UpkeepOwed { get; set; }
         public bool UpkeepUnpaid { get; set; }
         public List<string>? ShortageWarnings { get; set; }
@@ -429,6 +443,7 @@ public static class SaveGame
         public bool? Disasters { get; set; }
         public bool? Raids { get; set; }
         public int? MusterPercent { get; set; }
+        public string? Government { get; set; }
     }
 
     private sealed class BuildingSave
@@ -476,6 +491,7 @@ public static class SaveGame
         public int UnhappyDays { get; set; }
         public int SickDays { get; set; }
         public int? SquadId { get; set; }
+        public double? Coin { get; set; }
         public List<string> History { get; set; } = new();
     }
 }

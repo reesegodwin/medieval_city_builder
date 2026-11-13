@@ -17,11 +17,13 @@ using Sim.Core.World;
 //   --citizens         print every citizen at the end
 //   --realtime [x]     run at real speed (1 game day = 1 real hour), optionally sped up x times
 //   --no-disasters     switch off fires, sickness and poor harvests
+//   --government ID    how the town is run (households.json), e.g. common_weal
 
 var options = Options.Parse(args);
 var world = new GameWorld(options.Seed);
 var settlement = SettlementFounder.Found(world);
 settlement.Rules.Disasters = !options.NoDisasters;
+if (options.Government != null) world.Execute(new Sim.Core.Economy.SetGovernmentCommand(settlement.Id, options.Government));
 var sim = new Simulator(world);
 
 Console.WriteLine($"World seed {options.Seed}. {settlement.Name} founded at ({settlement.CenterX},{settlement.CenterY}) " +
@@ -85,12 +87,15 @@ Console.WriteLine($"State hash: {world.ComputeStateHash():X16}");
 internal sealed record Options(ulong Seed, int Days, string ReportMode, bool ShowMap, bool ShowCitizens, double? RealtimeSpeed,
     bool NoDisasters)
 {
+    public string? Government { get; init; }
+
     public static Options Parse(string[] args)
     {
         ulong seed = 42;
         int days = 100;
         string report = "weekly";
         bool map = false, citizens = false, noDisasters = false;
+        string? government = null;
         double? realtime = null;
 
         for (int i = 0; i < args.Length; i++)
@@ -104,6 +109,7 @@ internal sealed record Options(ulong Seed, int Days, string ReportMode, bool Sho
                 case "--map": map = true; break;
                 case "--citizens": citizens = true; break;
                 case "--no-disasters": noDisasters = true; break;
+                case "--government": government = Next(); break;
                 case "--realtime":
                     realtime = i + 1 < args.Length && double.TryParse(args[i + 1], out double x) ? x : 1;
                     if (i + 1 < args.Length && double.TryParse(args[i + 1], out _)) i++;
@@ -111,7 +117,7 @@ internal sealed record Options(ulong Seed, int Days, string ReportMode, bool Sho
                 default: throw new ArgumentException($"Unknown option {args[i]}");
             }
         }
-        return new Options(seed, days, report, map, citizens, realtime, noDisasters);
+        return new Options(seed, days, report, map, citizens, realtime, noDisasters) { Government = government };
     }
 }
 
@@ -189,6 +195,15 @@ internal static class Report
         var classes = s.Citizens.GroupBy(c => HomeSystem.ClassOf(world, s, c).Name).Select(g => $"{g.Count()} {g.Key.ToLowerInvariant()}");
         Console.WriteLine($"Homes: {string.Join(", ", homes)}. People: {string.Join(", ", classes)}.");
         var trade = world.Trade;
+        {
+            var occupied = s.Buildings.Where(b => b.Def.Home != null && b.IsOperational && b.ResidentIds.Count > 0).ToList();
+            string byClass = string.Join(", ", occupied.GroupBy(b => b.Def.Home!.Class).OrderBy(g => g.Key)
+                .Select(g => $"{g.Key} {g.Count()} homes avg {g.Average(h => Sim.Core.Economy.HouseholdSystem.Purse(s, h)):0.#}"));
+            double wages = s.Citizens.Sum(c => Sim.Core.Economy.HouseholdSystem.Wage(world, s, c).Pay);
+            int jobless = s.Citizens.Count(c => c.CanWork && c.JobBuildingId == null);
+            Console.WriteLine($"Households ({world.Data.Households.Government(s.Rules.Government).Name}): {byClass}; wages {wages:0.#}/day; " +
+                              $"{jobless} jobless; {s.ReliefHouseholds} homes on relief, {s.PoorHouseholds} going without.");
+        }
         Console.WriteLine($"Treasury: taxes {EconomySystem.DailyTax(world, s):0.#}/day, upkeep {EconomySystem.DailyUpkeep(world, s):0.#}/day" +
                           (s.UpkeepUnpaid ? " (UNPAID)" : "") + ".");
         Console.WriteLine($"Trade: {trade.CompletedTrades} trades, {trade.MerchantVisits} merchant visits, coin {s.Stock.Get("coin")}, " +

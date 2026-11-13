@@ -100,6 +100,9 @@ public sealed class SettlementRules
     /// <summary>Share of adults (percent) who arm as militia when the town musters (twice that at a call to arms).</summary>
     public int MusterPercent { get; set; } = 10;
 
+    /// <summary>How the town is run (households.json "governments"): taxes, pay, relief for the poor.</summary>
+    public string Government { get; set; } = "free_traders";
+
     /// <summary>
     /// Whether spare territory allowance is claimed automatically, evenly around the centre. Turn it off to
     /// paint territory by hand (e.g. only along one bank of a river).
@@ -311,6 +314,13 @@ public sealed class Settlement
 
     /// <summary>Taxes collected but not yet a whole coin.</summary>
     public double TaxAccrued { get; set; }
+
+    /// <summary>What households have spent but the treasury hasn't booked yet (less than a coin).</summary>
+    public double SalesAccrued { get; set; }
+
+    /// <summary>Homes the town gave something to for free yesterday, and homes that went without something.</summary>
+    public int ReliefHouseholds { get; set; }
+    public int PoorHouseholds { get; set; }
 
     /// <summary>Upkeep owed but not yet paid (fractions, or what the treasury couldn't cover).</summary>
     public double UpkeepOwed { get; set; }

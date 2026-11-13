@@ -116,22 +116,6 @@ public class HousingTests
     }
 
     [Fact]
-    public void BetterClassesPayMoreTax()
-    {
-        var (world, town, _) = Scenario.NewTown();
-        double before = EconomySystem.DailyTax(world, town);
-        var home = Hovel(world, town);
-        town.Stock.Add("wood", 200);
-        town.Stock.Add("stone", 100);
-        for (int day = 0; day < HomeSystem.UpgradeAfterDays; day++)
-        {
-            Cover(town, home, world.Data.Building("cottage").Home!.Requires);
-            HomeSystem.Daily(world, town);
-        }
-        Assert.True(EconomySystem.DailyTax(world, town) > before);
-    }
-
-    [Fact]
     public void UpgradedHomesCantBePlacedDirectly()
     {
         var (world, town, _) = Scenario.NewTown();

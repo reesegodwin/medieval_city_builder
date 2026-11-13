@@ -567,18 +567,28 @@ public static class RoadSystem
 /// </summary>
 public static class EconomySystem
 {
-    /// <summary>Taxes per day: each adult pays their class's rate (peasants, craftsmen, burghers).</summary>
-    public static double DailyTax(GameWorld world, Settlement s)
+    /// <summary>Income tax per day, by class: the government's share of every wage (soldiers pay none).</summary>
+    public static SortedDictionary<string, double> TaxByClass(GameWorld world, Settlement s)
     {
-        double tax = 0;
+        var byClass = new SortedDictionary<string, double>(StringComparer.Ordinal);
         foreach (var c in s.Citizens)
-            if (c.IsAdult && c.SquadId == null) tax += HomeSystem.ClassOf(world, s, c).TaxPerAdultDay; // soldiers pay no tax
-        return tax;
+        {
+            if (!c.IsAdult) continue;
+            double tax = Economy.HouseholdSystem.TaxOn(world, s, c, Economy.HouseholdSystem.Wage(world, s, c).Pay);
+            if (tax <= 0) continue;
+            string cls = HomeSystem.ClassOf(world, s, c).Name;
+            byClass[cls] = byClass.GetValueOrDefault(cls) + tax;
+        }
+        return byClass;
     }
 
-    /// <summary>Upkeep of buildings (and the army: soldiers' pay).</summary>
+    /// <summary>Income tax per day.</summary>
+    public static double DailyTax(GameWorld world, Settlement s) => TaxByClass(world, s).Values.Sum();
+
+    /// <summary>Upkeep of buildings, the army's pay and city workers' wages (builders, haulers, roadworkers).</summary>
     public static double DailyUpkeep(GameWorld world, Settlement s) =>
-        s.Buildings.Where(b => b.IsOperational).Sum(b => b.Def.Upkeep) + War.Armies.DailyUpkeep(world, s);
+        s.Buildings.Where(b => b.IsOperational).Sum(b => b.Def.Upkeep) + War.Armies.DailyUpkeep(world, s) +
+        Economy.HouseholdSystem.CityWages(world, s);
 
     /// <summary>Output factor for a building, given the state of the treasury.</summary>
     public static double OutputFactor(GameWorld world, Settlement s, Building b) =>
@@ -591,14 +601,9 @@ public static class EconomySystem
     private static void RecordTaxes(GameWorld world, Settlement s, int collected)
     {
         if (collected == 0) return;
-        var byClass = new SortedDictionary<string, double>(StringComparer.Ordinal);
-        foreach (var c in s.Citizens)
-        {
-            if (!c.IsAdult || c.SquadId != null) continue;
-            var cls = HomeSystem.ClassOf(world, s, c);
-            byClass[cls.Name] = byClass.GetValueOrDefault(cls.Name) + cls.TaxPerAdultDay;
-        }
+        var byClass = TaxByClass(world, s);
         double total = byClass.Values.Sum();
+        if (total <= 0) return;
         foreach (var (name, owed) in byClass)
             s.Ledger.Record(Economy.Inventory.Coin, collected * owed / total, Economy.LedgerKeys.Taxes_(name));
     }
@@ -612,6 +617,8 @@ public static class EconomySystem
             if (b.IsOperational && b.Def.Upkeep > 0) byType[b.Def.Name] = byType.GetValueOrDefault(b.Def.Name) + b.Def.Upkeep;
         double army = War.Armies.DailyUpkeep(world, s);
         if (army > 0) byType["Army"] = army;
+        double city = Economy.HouseholdSystem.CityWages(world, s);
+        if (city > 0) byType["City wages"] = city;
         foreach (var (name, upkeep) in byType)
             s.Ledger.Record(Economy.Inventory.Coin, -paid * upkeep / total, Economy.LedgerKeys.Upkeep_(name));
     }
