@@ -101,6 +101,12 @@ public static class RoadPlanner
 {
     public const int MaxSearch = 6000;
 
+    /// <summary>
+    /// Largest cut-off area <see cref="SealedLandPocket"/> maps. Roads may leave the territory, so the land
+    /// across a lake can be big; mapping it once a day is cheap next to the route searches it saves.
+    /// </summary>
+    public const int MaxPocketTiles = 60000;
+
     /// <summary>Longest bridge the planner will build in one go.</summary>
     public const int MaxBridgeTiles = 8;
 
@@ -173,7 +179,7 @@ public static class RoadPlanner
         {
             var (x, y) = pocket[i];
             if (world.Map.GetTile(x, y) is { IsRoad: true } or { RoadPlanned: true } || stockpileEntrances.Contains((x, y))) return null;
-            if (pocket.Count > MaxSearch) return null;
+            if (pocket.Count > MaxPocketTiles) return null;
             foreach (var (dx, dy) in Neighbours)
             {
                 var n = (x + dx, y + dy);
@@ -223,8 +229,14 @@ public static class SettlementGovernor
     /// <summary>Candidate sites per search that get a full road-route check.</summary>
     public const int MaxRouteChecksPerSearch = 10;
 
+    /// <summary>Skip candidate sites within this many tiles of one whose road couldn't be planned.</summary>
+    public const int UnconnectableSpread = 6;
+
     /// <summary>Labour a worker is assumed to give per day when sizing food production (a cautious <see cref="Work.DailyRate"/>).</summary>
     public const double ExpectedWorkerRate = 1.2;
+
+    /// <summary>Build more producers of wood, stone or food when the books say they'd run out within this many days.</summary>
+    public const double ForecastDays = 15;
 
     /// <summary>Planned food production must exceed the town's daily need by this factor.</summary>
     public const double FoodSupplyMargin = 1.2;
@@ -242,7 +254,7 @@ public static class SettlementGovernor
         // Try wishes in priority order; the first affordable one with a usable site gets built.
         long today = world.Time.Day;
         int attempts = 0;
-        CostGrid? field = null;
+        CostGrid? field = null, landField = null;
         bool fieldReady = false;
         // Land found to be cut off from the road network (beyond bridge range): skipped for the rest of today.
         var deadLand = new HashSet<(int X, int Y)>();
@@ -258,8 +270,12 @@ public static class SettlementGovernor
             {
                 // Where a road (or bridge) from a stockpile could reach: the same rules the road planner uses.
                 field = Logistics.StockpileField(world, settlement, Pathfinder.Mode.BuildRoad);
+                // Land a stockpile reaches without a new bridge. Sites there are tried first: the cheapest
+                // road elsewhere may need a bridge too long to build, and those sites would use up the searches.
+                landField = Logistics.StockpileField(world, settlement, Pathfinder.Mode.Walk);
                 fieldReady = true;
             }
+            if (landField != null && TryBuild(world, settlement, def, near, landField, deadLand)) return;
             if (TryBuild(world, settlement, def, near, field, deadLand)) return;
 
             settlement.FailedSiteSearches[key] = today;
@@ -333,7 +349,9 @@ public static class SettlementGovernor
             bool any = false;
             foreach (var t in candidate.AccessTiles().Prepend(candidate.DoorTile))
             {
-                if (Pathfinder.StepCost(world.Map.GetTile(t.X, t.Y), Pathfinder.Mode.BuildRoad) == null) continue;
+                var tile = world.Map.GetTile(t.X, t.Y);
+                // Dead land is land only: water next to the site leads nowhere without the too-long bridge.
+                if (tile.Terrain == Terrain.Water || Pathfinder.StepCost(tile, Pathfinder.Mode.BuildRoad) == null) continue;
                 if (!deadLand.Contains(t)) return false;
                 any = true;
             }
@@ -343,13 +361,18 @@ public static class SettlementGovernor
         // Plan the connecting road (and any bridge) before committing, so nothing gets built and torn
         // down. Route planning is expensive, so only a limited number of candidate sites get one.
         int routeChecks = 0;
+        // Sites next to one that couldn't be connected almost always fail the same way, so the limited
+        // route checks are spread out instead of being spent on one cut-off corner.
+        var unconnectable = new List<(int X, int Y)>();
         bool Connectable(int left, int top)
         {
             if (!Reachable(left, top)) return false;
             var candidate = new Building(0, def, left, top);
             if (OnlyOnDeadLand(candidate)) return false;
+            if (unconnectable.Any(f => Math.Max(Math.Abs(f.X - left), Math.Abs(f.Y - top)) <= UnconnectableSpread)) return false;
             if (routeChecks++ >= MaxRouteChecksPerSearch) return false;
             var route = RoadPlanner.PlanRoute(world, settlement, candidate);
+            if (route == null) unconnectable.Add((left, top));
             if (route == null && RoadPlanner.SealedLandPocket(world, settlement, candidate) is { } pocket)
                 deadLand.UnionWith(pocket);
             return route != null &&
@@ -413,6 +436,8 @@ public static class SettlementGovernor
 
         double gardenCycles = Rate("garden", out var garden);
         supply += gardenCycles * (garden?.Outputs.GetValueOrDefault("vegetables") ?? 0) * Nutrition("vegetables");
+        double fishingCycles = Rate("fishing_hut", out var fishing);
+        supply += fishingCycles * (fishing?.Outputs.GetValueOrDefault("fish") ?? 0) * Nutrition("fish");
         return supply;
     }
 
@@ -422,6 +447,8 @@ public static class SettlementGovernor
         int population = s.Citizens.Count;
         int plannedHousing = s.Buildings.Sum(b => b.Def.Housing) - population;
         double foodDays = Needs.FoodDays(world, s);
+        // Goods the books say are falling fast get producers before they run out, not after.
+        bool RunningOut(string resource) => Economy.Forecast.DaysLeft(world, s, resource) < ForecastDays;
         int farms = s.CountIncludingPlanned("farm");
         int bakeries = s.CountIncludingPlanned("bakery");
 
@@ -473,16 +500,17 @@ public static class SettlementGovernor
         // Size farming to the town's need (counting bread and gardens), with an emergency top-up.
         double dailyFoodNeed = s.Citizens.Sum(Needs.DailyFoodNeed);
         bool grainSurplus = s.Stock.Get("grain") >= s.LimitOf("grain") * 0.8;
-        if ((foodDays < 3 && !grainSurplus) || EstimatedFoodSupply(world, s) < dailyFoodNeed * FoodSupplyMargin)
+        if (((foodDays < 3 || RunningOut(Economy.Forecast.Food)) && !grainSurplus) ||
+            EstimatedFoodSupply(world, s) < dailyFoodNeed * FoodSupplyMargin)
         {
             if (!Understaffed("farm")) Wish("farm");
         }
         if ((bakeries == 0 && population >= 18) || (grainSurplus && bakeries < farms * 0.6 && !Understaffed("bakery")))
             Wish("bakery");
-        if (s.Stock.Get("wood") < 40 && s.CountIncludingPlanned("woodcutter") < 1 + population / 15)
+        if ((s.Stock.Get("wood") < 40 || RunningOut("wood")) && s.CountIncludingPlanned("woodcutter") < 1 + population / 15)
             Wish("woodcutter");
         int quarries = s.CountIncludingPlanned("quarry");
-        if (quarries == 0 || (s.Stock.Get("stone") < 20 && quarries < 1 + population / 30))
+        if (quarries == 0 || ((s.Stock.Get("stone") < 20 || RunningOut("stone")) && quarries < 1 + population / 30))
             Wish("quarry");
         if (s.FreeStorage < 80) Wish("stockpile");
         if (population >= TradingPostPopulation && !s.Buildings.Any(b => b.Def.Trade)) Wish("trading_post");

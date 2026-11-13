@@ -65,6 +65,12 @@ public partial class RulesPanel : PanelContainer
         upgrades.Toggled += on => _session.Execute(new SetAutoUpgradeHomesCommand(town.Id, on));
         body.AddChild(upgrades);
 
+        Section(body, "Disasters", "Now and then a building catches fire (wells nearby make it rarer) and needs repairs, " +
+                                   "a few people fall sick for some days (water and faith help), or a harvest is poor.");
+        var disasters = new CheckBox { Text = "Fires, sickness and poor harvests", ButtonPressed = town.Rules.Disasters, FocusMode = FocusModeEnum.None };
+        disasters.Toggled += on => _session.Execute(new SetDisastersCommand(town.Id, on));
+        body.AddChild(disasters);
+
         Section(body, "Stock limits", "Workplaces stop (and free their workers) once stock reaches the limit. " +
                                        "Food limits also grow with population.");
         foreach (var resource in world.Data.Resources.Values)

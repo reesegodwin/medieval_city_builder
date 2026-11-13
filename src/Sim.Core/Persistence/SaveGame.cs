@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 10;
+    public const int CurrentVersion = 11;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -90,6 +90,7 @@ public static class SaveGame
             AutoBuild = s.Rules.AutoBuild,
             AutoUpgradeHomes = s.Rules.AutoUpgradeHomes,
             AutoExpandTerritory = s.Rules.AutoExpandTerritory,
+            Disasters = s.Rules.Disasters,
         },
         Buildings = s.Buildings.Select(b => new BuildingSave
         {
@@ -132,6 +133,7 @@ public static class SaveGame
             LastMealMood = c.LastMealMood,
             StarvingTicks = c.StarvingTicks,
             UnhappyDays = c.UnhappyDays,
+            SickDays = c.SickDays,
             History = c.History.ToList(),
         }).ToList(),
         Roads = s.Roads.Select(r => new[] { r.X, r.Y, (int)tierOf(r) }).ToList(),
@@ -145,6 +147,8 @@ public static class SaveGame
         TaxAccrued = s.TaxAccrued,
         UpkeepOwed = s.UpkeepOwed,
         UpkeepUnpaid = s.UpkeepUnpaid,
+        ShortageWarnings = s.ShortageWarnings.ToList(),
+        PoorHarvestDays = s.PoorHarvestDays,
         ToolWear = new(s.ToolWear),
         GoodsUse = new(s.GoodsUse),
         FailedSiteSearches = new(s.FailedSiteSearches),
@@ -197,6 +201,12 @@ public static class SaveGame
         s.Rules.AutoBuild = save.Rules.AutoBuild;
         s.Rules.AutoUpgradeHomes = save.Rules.AutoUpgradeHomes ?? true;
         s.Rules.AutoExpandTerritory = save.Rules.AutoExpandTerritory ?? true;
+        s.Rules.Disasters = save.Rules.Disasters ?? true; // version 10 and older had none
+        // Goods added since the save was made (e.g. fish) get the default limits.
+        var defaults = new SettlementRules();
+        foreach (var (k, v) in defaults.ProductionLimits) s.Rules.ProductionLimits.TryAdd(k, v);
+        foreach (var (k, v) in defaults.PerCitizenLimits) s.Rules.PerCitizenLimits.TryAdd(k, v);
+        foreach (var (k, v) in defaults.JobPriority) s.Rules.JobPriority.TryAdd(k, v);
 
         foreach (var b in save.Buildings)
         {
@@ -235,6 +245,7 @@ public static class SaveGame
                 LastMealMood = c.LastMealMood,
                 StarvingTicks = c.StarvingTicks,
                 UnhappyDays = c.UnhappyDays,
+                SickDays = c.SickDays,
             };
             citizen.Traits.AddRange(c.Traits);
             CopyInto(c.Skills, citizen.Skills);
@@ -266,6 +277,8 @@ public static class SaveGame
         s.TaxAccrued = save.TaxAccrued;
         s.UpkeepOwed = save.UpkeepOwed;
         s.UpkeepUnpaid = save.UpkeepUnpaid;
+        foreach (string warning in save.ShortageWarnings ?? new()) s.ShortageWarnings.Add(warning);
+        s.PoorHarvestDays = save.PoorHarvestDays;
         // Version 3 and older had no tools or household goods; both start with nothing carried over.
         CopyInto(save.ToolWear, s.ToolWear);
         CopyInto(save.GoodsUse, s.GoodsUse);
@@ -336,6 +349,8 @@ public static class SaveGame
         public double TaxAccrued { get; set; }
         public double UpkeepOwed { get; set; }
         public bool UpkeepUnpaid { get; set; }
+        public List<string>? ShortageWarnings { get; set; }
+        public int PoorHarvestDays { get; set; }
         public SortedDictionary<string, double> ToolWear { get; set; } = new(StringComparer.Ordinal);
         public SortedDictionary<string, double> GoodsUse { get; set; } = new(StringComparer.Ordinal);
         public Dictionary<string, long> FailedSiteSearches { get; set; } = new();
@@ -351,6 +366,7 @@ public static class SaveGame
         public bool AutoBuild { get; set; }
         public bool? AutoUpgradeHomes { get; set; }
         public bool? AutoExpandTerritory { get; set; }
+        public bool? Disasters { get; set; }
     }
 
     private sealed class BuildingSave
@@ -395,6 +411,7 @@ public static class SaveGame
         public double LastMealMood { get; set; }
         public long StarvingTicks { get; set; }
         public int UnhappyDays { get; set; }
+        public int SickDays { get; set; }
         public List<string> History { get; set; } = new();
     }
 }

@@ -178,8 +178,8 @@ public partial class Hud : CanvasLayer
         // --- Event feed and status (bottom-left, above the build menu) ---
         var feedBox = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         feedBox.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomLeft);
-        feedBox.OffsetTop = -330;
-        feedBox.OffsetBottom = -112;
+        feedBox.OffsetTop = -400;
+        feedBox.OffsetBottom = -182; // the build menu is up to three rows tall
         feedBox.OffsetLeft = 12;
         feedBox.OffsetRight = 560;
         feedBox.GrowVertical = Control.GrowDirection.Begin;

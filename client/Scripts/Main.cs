@@ -21,7 +21,9 @@ namespace MedievalClient;
 ///   --rules               open the rules panel on start
 ///   --trade [TAB]         open the trade panel on start (tab 0-4)
 ///   --ledger [TAB]        open the town ledger on start (tab 0-3)
+///   --ledger-good ID      open the ledger's Goods tab with a good's 30-day charts (e.g. wood)
 ///   --follow-caravan      keep the camera on a caravan on the road (automated checks)
+///   --look-at ID          start with the camera on the town's first building of type ID (e.g. fishing_hut)
 ///   --territory           open the territory paint tool on start
 ///   --zoom N              start with the camera N units away (6-90)
 ///   --place ID            start placing building ID with the cursor mid-screen (automated checks)
@@ -280,6 +282,11 @@ public partial class Main : Node3D
             _ledger.Toggle();
             if (int.TryParse(ledgerTab, out int tab)) _ledger.ShowTab(tab);
         }
+        if (SimSession.UserArg("--ledger-good") is { Length: > 0 } good)
+        {
+            if (!_ledger.Visible) _ledger.Toggle();
+            _ledger.SelectGood(good);
+        }
         if (SimSession.UserArg("--trade") is { } tradeTab)
         {
             _trade.Toggle();
@@ -288,6 +295,9 @@ public partial class Main : Node3D
         if (SimSession.UserArg("--territory") != null) StartTerritoryTool();
         if (float.TryParse(SimSession.UserArg("--zoom"), out float zoom)) _camera.SetDistance(zoom);
         _followCaravan = SimSession.UserArg("--follow-caravan") != null;
+        if (SimSession.UserArg("--look-at") is { Length: > 0 } lookAt &&
+            _session.PlayerTown.Buildings.FirstOrDefault(b => b.Def.Id == lookAt) is { } sight)
+            _camera.LookAtTile(sight.CenterX, sight.CenterY);
         if (SimSession.UserArg("--place") is { Length: > 0 } placeId && _session.World.Data.Buildings.TryGetValue(placeId, out var placeDef))
             _placement.Begin(placeDef);
         if (SimSession.UserArg("--inspect") != null)

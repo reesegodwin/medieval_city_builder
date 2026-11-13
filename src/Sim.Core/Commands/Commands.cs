@@ -423,6 +423,18 @@ public sealed record FoundSettlementCommand(string OwnerId) : ICommand
     }
 }
 
+/// <summary>Switches fires, sickness and poor harvests on or off for a settlement.</summary>
+public sealed record SetDisastersCommand(int SettlementId, bool Enabled) : ISettlementCommand
+{
+    public CommandResult Execute(GameWorld world)
+    {
+        var settlement = world.FindSettlement(SettlementId);
+        if (settlement == null) return CommandResult.Fail("Unknown settlement");
+        settlement.Rules.Disasters = Enabled;
+        return CommandResult.Success();
+    }
+}
+
 public sealed record SetAutoUpgradeHomesCommand(int SettlementId, bool Enabled) : ISettlementCommand
 {
     public CommandResult Execute(GameWorld world)

@@ -13,6 +13,7 @@ public sealed class SettlementRules
         ["farmer"] = 5,
         ["baker"] = 4,
         ["gardener"] = 4,
+        ["fisher"] = 4,
         ["priest"] = 4,
         ["woodcutter"] = 3,
         ["barkeep"] = 3,
@@ -43,6 +44,7 @@ public sealed class SettlementRules
         ["grain"] = 500,
         ["bread"] = 300,
         ["vegetables"] = 200,
+        ["fish"] = 200,
         ["ale"] = 150,
         ["wood"] = 250,
         ["stone"] = 200,
@@ -59,6 +61,7 @@ public sealed class SettlementRules
         ["grain"] = 3,
         ["bread"] = 3,
         ["vegetables"] = 2,
+        ["fish"] = 2,
         ["ale"] = 1,
     };
 
@@ -70,6 +73,9 @@ public sealed class SettlementRules
 
     /// <summary>Whether homes upgrade on their own once their residents' needs are met (paying the upgrade cost).</summary>
     public bool AutoUpgradeHomes { get; set; } = true;
+
+    /// <summary>Whether fires, sickness and poor harvests can strike this settlement.</summary>
+    public bool Disasters { get; set; } = true;
 
     /// <summary>
     /// Whether spare territory allowance is claimed automatically, evenly around the centre. Turn it off to
@@ -230,6 +236,12 @@ public sealed class Settlement
 
     /// <summary>The treasury couldn't pay upkeep at the last daily reckoning; buildings with upkeep run at reduced output.</summary>
     public bool UpkeepUnpaid { get; set; }
+
+    /// <summary>Goods the player has been warned are running out (see <see cref="Economy.Forecast"/>).</summary>
+    public SortedSet<string> ShortageWarnings { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Days left of a poor harvest (farms and gardens produce less).</summary>
+    public int PoorHarvestDays { get; set; }
 
     /// <summary>Household goods used but not yet amounting to a whole unit, per resource.</summary>
     public SortedDictionary<string, double> GoodsUse { get; } = new(StringComparer.Ordinal);

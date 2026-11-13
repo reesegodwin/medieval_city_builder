@@ -18,8 +18,13 @@ public partial class LedgerPanel : PanelContainer
 
     private SimSession _session = null!;
     private TabContainer _tabs = null!;
-    private RichTextLabel _overview = null!, _treasury = null!;
+    private RichTextLabel _overview = null!, _treasury = null!, _goodDetails = null!;
     private GridContainer _goods = null!, _work = null!;
+    private LineChart _stockChart = null!, _flowChart = null!, _coinChart = null!, _treasuryChart = null!;
+    private VBoxContainer _goodPanel = null!;
+
+    /// <summary>The good whose history is shown under the Goods table (kept here: the table is rebuilt every second).</summary>
+    private string? _selectedGood;
     private double _sinceRefresh = RefreshSeconds;
 
     public void Initialize(SimSession session) => _session = session;
@@ -53,8 +58,29 @@ public partial class LedgerPanel : PanelContainer
         _tabs = new TabContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
         column.AddChild(_tabs);
         _overview = TextTab("Overview");
-        _goods = GridTab("Goods", 8);
-        _treasury = TextTab("Treasury");
+
+        // The selected good's charts sit above the table, where they're seen without scrolling.
+        var goodsColumn = ScrollTab("Goods");
+        _goodPanel = new VBoxContainer { Visible = false };
+        goodsColumn.AddChild(_goodPanel);
+        _stockChart = new LineChart();
+        _flowChart = new LineChart();
+        _goodDetails = new RichTextLabel { BbcodeEnabled = true, FitContent = true, ScrollActive = false };
+        _goodPanel.AddChild(_stockChart);
+        _goodPanel.AddChild(_flowChart);
+        _goodPanel.AddChild(_goodDetails);
+        _goodPanel.AddChild(new HSeparator());
+        goodsColumn.AddChild(new Label { Text = "Click a good to see its last 30 days.", Modulate = new Color(1, 1, 1, 0.7f) });
+        _goods = Grid(goodsColumn, 8);
+
+        var treasuryColumn = ScrollTab("Treasury");
+        _treasury = new RichTextLabel { BbcodeEnabled = true, FitContent = true, ScrollActive = false, SelectionEnabled = true };
+        _coinChart = new LineChart();
+        _treasuryChart = new LineChart();
+        treasuryColumn.AddChild(_treasuryChart);
+        treasuryColumn.AddChild(_coinChart);
+        treasuryColumn.AddChild(_treasury);
+
         _work = GridTab("Work", 4);
     }
 
@@ -65,13 +91,23 @@ public partial class LedgerPanel : PanelContainer
         return label;
     }
 
-    private GridContainer GridTab(string name, int columns)
+    private GridContainer GridTab(string name, int columns) => Grid(ScrollTab(name), columns);
+
+    /// <summary>A scrolling tab holding a column of controls.</summary>
+    private VBoxContainer ScrollTab(string name)
     {
         var scroll = new ScrollContainer { Name = name, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         _tabs.AddChild(scroll);
+        var column = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        scroll.AddChild(column);
+        return column;
+    }
+
+    private static GridContainer Grid(Container parent, int columns)
+    {
         var grid = new GridContainer { Columns = columns, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         grid.AddThemeConstantOverride("h_separation", 14);
-        scroll.AddChild(grid);
+        parent.AddChild(grid);
         return grid;
     }
 
@@ -84,6 +120,14 @@ public partial class LedgerPanel : PanelContainer
     /// <summary>Opens on a tab: 0 Overview, 1 Goods, 2 Treasury, 3 Work.</summary>
     public void ShowTab(int index) => _tabs.CurrentTab = Math.Clamp(index, 0, _tabs.GetTabCount() - 1);
 
+    /// <summary>Shows a good's history on the Goods tab.</summary>
+    public void SelectGood(string resource)
+    {
+        _selectedGood = resource;
+        ShowTab(1);
+        _sinceRefresh = RefreshSeconds;
+    }
+
     public override void _Process(double delta)
     {
         if (!Visible || _session == null) return;
@@ -92,6 +136,7 @@ public partial class LedgerPanel : PanelContainer
         _sinceRefresh = 0;
         FillOverview();
         FillGoods();
+        FillGoodDetails();
         FillTreasury();
         FillWork();
     }
@@ -108,7 +153,8 @@ public partial class LedgerPanel : PanelContainer
         int hauling = jobs.Count(b => b?.CurrentJobKind == JobKinds.Hauler);
         int standby = jobs.Count(b => b != null && s.IsOnStandby(b));
         int working = jobs.Count - hauling - standby;
-        int idle = adults - jobs.Count;
+        int sick = s.Citizens.Count(c => c.IsSick);
+        int idle = s.Citizens.Count(c => c.CanWork && c.JobBuildingId == null);
         int homeless = s.Citizens.Count(c => c.HomeBuildingId == null);
 
         sb.AppendLine($"[b]{s.Name}[/b], {World.Time}: {s.Citizens.Count} people, {adults} adults, " +
@@ -119,7 +165,17 @@ public partial class LedgerPanel : PanelContainer
             .GroupBy(b => b.Def.Name).Select(g => $"{g.Count()} {g.Key.ToLowerInvariant()}s")) +
                       (homeless > 0 ? $"; [color=#ff9070]{homeless} homeless[/color]" : ""));
         sb.AppendLine($"[b]Adults:[/b] {working} working, {standby} on standby (stock limits reached), {hauling} hauling, " +
-                      (idle > 0 ? $"[color=#ffb060]{idle} idle[/color]" : "0 idle"));
+                      (idle > 0 ? $"[color=#ffb060]{idle} idle[/color]" : "0 idle") +
+                      (sick > 0 ? $", [color=#ff9070]{sick} sick[/color]" : ""));
+        if (s.PoorHarvestDays > 0)
+            sb.AppendLine($"[color=#ffb060]Poor harvest:[/color] farms and gardens yield less for {s.PoorHarvestDays} more days");
+        foreach (string warning in s.ShortageWarnings)
+        {
+            double days = Forecast.DaysLeft(World, s, warning);
+            if (days < Forecast.ClearDays)
+                sb.AppendLine($"[color=#ff9070]{Forecast.NameOf(World, warning)} runs out in {days:0} days[/color] at the current rate");
+        }
+        if (!s.Rules.Disasters) sb.AppendLine("Disasters are switched off in the rules.");
         sb.AppendLine();
         sb.AppendLine("[b]Needs met[/b]");
         foreach (var need in World.Data.Needs)
@@ -173,9 +229,10 @@ public partial class LedgerPanel : PanelContainer
             int stock = Town.Stock.Get(r.Id);
             int limit = Town.LimitOf(r.Id);
             if (stock == 0 && Math.Abs(row.Made) + Math.Abs(row.Used) + Math.Abs(row.Traded) < 0.05) continue;
-            string runsOut = row.Net < -0.05 ? $"{stock / -row.Net:0} days" : "-";
-            Color? warn = row.Net < -0.05 && stock / -row.Net < 10 ? new Color(1f, 0.55f, 0.45f) : null;
-            Cell(_goods, r.Name, left: true);
+            double daysLeft = Forecast.DaysLeft(World, Town, r.Id);
+            string runsOut = double.IsPositiveInfinity(daysLeft) ? "-" : $"{daysLeft:0} days";
+            Color? warn = daysLeft < Forecast.WarnDays ? new Color(1f, 0.55f, 0.45f) : null;
+            GoodButton(r.Id, r.Name);
             Cell(_goods, stock.ToString());
             Cell(_goods, limit == int.MaxValue ? "-" : limit.ToString());
             Cell(_goods, $"{row.Made:0.#}");
@@ -184,6 +241,61 @@ public partial class LedgerPanel : PanelContainer
             Cell(_goods, $"{row.Net:+0.#;-0.#;0}", row.Net < -0.05 ? new Color(1f, 0.7f, 0.5f) : row.Net > 0.05 ? new Color(0.6f, 0.95f, 0.6f) : null);
             Cell(_goods, runsOut, warn);
         }
+    }
+
+    private void GoodButton(string id, string name)
+    {
+        var button = new Button
+        {
+            Text = name, Flat = true, FocusMode = FocusModeEnum.None, Alignment = HorizontalAlignment.Left,
+            TooltipText = "Show this good's last 30 days", ToggleMode = true, ButtonPressed = id == _selectedGood,
+        };
+        button.AddThemeConstantOverride("h_separation", 0);
+        button.Pressed += () =>
+        {
+            _selectedGood = _selectedGood == id ? null : id;
+            _sinceRefresh = RefreshSeconds;
+        };
+        _goods.AddChild(button);
+    }
+
+    private static readonly Color MadeColor = new(0.55f, 0.9f, 0.55f);
+    private static readonly Color UsedColor = new(1f, 0.6f, 0.45f);
+    private static readonly Color TradedColor = new(0.55f, 0.75f, 1f);
+    private static readonly Color StockColor = new(1f, 0.85f, 0.45f);
+
+    private static bool IsMade(string k) => LedgerKeys.Category(k) is LedgerKeys.Made or LedgerKeys.Taxes or LedgerKeys.Refunds;
+    private static bool IsUsed(string k) => LedgerKeys.Category(k) is LedgerKeys.Inputs or LedgerKeys.Eaten or LedgerKeys.Used
+        or LedgerKeys.Building or LedgerKeys.Upkeep or LedgerKeys.Disaster;
+    private static bool IsTraded(string k) => LedgerKeys.Category(k) is LedgerKeys.TradeIn or LedgerKeys.TradeOut or LedgerKeys.Offers;
+
+    private void FillGoodDetails()
+    {
+        if (_selectedGood is not { } id || !World.Data.Resources.TryGetValue(id, out var def))
+        {
+            _goodPanel.Visible = false;
+            return;
+        }
+        _goodPanel.Visible = true;
+        var ledger = Town.Ledger;
+        _stockChart.SetData($"{def.Name}: stock", new[]
+        {
+            new LineChart.Series("in store", StockColor, ledger.StockSeries(id, Town.Stock.Get(id))),
+        });
+        _flowChart.SetData("Per day", new[]
+        {
+            new LineChart.Series("made", MadeColor, ledger.Series(id, IsMade)),
+            new LineChart.Series("used", UsedColor, ledger.Series(id, IsUsed).Select(v => -v).ToArray()),
+            new LineChart.Series("traded", TradedColor, ledger.Series(id, IsTraded)),
+        });
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"[b]{def.Name}: where it came from and went, per day over the last {Math.Min(AverageDays, ledger.History.Count)} days[/b]");
+        var breakdown = ledger.Breakdown(id, AverageDays);
+        if (breakdown.Count == 0) sb.AppendLine("  Nothing moved.");
+        foreach (var (key, amount) in breakdown.Where(kv => Math.Abs(kv.Value) >= 0.05).OrderByDescending(kv => kv.Value))
+            sb.AppendLine($"  {(amount > 0 ? "[color=#90e090]+" : "[color=#ff9070]")}{amount:0.#}[/color]  {Pretty(key)}");
+        _goodDetails.Text = sb.ToString();
     }
 
     // ---------- treasury ----------
@@ -200,6 +312,11 @@ public partial class LedgerPanel : PanelContainer
             LedgerKeys.Offers => "Set aside for offers",
             LedgerKeys.Building => "Building and roads",
             LedgerKeys.Refunds => "Refunds",
+            LedgerKeys.Made => "Made",
+            LedgerKeys.Inputs => "Used by workshops",
+            LedgerKeys.Eaten => "Eaten",
+            LedgerKeys.Used => "Used up (services, households, tools)",
+            LedgerKeys.Disaster => "Lost to disaster",
             _ => parts[0],
         };
         return parts.Length > 1 ? $"{what}: {parts[1]}" : what;
@@ -225,6 +342,19 @@ public partial class LedgerPanel : PanelContainer
         sb.AppendLine($"[b]Balance:[/b] {(net >= 0 ? "[color=#90e090]" : "[color=#ff9070]")}{net:+0.#;-0.#;0} coin a day[/color]");
         sb.AppendLine($"Taxes today would bring {EconomySystem.DailyTax(World, s):0.#}; upkeep costs {EconomySystem.DailyUpkeep(s):0.#}.");
         _treasury.Text = sb.ToString();
+
+        // Income and spending per day, and the treasury itself, over the books' history.
+        var income = s.Ledger.History.Select(d => d.Flows.TryGetValue(Inventory.Coin, out var k) ? k.Values.Where(v => v > 0).Sum() : 0).ToArray();
+        var spending = s.Ledger.History.Select(d => d.Flows.TryGetValue(Inventory.Coin, out var k) ? -k.Values.Where(v => v < 0).Sum() : 0).ToArray();
+        _coinChart.SetData("Coin per day", new[]
+        {
+            new LineChart.Series("income", MadeColor, income),
+            new LineChart.Series("spending", UsedColor, spending),
+        });
+        _treasuryChart.SetData("Treasury", new[]
+        {
+            new LineChart.Series("coin", StockColor, s.Ledger.StockSeries(Inventory.Coin, s.Stock.Get(Inventory.Coin))),
+        });
     }
 
     // ---------- work ----------

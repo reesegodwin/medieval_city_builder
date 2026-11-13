@@ -110,7 +110,8 @@ public static class Needs
         Add(c.HomeBuildingId != null ? "Has a home" : "Homeless", c.HomeBuildingId != null ? 5 : -20);
         if (c.HomeBuildingId is int homeId && settlement.FindBuilding(homeId)?.Def is { Home.Mood: > 0 } fine)
             Add(labels != null ? $"Lives in a {fine.Name.ToLowerInvariant()}" : "", fine.Home!.Mood);
-        if (c.IsAdult) Add(c.JobBuildingId != null ? "Has work" : "Idle", c.JobBuildingId != null ? 3 : -3);
+        if (c.IsSick) Add("Sick", world.Data.Disasters.SickMood);
+        else if (c.IsAdult) Add(c.JobBuildingId != null ? "Has work" : "Idle", c.JobBuildingId != null ? 3 : -3);
 
         int population = settlement.Citizens.Count;
         foreach (var need in world.Data.Needs)

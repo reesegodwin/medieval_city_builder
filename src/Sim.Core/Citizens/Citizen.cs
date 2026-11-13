@@ -62,6 +62,11 @@ public sealed class Citizen
     public long StarvingTicks { get; set; }
     public int UnhappyDays { get; set; }
 
+    /// <summary>Days of sickness left; sick people don't work.</summary>
+    public int SickDays { get; set; }
+
+    public bool IsSick => SickDays > 0;
+
     /// <summary>Notable life events, for the inspection panel and faction chronicle.</summary>
     public List<string> History { get; } = new();
 
@@ -77,6 +82,9 @@ public sealed class Citizen
     public string FullName => $"{FirstName} {FamilyName}";
     public double AgeYears => AgeDays / (double)TimeScale.DaysPerYear;
     public bool IsAdult => AgeYears >= AdultAgeYears;
+
+    /// <summary>Adults who aren't sick can take a job.</summary>
+    public bool CanWork => IsAdult && !IsSick;
     public bool IsStarving => Satiation <= 0;
 
     public bool Has(Trait trait) => Traits.Contains(trait);

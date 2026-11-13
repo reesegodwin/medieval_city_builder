@@ -258,6 +258,34 @@
     "fertileBonus": 0.5
   },
   {
+    "id": "fishing_hut",
+    "name": "Fishing Hut",
+    "width": 2,
+    "height": 2,
+    "buildDays": 0.2,
+    "cost": {
+      "wood": 10
+    },
+    "jobs": 2,
+    "jobKind": "fisher",
+    "recipe": {
+      "outputs": {
+        "fish": 3
+      },
+      "workDays": 1
+    },
+    "nearTerrain": {
+      "terrain": "water",
+      "radius": 3,
+      "min": 4
+    },
+    "governor": {
+      "minPopulation": 25,
+      "populationPerBuilding": 80,
+      "lowStock": 60
+    }
+  },
+  {
     "id": "chapel",
     "name": "Chapel",
     "width": 3,

@@ -304,7 +304,7 @@ public static class JobSystem
         {
             if (c.JobBuildingId is not int jobId) continue;
             var b = settlement.FindBuilding(jobId);
-            if (b == null || !c.IsAdult || !b.WorkerIds.Contains(c.Id))
+            if (b == null || !c.CanWork || !b.WorkerIds.Contains(c.Id))
             {
                 b?.WorkerIds.Remove(c.Id);
                 c.JobBuildingId = null;
@@ -339,7 +339,7 @@ public static class JobSystem
             .SelectMany(b => Enumerable.Repeat(b, settlement.WantedWorkers(b) - b.WorkerIds.Count))
             .ToList();
 
-        var unemployed = settlement.Citizens.Where(c => c.IsAdult && c.JobBuildingId == null).ToList();
+        var unemployed = settlement.Citizens.Where(c => c.CanWork && c.JobBuildingId == null).ToList();
         // Spare hands any other job may take without counting as a reassignment: first workers on standby at
         // workplaces that reached their stock limit (who may also haul meanwhile), then haulers.
         var spare = settlement.Citizens
@@ -536,7 +536,8 @@ public static class EconomySystem
 
     /// <summary>Output factor for a building, given the state of the treasury.</summary>
     public static double OutputFactor(GameWorld world, Settlement s, Building b) =>
-        s.UpkeepUnpaid && b.Def.Upkeep > 0 ? world.Data.Trade.UnpaidOutput : 1;
+        (s.UpkeepUnpaid && b.Def.Upkeep > 0 ? world.Data.Trade.UnpaidOutput : 1) *
+        (s.PoorHarvestDays > 0 && b.Def.FertileBonus > 0 ? world.Data.Disasters.PoorHarvestOutput : 1);
 
     /// <summary>Books the taxes collected, split by class in proportion to what each class owes.</summary>
     private static void RecordTaxes(GameWorld world, Settlement s, int collected)

@@ -18,8 +18,12 @@ public static class LedgerKeys
     public const string Taxes = "taxes";
     public const string Upkeep = "upkeep";
 
+    /// <summary>Goods lost to a disaster, e.g. "disaster:fire".</summary>
+    public const string Disaster = "disaster";
+
     public static string Taxes_(string className) => $"{Taxes}:{className}";
     public static string Upkeep_(string buildingName) => $"{Upkeep}:{buildingName}";
+    public static string Disaster_(string what) => $"{Disaster}:{what}";
 
     /// <summary>The broad category of a key ("taxes:Burghers" is "taxes").</summary>
     public static string Category(string key) => key.Split(':')[0];
@@ -41,7 +45,7 @@ public sealed class LedgerDay
 
 /// <summary>
 /// A settlement's books: where each good and coin came from and went, per day, for the last
-/// <see cref="HistoryDays"/> days. It only observes; nothing in the simulation reads it back.
+/// <see cref="HistoryDays"/> days. It never changes stock itself; forecasts (<see cref="Forecast"/>) read it.
 /// </summary>
 public sealed class Ledger
 {
@@ -83,6 +87,26 @@ public sealed class Ledger
         return recent.Count == 0 ? 0 : recent.Sum(d => d.Sum(resource, keyFilter)) / recent.Count;
     }
 
+    /// <summary>Per finished day, oldest first, the sum of the flows a filter selects (for charts).</summary>
+    public double[] Series(string resource, Func<string, bool> keyFilter) =>
+        History.Select(d => d.Sum(resource, keyFilter)).ToArray();
+
+    /// <summary>
+    /// Stock at the end of each finished day, oldest first, worked back from today's stock and each day's
+    /// net flow. Only as accurate as the books, which cover every change.
+    /// </summary>
+    public double[] StockSeries(string resource, int stockNow)
+    {
+        var result = new double[History.Count];
+        double stock = stockNow - Today.Sum(resource, _ => true);
+        for (int i = History.Count - 1; i >= 0; i--)
+        {
+            result[i] = stock;
+            stock -= History[i].Sum(resource, _ => true);
+        }
+        return result;
+    }
+
     /// <summary>Average per day of every key for a resource (for breakdowns like coin income by source).</summary>
     public SortedDictionary<string, double> Breakdown(string resource, int days = 7)
     {
@@ -101,13 +125,13 @@ public readonly record struct LedgerRow(double Made, double Used, double Traded)
 {
     public double Net => Made + Used + Traded;
 
-    /// <summary>Made: production, taxes, refunds. Used: inputs, food, services, building, upkeep. Traded: trade and offers.</summary>
+    /// <summary>Made: production, taxes, refunds. Used: inputs, food, services, building, upkeep, disasters. Traded: trade and offers.</summary>
     public static LedgerRow Of(Ledger ledger, string resource, int days = 7)
     {
         static string Cat(string key) => LedgerKeys.Category(key);
         return new LedgerRow(
             ledger.Average(resource, k => Cat(k) is LedgerKeys.Made or LedgerKeys.Taxes or LedgerKeys.Refunds, days),
-            ledger.Average(resource, k => Cat(k) is LedgerKeys.Inputs or LedgerKeys.Eaten or LedgerKeys.Used or LedgerKeys.Building or LedgerKeys.Upkeep, days),
+            ledger.Average(resource, k => Cat(k) is LedgerKeys.Inputs or LedgerKeys.Eaten or LedgerKeys.Used or LedgerKeys.Building or LedgerKeys.Upkeep or LedgerKeys.Disaster, days),
             ledger.Average(resource, k => Cat(k) is LedgerKeys.TradeIn or LedgerKeys.TradeOut or LedgerKeys.Offers, days));
     }
 }

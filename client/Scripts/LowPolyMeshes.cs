@@ -112,6 +112,19 @@ public static class LowPolyMeshes
                     mb.Box(new Vector3(x, 0, z), new Vector3(x + 0.08f, 0.35f, z + 0.08f), Timber);
                 break;
 
+            case "fishing_hut":
+                // A small hut, a drying rack hung with fish, and a rowboat pulled up beside it.
+                House(mb, new Vector3(0.15f, 0, 0.15f), new Vector3(w - 0.75f, 0.55f, h - 0.75f), Wattle.Darkened(0.05f), Thatch, 0.45f);
+                foreach (float x in new[] { w - 0.6f, w - 0.15f })
+                    mb.Box(new Vector3(x, 0, 0.25f), new Vector3(x + 0.06f, 0.6f, 0.31f), Timber);
+                mb.Box(new Vector3(w - 0.6f, 0.56f, 0.25f), new Vector3(w - 0.09f, 0.6f, 0.31f), Timber);
+                for (float x = w - 0.52f; x < w - 0.15f; x += 0.12f)
+                    mb.Box(new Vector3(x, 0.32f, 0.26f), new Vector3(x + 0.06f, 0.55f, 0.3f), new Color(0.62f, 0.66f, 0.70f));
+                mb.Box(new Vector3(0.25f, 0, h - 0.55f), new Vector3(w - 0.25f, 0.14f, h - 0.2f), Wood.Darkened(0.15f)); // boat hull
+                mb.Box(new Vector3(0.35f, 0.04f, h - 0.48f), new Vector3(w - 0.35f, 0.15f, h - 0.27f), Wood.Darkened(0.4f));
+                mb.Box(new Vector3(0.6f, 0.15f, h - 0.4f), new Vector3(w - 0.6f, 0.18f, h - 0.35f), Timber); // oar
+                break;
+
             case "chapel":
                 House(mb, new Vector3(0.45f, 0, 0.2f), new Vector3(w - 0.45f, 1.1f, h - 0.9f), Stone, Slate, 0.8f);
                 mb.Box(new Vector3(1.05f, 0, h - 1.0f), new Vector3(1.95f, 2.0f, h - 0.15f), Stone.Lightened(0.05f));
