@@ -166,6 +166,17 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
 - **Coin costs:** Town Hall 150, Castle 600, Smithy and Carpenter 15 each (taken like any construction material). Basic services cost no coin, so early towns aren't starved of them.
 - Result over 720 days (three seeds, with housing classes): treasuries end around 5,000–11,000 coin, taxes roughly match upkeep, and upkeep goes unpaid at most once, briefly, in the early game.
 
+## Town ledger
+- Each settlement keeps books (`Economy/Ledger.cs`): every change to stock or coin is recorded by good under a category key. The keys are `made`, `inputs`, `eaten`, `used`, `building`, `trade-in`, `trade-out`, `offers`, `refunds`, `taxes:<class>` and `upkeep:<building>`.
+- **Books:** today plus the last 30 days. They are saved (save v10) and hashed, so a joining player sees the same history.
+- **Observer only:** the ledger never changes the simulation. A test checks that the books exactly explain every stock change over 30 days.
+- **Ledger screen (L or the HUD button):**
+  - **Overview:** people by class, homes, adults working, on standby, hauling or idle, needs met, and the top complaints (negative mood factors added up).
+  - **Goods:** stock, limit, made, used, traded and net per day (7-day average), plus "runs out in N days".
+  - **Treasury:** income and spending by source, and the daily balance.
+  - **Work:** workers and slots for each job, standby workers, and problems.
+- The console summary prints the same goods and coin tables.
+
 ## Colony Simulation (Dwarf Fortress / Songs of Syx-inspired depth, Stronghold look)
 
 **Principle:** *the people are real, their footsteps are not.* Every citizen is a full data record simulated on the server. Their moment-to-moment walking is drawn by the client and doesn't drive the simulation.

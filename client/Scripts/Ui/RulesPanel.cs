@@ -25,7 +25,7 @@ public partial class RulesPanel : PanelContainer
         OffsetLeft = 10;
         OffsetRight = 400;
         OffsetTop = 108;
-        OffsetBottom = -120;
+        OffsetBottom = -180;
         Visible = false;
 
         var column = new VBoxContainer();

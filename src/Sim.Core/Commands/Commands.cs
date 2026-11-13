@@ -234,7 +234,10 @@ public static class Roads
         // Materials paid for the surface come back; bridge wood was already used for the pilings.
         if (tile.Terrain != Terrain.Water)
             foreach (var (r, n) in world.Data.RoadTiers[Math.Min(plan.Tier, world.Data.RoadTiers.Count - 1)].Cost)
+            {
                 settlement.Stock.Add(r, n);
+                settlement.Ledger.Record(r, n, Economy.LedgerKeys.Refunds);
+            }
         return true;
     }
 
@@ -304,6 +307,7 @@ public sealed record PlaceRoadCommand(int SettlementId, IReadOnlyList<(int X, in
         var cost = Roads.PlanCost(world, settlement, Tiles, Tier);
         if (!settlement.Stock.TryTakeAll(cost))
             return CommandResult.Fail($"Needs {string.Join(", ", cost.Select(kv => $"{kv.Value} {kv.Key}"))}");
+        settlement.Ledger.RecordAll(cost, -1, Economy.LedgerKeys.Building);
 
         foreach (var (x, y) in Tiles) Roads.Plan(world, settlement, x, y, Tier);
         return CommandResult.Success();
@@ -372,6 +376,7 @@ public sealed record DemolishBuildingCommand(int SettlementId, int BuildingId) :
             int back = Math.Min((int)(amount * refund), settlement.FreeStorage);
             if (back <= 0) continue;
             settlement.Stock.Add(resource, back);
+            settlement.Ledger.Record(resource, back, Economy.LedgerKeys.Refunds);
             returned.Add($"{back} {resource}");
         }
 

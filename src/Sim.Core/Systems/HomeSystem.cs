@@ -66,6 +66,7 @@ public static class HomeSystem
             if (!CanAfford(s, next.Cost)) continue;
 
             s.Stock.TryTakeAll(next.Cost);
+            s.Ledger.RecordAll(next.Cost, -1, Economy.LedgerKeys.Building);
             Change(world, s, home, next);
             upgrades++;
             world.Log(EventKind.BuildingCompleted, s, $"A home became a {next.Name}: its people are now {world.Data.ClassOf(next.Home.Class).Name.ToLowerInvariant()}");

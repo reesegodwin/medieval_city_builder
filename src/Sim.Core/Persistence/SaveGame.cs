@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 9;
+    public const int CurrentVersion = 10;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -141,6 +141,7 @@ public static class SaveGame
         TerritoryVersion = s.TerritoryVersion,
         TerritoryCap = s.TerritoryCap,
         HaulCoverage = s.HaulCoverage,
+        Ledger = s.Ledger,
         TaxAccrued = s.TaxAccrued,
         UpkeepOwed = s.UpkeepOwed,
         UpkeepUnpaid = s.UpkeepUnpaid,
@@ -261,6 +262,7 @@ public static class SaveGame
 
         // Version 2 and older had no haulers: coverage starts at 0 and is set at the next hour.
         s.HaulCoverage = save.HaulCoverage;
+        s.Ledger = save.Ledger ?? new Economy.Ledger(); // version 9 and older kept no books
         s.TaxAccrued = save.TaxAccrued;
         s.UpkeepOwed = save.UpkeepOwed;
         s.UpkeepUnpaid = save.UpkeepUnpaid;
@@ -330,6 +332,7 @@ public static class SaveGame
         public int TerritoryVersion { get; set; }
         public int TerritoryCap { get; set; }
         public double HaulCoverage { get; set; }
+        public Economy.Ledger? Ledger { get; set; }
         public double TaxAccrued { get; set; }
         public double UpkeepOwed { get; set; }
         public bool UpkeepUnpaid { get; set; }

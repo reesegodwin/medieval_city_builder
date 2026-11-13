@@ -45,6 +45,7 @@ public static class Needs
                 {
                     while (c.Satiation < EatUntil && settlement.Stock.TryTake(food.Id, 1))
                     {
+                        settlement.Ledger.Record(food.Id, -1, Economy.LedgerKeys.Eaten);
                         c.Satiation += food.Nutrition;
                         c.LastMealMood = food.MealMood;
                         c.RecentFoods[food.Id] = today;
@@ -188,7 +189,11 @@ public static class ServiceSystem
             }
 
             foreach (var (resource, perPerson) in consumes)
-                settlement.Stock.TryTake(resource, Math.Min(settlement.Stock.Get(resource), (int)Math.Ceiling(served * perPerson)));
+            {
+                int used = Math.Min(settlement.Stock.Get(resource), (int)Math.Ceiling(served * perPerson));
+                settlement.Stock.TryTake(resource, used);
+                settlement.Ledger.Record(resource, -used, Economy.LedgerKeys.Used);
+            }
 
             foreach (var b in open)
             {
@@ -228,6 +233,7 @@ public static class ServiceSystem
             double use = settlement.GoodsUse.GetValueOrDefault(resource) + served * perPerson;
             int whole = Math.Min(settlement.Stock.Get(resource), (int)use);
             if (whole > 0) settlement.Stock.TryTake(resource, whole);
+            settlement.Ledger.Record(resource, -whole, Economy.LedgerKeys.Used);
             settlement.GoodsUse[resource] = use - (int)use;
         }
     }

@@ -47,6 +47,7 @@ public sealed record PostOfferCommand(int SettlementId, IReadOnlyDictionary<stri
         if (world.Trade.Offers.Count(o => o.SettlementId == s.Id) >= world.Data.Trade.MaxOpenOffers)
             return CommandResult.Fail($"At most {world.Data.Trade.MaxOpenOffers} open offers");
         if (!s.Stock.TryTakeAll(Give)) return CommandResult.Fail($"Not enough in stock to give {Trading.Describe(Give)}");
+        s.Ledger.RecordAll(Give, -1, LedgerKeys.Offers);
 
         var offer = new TradeOffer
         {
@@ -90,8 +91,11 @@ public sealed record AcceptOfferCommand(int SettlementId, int OfferId) : ISettle
         var path = Trading.RoadPath(world, seller, buyer);
         if (path == null) return CommandResult.Fail(Trading.NoRoadMessage(seller, buyer));
         if (!buyer.Stock.TryTakeAll(offer.Want)) return CommandResult.Fail($"You need {Trading.Describe(offer.Want)}");
+        buyer.Ledger.RecordAll(offer.Want, -1, LedgerKeys.TradeOut);
 
         world.Trade.Offers.Remove(offer);
+        seller.Ledger.RecordAll(offer.Give, -1, LedgerKeys.TradeOut); // set aside earlier, now sold
+        seller.Ledger.RecordAll(offer.Give, +1, LedgerKeys.Offers);
         Trading.Send(world, seller, buyer, offer.Give, path);
         Trading.Send(world, buyer, seller, offer.Want, path.AsEnumerable().Reverse().ToList());
         world.Trade.CompletedTrades++;

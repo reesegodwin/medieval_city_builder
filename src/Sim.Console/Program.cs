@@ -127,11 +127,28 @@ internal static class Report
             string.Join(" ", world.Data.Needs.Select(n => $"{n.Id} {ServiceSystem.Coverage(s, n.Id):P0}")));
     }
 
+    /// <summary>The town's books: each good's average daily flows over the last week, and where coin comes and goes.</summary>
+    public static void PrintLedger(GameWorld world, Settlement s)
+    {
+        var ledger = s.Ledger;
+        Console.WriteLine("Ledger (per day, last 7 days):  good          made     used   traded      net");
+        foreach (var r in world.Data.Resources.Keys.OrderBy(k => k, StringComparer.Ordinal))
+        {
+            if (r == Sim.Core.Economy.Inventory.Coin) continue;
+            var parts = Sim.Core.Economy.LedgerRow.Of(ledger, r);
+            if (Math.Abs(parts.Made) + Math.Abs(parts.Used) + Math.Abs(parts.Traded) < 0.05) continue;
+            Console.WriteLine($"{"",32}{r,-12}{parts.Made,8:0.#}{parts.Used,9:0.#}{parts.Traded,9:0.#}{parts.Net,9:0.#}");
+        }
+        var coin = ledger.Breakdown(Sim.Core.Economy.Inventory.Coin);
+        Console.WriteLine("Coin per day: " + string.Join(", ", coin.Where(kv => Math.Abs(kv.Value) >= 0.05).Select(kv => $"{kv.Key} {kv.Value:+0.#;-0.#}")));
+    }
+
     public static void PrintSummary(GameWorld world, Settlement s)
     {
         PrintDay(world, s);
         Console.WriteLine($"Births {world.TotalBirths}, deaths {world.TotalDeaths}. Storage {s.Stock.Total}/{s.StorageCapacity}, " +
                           $"housing {s.HousingCapacity - s.FreeHousing}/{s.HousingCapacity}, road tiles {s.Roads.Count}.");
+        PrintLedger(world, s);
         var homes = s.Buildings.Where(b => b.Def.Home != null && b.IsOperational).GroupBy(b => b.Def.Name)
             .Select(g => $"{g.Count()} {g.Key.ToLowerInvariant()}s");
         var classes = s.Citizens.GroupBy(c => HomeSystem.ClassOf(world, s, c).Name).Select(g => $"{g.Count()} {g.Key.ToLowerInvariant()}");

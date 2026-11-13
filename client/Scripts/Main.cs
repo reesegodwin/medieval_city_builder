@@ -20,6 +20,7 @@ namespace MedievalClient;
 ///   --inspect             select a citizen on start (shows the inspector panel)
 ///   --rules               open the rules panel on start
 ///   --trade [TAB]         open the trade panel on start (tab 0-4)
+///   --ledger [TAB]        open the town ledger on start (tab 0-3)
 ///   --follow-caravan      keep the camera on a caravan on the road (automated checks)
 ///   --territory           open the territory paint tool on start
 ///   --zoom N              start with the camera N units away (6-90)
@@ -45,6 +46,7 @@ public partial class Main : Node3D
     private InspectorPanel _inspector = null!;
     private RulesPanel _rules = null!;
     private TradePanel _trade = null!;
+    private LedgerPanel _ledger = null!;
     private SoundManager _sound = null!;
     private MeshInstance3D _marker = null!;
 
@@ -250,6 +252,11 @@ public partial class Main : Node3D
         _trade.Initialize(_session);
         _hud.AddChild(_trade);
         _hud.TradeRequested += ToggleTrade;
+
+        _ledger = new LedgerPanel { Name = "Ledger" };
+        _ledger.Initialize(_session);
+        _hud.AddChild(_ledger);
+        _hud.LedgerRequested += ToggleLedger;
         _hud.SaveRequested += SaveGame;
         _hud.LoadRequested += LoadGame;
         _hud.SoundToggled += _sound.ToggleMute;
@@ -268,6 +275,11 @@ public partial class Main : Node3D
             _session.RunDays(warmup);
         _screenshotPath = SimSession.UserArg("--screenshot");
         if (SimSession.UserArg("--rules") != null) _rules.Toggle();
+        if (SimSession.UserArg("--ledger") is { } ledgerTab)
+        {
+            _ledger.Toggle();
+            if (int.TryParse(ledgerTab, out int tab)) _ledger.ShowTab(tab);
+        }
         if (SimSession.UserArg("--trade") is { } tradeTab)
         {
             _trade.Toggle();
@@ -388,7 +400,7 @@ public partial class Main : Node3D
             RefreshInspector();
             if (_rules.Visible) _rules.Refresh();
             _trade.Refresh();
-            _hud.FeedVisible = !_rules.Visible && !_trade.Visible;
+            _hud.FeedVisible = !_rules.Visible && !_trade.Visible && !_ledger.Visible;
         }
 
         if (_flashTimer > 0)
@@ -492,11 +504,16 @@ public partial class Main : Node3D
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.P }:
                 if (_trade.Visible) _trade.Toggle();
+                if (_ledger.Visible) _ledger.Toggle();
                 _rules.Toggle();
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.J }:
                 ToggleTrade();
+                break;
+
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.L }:
+                ToggleLedger();
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.M }:
@@ -529,7 +546,15 @@ public partial class Main : Node3D
     private void ToggleTrade()
     {
         if (_rules.Visible) _rules.Toggle(); // they share the left side of the screen
+        if (_ledger.Visible) _ledger.Toggle();
         _trade.Toggle();
+    }
+
+    private void ToggleLedger()
+    {
+        if (_rules.Visible) _rules.Toggle();
+        if (_trade.Visible) _trade.Toggle();
+        _ledger.Toggle();
     }
 
     private bool AnyToolActive => _placement.Active != null || _roadTool.Active || _demolishTool.Active || _territoryTool.Active;
