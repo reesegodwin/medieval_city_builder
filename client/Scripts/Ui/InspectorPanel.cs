@@ -115,7 +115,13 @@ public partial class InspectorPanel : PanelContainer
                 if (town.FindCitizen(id) is { } c)
                     sb.AppendLine($"  {c.FullName} ({(int)c.AgeYears})");
         }
-        if (b.Def.Storage > 0) sb.AppendLine($"[b]Town storage:[/b] {town.Stock.Total}/{town.StorageCapacity}");
+        if (b.Def.Storage > 0)
+            sb.AppendLine($"[b]Town storage:[/b] {town.Stock.Total - town.StoredAtWorkplaces}/{town.StorageCapacity} " +
+                          $"(+{town.StoredAtWorkplaces} kept at workplaces)");
+        if (b.Def.Recipe is { } made && b.Def.OwnStorageCapacity > 0)
+            sb.AppendLine($"[b]Keeps on site:[/b] up to {b.Def.OwnStorageCapacity} " +
+                          string.Join(" and ", made.Outputs.Keys.Select(r => world.Data.Resources.GetValueOrDefault(r)?.Name.ToLowerInvariant() ?? r)) +
+                          ", outside the stockpiles");
         if (b.CurrentJobKind == JobKinds.Hauler)
             sb.AppendLine($"[b]Hauling:[/b] haulers here carry goods for other workplaces. Across town they cover " +
                           $"{town.HaulCoverage:P0} of the carrying workers would otherwise do themselves.");

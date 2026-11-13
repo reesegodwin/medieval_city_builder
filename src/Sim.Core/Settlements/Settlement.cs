@@ -171,8 +171,34 @@ public sealed class Settlement
     /// <summary>The settlement's town centre (keep, town hall...), or null if it has none.</summary>
     public Building? TownCentre => Buildings.FirstOrDefault(b => b.Def.IsTownCentre);
 
+    /// <summary>General storage: stockpiles and granaries.</summary>
     public int StorageCapacity => Buildings.Where(b => b.IsOperational).Sum(b => b.Def.Storage);
-    public int FreeStorage => Math.Max(0, StorageCapacity - Stock.Total);
+
+    /// <summary>
+    /// General storage still free. Goods first fill the stores of the workplaces that make them (see
+    /// <see cref="Data.BuildingDef.OwnStorageCapacity"/>); only the rest takes stockpile and granary space.
+    /// </summary>
+    public int FreeStorage => Math.Max(0, StorageCapacity - (Stock.Total - StoredAtWorkplaces));
+
+    /// <summary>Space for each good at the workplaces that make it (operational ones), by resource.</summary>
+    public Dictionary<string, int> OwnStorage()
+    {
+        var room = new Dictionary<string, int>();
+        foreach (var b in Buildings)
+        {
+            if (!b.IsOperational || b.Def.Recipe is not { } recipe || b.Def.OwnStorageCapacity <= 0) continue;
+            foreach (string r in recipe.Outputs.Keys) room[r] = room.GetValueOrDefault(r) + b.Def.OwnStorageCapacity;
+        }
+        return room;
+    }
+
+    public int OwnStorageOf(string resource) => OwnStorage().GetValueOrDefault(resource);
+
+    /// <summary>Goods held at workplaces rather than in stockpiles.</summary>
+    public int StoredAtWorkplaces => OwnStorage().Sum(kv => Math.Min(kv.Value, Stock.Get(kv.Key)));
+
+    /// <summary>How much more of a good the town can store: its free workplace space plus general space.</summary>
+    public int RoomFor(string resource) => FreeStorage + Math.Max(0, OwnStorageOf(resource) - Stock.Get(resource));
 
     public int HousingCapacity => Buildings.Where(b => b.IsOperational).Sum(b => b.Def.Housing);
     public int FreeHousing => Buildings.Sum(b => b.FreeHousing);

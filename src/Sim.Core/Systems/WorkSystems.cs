@@ -217,7 +217,9 @@ public static class ProductionSystem
 {
     public static void Tick(GameWorld world, Settlement settlement)
     {
-        int freeStorage = settlement.FreeStorage; // computed once per tick; updated as goods are stored
+        int freeStorage = settlement.FreeStorage; // general space, computed once per tick; updated as goods are stored
+        var ownRoom = settlement.OwnStorage();    // workplace space per good, likewise
+        foreach (var r in ownRoom.Keys.ToList()) ownRoom[r] = Math.Max(0, ownRoom[r] - settlement.Stock.Get(r));
         double tools = Tools.Multiplier(world, settlement);
         int workersThisTick = 0;
         foreach (var b in settlement.Buildings)
@@ -269,10 +271,11 @@ public static class ProductionSystem
             // limit, so one full store doesn't stop the others or overflow.
             bool several = recipe.Outputs.Count > 1;
             bool Wanted(string resource) => !several || settlement.Stock.Get(resource) < settlement.LimitOf(resource);
-            int total = 0;
+            // What doesn't fit in the workplaces' own stores goes to stockpiles and granaries.
+            int overflow = 0;
             foreach (var (resource, amount) in recipe.Outputs)
-                if (Wanted(resource)) total += (int)Math.Round(amount * b.TerrainMultiplier);
-            if (total > freeStorage)
+                if (Wanted(resource)) overflow += Math.Max(0, (int)Math.Round(amount * b.TerrainMultiplier) - ownRoom.GetValueOrDefault(resource));
+            if (overflow > freeStorage)
             {
                 b.Problem = "Storage full";
                 continue;
@@ -284,8 +287,9 @@ public static class ProductionSystem
                 int made = (int)Math.Round(amount * b.TerrainMultiplier);
                 settlement.Stock.Add(resource, made);
                 settlement.Ledger.Record(resource, made, Economy.LedgerKeys.Made);
+                if (ownRoom.TryGetValue(resource, out int own)) ownRoom[resource] = Math.Max(0, own - made);
             }
-            freeStorage -= total;
+            freeStorage -= overflow;
             b.CycleProgress -= recipe.WorkDays;
             b.InputsLoaded = false;
             b.Problem = null;

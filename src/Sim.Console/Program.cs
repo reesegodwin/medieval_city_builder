@@ -150,7 +150,8 @@ internal static class Report
     public static void PrintSummary(GameWorld world, Settlement s)
     {
         PrintDay(world, s);
-        Console.WriteLine($"Births {world.TotalBirths}, deaths {world.TotalDeaths}. Storage {s.Stock.Total}/{s.StorageCapacity}, " +
+        Console.WriteLine($"Births {world.TotalBirths}, deaths {world.TotalDeaths}. Storage {s.Stock.Total - s.StoredAtWorkplaces}/{s.StorageCapacity} " +
+                          $"(+{s.StoredAtWorkplaces} at workplaces), {s.Buildings.Count(b => b.Problem == "Storage full")} workplaces with storage full, " +
                           $"housing {s.HousingCapacity - s.FreeHousing}/{s.HousingCapacity}, road tiles {s.Roads.Count}.");
         PrintLedger(world, s);
         double spoiled = world.Data.FoodsByPreference.Sum(f => -s.Ledger.History.Sum(d => d.Get(f.Id, Sim.Core.Economy.LedgerKeys.Spoiled)));

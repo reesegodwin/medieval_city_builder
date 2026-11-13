@@ -222,6 +222,17 @@ public sealed class BuildingDef
     public int BuilderSlots { get; set; } = 2;
     public RecipeDef? Recipe { get; set; }
 
+    /// <summary>Units of each of its own products a workplace keeps on site (data override; see OwnStorageCapacity).</summary>
+    public int? OwnStorage { get; set; }
+
+    /// <summary>
+    /// How much of each good it makes a workplace holds itself (a farm's grain, a bakery's bread), outside the
+    /// town's stockpiles and granaries. 30 unless the data says otherwise; 0 for buildings that make nothing.
+    /// </summary>
+    public int OwnStorageCapacity => OwnStorage ?? (Recipe != null ? DefaultOwnStorage : 0);
+
+    public const int DefaultOwnStorage = 30;
+
     /// <summary>Extra output multiplier scaled by the fraction of fertile tiles under the footprint.</summary>
     public double FertileBonus { get; set; }
 
