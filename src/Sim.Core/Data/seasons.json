@@ -1,0 +1,10 @@
+{
+  "seasons": [
+    {"name": "Spring", "output": {"farm": 0.9, "garden": 0.9, "fishing_hut": 1.0}, "heatingWoodPerHomeDay": 0},
+    {"name": "Summer", "output": {"farm": 1.15, "garden": 1.15, "fishing_hut": 1.15}, "heatingWoodPerHomeDay": 0},
+    {"name": "Autumn", "output": {"farm": 1.35, "garden": 1.35, "fishing_hut": 1.05}, "heatingWoodPerHomeDay": 0},
+    {"name": "Winter", "output": {"farm": 0.6, "garden": 0.6, "fishing_hut": 0.8}, "heatingWoodPerHomeDay": 0.3}
+  ],
+  "coldMood": -12,
+  "winterReserveDays": 30
+}

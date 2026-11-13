@@ -38,7 +38,8 @@ public class EconomyTests
 
         Assert.True(town.UpkeepUnpaid);
         Assert.Equal(world.Data.Trade.UnpaidOutput, EconomySystem.OutputFactor(world, town, market));
-        Assert.Equal(1.0, EconomySystem.OutputFactor(world, town, farm)); // farms have no upkeep
+        // Farms have no upkeep: only the season changes their output.
+        Assert.Equal(SeasonSystem.Current(world).OutputOf("farm"), EconomySystem.OutputFactor(world, town, farm));
 
         town.Stock.Add("coin", 100);
         EconomySystem.Daily(world, town);

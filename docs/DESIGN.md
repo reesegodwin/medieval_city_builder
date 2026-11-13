@@ -179,7 +179,7 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
 - The charts are the client's first custom drawing (`Ui/LineChart.cs`). Stock history is worked back from today's stock using each day's net flow (`Ledger.StockSeries`).
 
 ## Shortage warnings (`Economy/Forecast.cs`)
-- `Forecast.DaysLeft` is stock divided by the average net loss over the last 7 days. It's infinite when stock isn't falling, and needs at least 3 days of books.
+- `Forecast.DaysLeft` is stock divided by the average net loss over the last 7 days (14 for coin, which arrives in lumps when merchants visit). It's infinite when stock isn't falling, and needs at least 3 days of books.
 - **Watched:** food (all foods together, weighted by nutrition), wood, stone, tools and coin.
 - **Warnings:** under 10 days left logs a `Shortage` event ("Wood runs out in 8 days at the current rate") that shows in the feed. A good isn't warned about again until it recovers past 20 days. The warned goods are saved and hashed (`Settlement.ShortageWarnings`).
 - **Governor:** it also wants a woodcutter, quarry or farm when that good would run out within 15 days, alongside the fixed stock checks.
@@ -188,6 +188,33 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
 - **Fishing Hut:** 2×2 and 10 wood. It must have water within 3 tiles (the same `nearTerrain` rule as woodcutters near forest). Two fishers, 3 fish per cycle.
 - **Fish:** nutrition 0.8 and meal mood +3. That's better than grain (−6) or vegetables (+2) and below bread (+6). A third or fourth food adds to the existing variety bonus.
 - **Governor:** builds fishing huts from population 25, one per 80 people, and counts them in its food estimate.
+
+## Seasons (`Systems/SeasonSystem.cs`, `seasons.json`)
+- A year has four 90-day seasons. The look is lean winter: hard enough to plan for, not a starvation test.
+- **Output by season** (farms and gardens / fishing huts):
+
+  | | Spring | Summer | Autumn | Winter |
+  |---|---|---|---|---|
+  | Farms and gardens | 90% | 115% | 135% | 60% |
+  | Fishing huts | 100% | 115% | 105% | 80% |
+
+  Over a year farms make what they always did, so the governor sizes farms on the yearly average (`SeasonRules.AverageOutputOf`).
+- **Storing for winter**
+  - Per-citizen food limits went up so a reserve fits: 10 grain, 10 bread, 6 vegetables and 5 fish per person.
+  - In summer and autumn the governor makes room for 30 days of food. It builds **granaries** (storage 1,500, 30 wood and 15 stone) from population 60, about one per 60 people, and stockpiles before that.
+  - It doesn't add farms just because food falls in winter.
+- **Heating**
+  - In winter each occupied home burns 0.3 firewood a day, booked as `heating`.
+  - Homes are heated in list order until the wood runs out. The rest are `Cold`, and their people get −12 mood ("Cold"). People without a home are cold all winter.
+  - In autumn the governor lays in wood (up to half its limit, which is now at least one per person).
+- **Announcements:** each season start is logged as a `Season` event, e.g. "Winter has come: farms yield 60%, fishing 80%, and every home burns firewood".
+- **Saves:** save v12 stores the cold homes and the part-unit of firewood owed. Older saves get the new per-citizen limits.
+- **Look (client, `SeasonLook.cs`):** one shader for terrain, trees and buildings. Snow settles on flat ground over the first days of winter and melts in early spring. Greens turn golden through autumn. The time of year is read from the game clock, so it's purely cosmetic.
+- **Result over 720 days (seeds 42, 7 and 1234):**
+  - Food falls slowly through each winter (from about 23 to 18 days' worth), and nobody starves.
+  - No home went cold, because the governor stocks firewood.
+  - Populations end at 796/724/662 (707/733/740 before seasons).
+  - Treasuries end lower (2,970 / 9,163 / 2,550), because towns keep food for winter instead of selling it.
 
 ## Disasters (`Systems/DisasterSystem.cs`, `disasters.json`)
 - **Mild:** nothing is lost for good except some goods in a burning stockpile. Each settlement can switch disasters off in the Rules panel (`SetDisastersCommand`). The setting is on by default and saved (save v11).

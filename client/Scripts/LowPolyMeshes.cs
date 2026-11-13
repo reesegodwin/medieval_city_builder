@@ -32,6 +32,18 @@ public static class LowPolyMeshes
 
         switch (def.Id)
         {
+            case "granary":
+                // A raised timber store on stone piers, with a steep thatched roof and a loading door.
+                foreach (float x in new[] { 0.3f, w / 2 - 0.15f, w - 0.6f })
+                foreach (float z in new[] { 0.35f, h - 0.65f })
+                    mb.Box(new Vector3(x, 0, z), new Vector3(x + 0.3f, 0.35f, z + 0.3f), Stone);
+                House(mb, new Vector3(0.25f, 0.35f, 0.3f), new Vector3(w - 0.25f, 1.25f, h - 0.3f), Wood.Lightened(0.1f), Thatch, 0.95f);
+                mb.Box(new Vector3(w / 2 - 0.3f, 0.45f, h - 0.31f), new Vector3(w / 2 + 0.3f, 1.05f, h - 0.27f), Timber.Darkened(0.3f));
+                mb.Box(new Vector3(w / 2 - 0.35f, 0, h - 0.3f), new Vector3(w / 2 + 0.35f, 0.08f, h - 0.02f), Wood); // ramp
+                for (int i = 0; i < 3; i++)
+                    mb.Box(new Vector3(0.35f + i * 0.3f, 0, h - 0.25f), new Vector3(0.6f + i * 0.3f, 0.22f, h - 0.02f), Wheat.Darkened(0.2f)); // sacks
+                break;
+
             case "hovel":
                 House(mb, new Vector3(0.2f, 0, 0.25f), new Vector3(w - 0.2f, 0.75f, h - 0.25f), Wattle, Thatch, 0.6f);
                 break;
@@ -422,7 +434,7 @@ public static class LowPolyMeshes
         var leaves = new Color(0.20f, 0.42f, 0.18f);
         mb.Cone(new Vector3(0, 0.25f, 0), 0.42f, 0.7f, 6, leaves);
         mb.Cone(new Vector3(0, 0.6f, 0), 0.32f, 0.6f, 6, leaves.Lightened(0.08f));
-        return mb.Commit();
+        return mb.Commit(SeasonLook.Default);
     }
 
     private static ArrayMesh BuildRock()

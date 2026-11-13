@@ -391,6 +391,7 @@ public partial class Main : Node3D
             return;
         }
         _session.Advance(delta);
+        SeasonLook.Update(_session.World);
         if (_session.World.Settlements.Count != _renderedSettlements.Count) AddNewSettlements();
         if (_followCaravan && _session.World.Trade.Caravans.FirstOrDefault() is { } caravan)
         {

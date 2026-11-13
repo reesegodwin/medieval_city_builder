@@ -70,6 +70,20 @@
     "jobKind": "hauler"
   },
   {
+    "id": "granary",
+    "name": "Granary",
+    "width": 4,
+    "height": 3,
+    "buildDays": 0.3,
+    "cost": {
+      "wood": 30,
+      "stone": 15
+    },
+    "storage": 1500,
+    "jobs": 4,
+    "jobKind": "hauler"
+  },
+  {
     "id": "hovel",
     "name": "Hovel",
     "width": 2,

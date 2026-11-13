@@ -50,6 +50,9 @@ public sealed class Building
     /// <summary>Human-readable reason the building is idle, if any.</summary>
     public string? Problem { get; set; }
 
+    /// <summary>A home left without firewood today while homes need heating.</summary>
+    public bool Cold { get; set; }
+
     public List<int> WorkerIds { get; } = new();
     public List<int> ResidentIds { get; } = new();
 

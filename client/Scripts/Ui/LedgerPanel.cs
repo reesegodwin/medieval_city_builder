@@ -167,6 +167,11 @@ public partial class LedgerPanel : PanelContainer
         sb.AppendLine($"[b]Adults:[/b] {working} working, {standby} on standby (stock limits reached), {hauling} hauling, " +
                       (idle > 0 ? $"[color=#ffb060]{idle} idle[/color]" : "0 idle") +
                       (sick > 0 ? $", [color=#ff9070]{sick} sick[/color]" : ""));
+        var season = SeasonSystem.Current(World);
+        int coldHomes = s.Buildings.Count(b => b.Cold);
+        sb.AppendLine($"[b]{season.Name}:[/b] farms and gardens yield {season.OutputOf("farm"):P0}, fishing {season.OutputOf("fishing_hut"):P0}" +
+                      (season.HeatingWoodPerHomeDay > 0 ? $"; homes burn {season.HeatingWoodPerHomeDay:0.#} wood a day" : "") +
+                      (coldHomes > 0 ? $"; [color=#ff9070]{coldHomes} homes are cold[/color]" : ""));
         if (s.PoorHarvestDays > 0)
             sb.AppendLine($"[color=#ffb060]Poor harvest:[/color] farms and gardens yield less for {s.PoorHarvestDays} more days");
         foreach (string warning in s.ShortageWarnings)
@@ -266,7 +271,7 @@ public partial class LedgerPanel : PanelContainer
 
     private static bool IsMade(string k) => LedgerKeys.Category(k) is LedgerKeys.Made or LedgerKeys.Taxes or LedgerKeys.Refunds;
     private static bool IsUsed(string k) => LedgerKeys.Category(k) is LedgerKeys.Inputs or LedgerKeys.Eaten or LedgerKeys.Used
-        or LedgerKeys.Building or LedgerKeys.Upkeep or LedgerKeys.Disaster;
+        or LedgerKeys.Building or LedgerKeys.Upkeep or LedgerKeys.Disaster or LedgerKeys.Heating;
     private static bool IsTraded(string k) => LedgerKeys.Category(k) is LedgerKeys.TradeIn or LedgerKeys.TradeOut or LedgerKeys.Offers;
 
     private void FillGoodDetails()
@@ -317,6 +322,7 @@ public partial class LedgerPanel : PanelContainer
             LedgerKeys.Eaten => "Eaten",
             LedgerKeys.Used => "Used up (services, households, tools)",
             LedgerKeys.Disaster => "Lost to disaster",
+            LedgerKeys.Heating => "Firewood for homes",
             _ => parts[0],
         };
         return parts.Length > 1 ? $"{what}: {parts[1]}" : what;
