@@ -161,7 +161,8 @@ internal static class Report
         int safeHomes = s.Buildings.Count(b => b.Def.Housing > 0 && b.IsOperational && WallSystem.IsInside(world, s, b));
         Console.WriteLine($"Walls: {s.Walls.Count} tiles (" + string.Join(", ", s.Walls.Values.GroupBy(w => w.Tier).OrderBy(g => g.Key)
                               .Select(g => $"{g.Count()} {world.Data.WallTiers[g.Key].Name.ToLowerInvariant()}")) +
-                          $"), {s.Walls.Values.Count(w => w.Gate)} gates, {s.WallPlans.Count} planned, ring {s.WallRing.Count} tiles; " +
+                          $"), {s.Walls.Values.Count(w => w.Piece == WallPiece.Gate)} gates, {s.Walls.Values.Count(w => w.Piece == WallPiece.Gatehouse)} gatehouses, " +
+                          $"{s.Walls.Values.Count(w => w.Piece == WallPiece.Tower)} towers, {s.WallPlans.Count} planned, ring {s.WallRing.Count} tiles; " +
                           $"{safeHomes} homes safe behind {(enclosure.RingTier >= 0 ? world.Data.WallTiers[enclosure.RingTier].Name.ToLowerInvariant() : "no closed ring")}; " +
                           $"wall-walk {WallSystem.WalkwayTiles(world, s)} tiles for {WallSystem.DefenderCapacity(world, s)} defenders; " +
                           $"{s.Buildings.Count(b => b.NoRoute)} buildings cut off.");

@@ -1,8 +1,14 @@
 [
   {"id": "palisade", "name": "Palisade", "cost": {"wood": 4}, "workDays": 0.4, "hitPoints": 100, "safetyMood": 2,
-   "gateCost": {"wood": 10}, "walkway": false, "defendersPerTile": 0},
+   "gateCost": {"wood": 10}, "walkway": false, "defendersPerTile": 0,
+   "tower": {"name": "Wooden watchtower", "cost": {"wood": 25}, "workDays": 1.5, "hitPoints": 300, "defenders": 3},
+   "gatehouse": {"name": "Timber gatehouse", "cost": {"wood": 30}, "workDays": 2, "hitPoints": 300, "defenders": 2}},
   {"id": "stone_wall", "name": "Stone wall", "cost": {"stone": 6}, "workDays": 1.2, "hitPoints": 400, "safetyMood": 4,
-   "gateCost": {"stone": 20, "wood": 5}, "walkway": true, "defendersPerTile": 2},
+   "gateCost": {"stone": 20, "wood": 5}, "walkway": true, "defendersPerTile": 2,
+   "tower": {"name": "Stone tower", "cost": {"stone": 60, "wood": 10}, "workDays": 6, "hitPoints": 1500, "defenders": 6},
+   "gatehouse": {"name": "Stone gatehouse", "cost": {"stone": 80, "wood": 15}, "workDays": 8, "hitPoints": 1800, "defenders": 6}},
   {"id": "large_wall", "name": "Large stone wall", "cost": {"stone": 12, "wood": 2}, "workDays": 2.5, "hitPoints": 1000, "safetyMood": 6,
-   "gateCost": {"stone": 40, "wood": 10}, "walkway": true, "defendersPerTile": 3}
+   "gateCost": {"stone": 40, "wood": 10}, "walkway": true, "defendersPerTile": 3,
+   "tower": {"name": "Great tower", "cost": {"stone": 120, "wood": 20}, "workDays": 12, "hitPoints": 3500, "defenders": 10},
+   "gatehouse": {"name": "Great gatehouse", "cost": {"stone": 160, "wood": 30}, "workDays": 15, "hitPoints": 4000, "defenders": 10}}
 ]

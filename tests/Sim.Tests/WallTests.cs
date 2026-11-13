@@ -235,4 +235,94 @@ public class WallTests
         Assert.True(world.Execute(new RemoveWallCommand(town.Id, new[] { line[3] })).Ok);
         Assert.Null(WallSystem.WalkPath(world, town, line[0], line[^1]));
     }
+
+    [Fact]
+    public void TowersRiseOnWallsHoldDefendersAndBlockPassage()
+    {
+        var (world, town, sim) = Scenario.NewTown();
+        town.Rules.Disasters = false;
+        town.Stock.Add("wood", 500);
+        town.Stock.Add("stone", 1000);
+        var line = FreeLine(world, town, 5);
+        Assert.True(world.Execute(new PlaceWallCommand(town.Id, line)).Ok);
+        Walls.FinishAllPlans(world, town);
+
+        var spot = line[2];
+        int wood = town.Stock.Get("wood");
+        Assert.True(world.Execute(new PlaceTowerCommand(town.Id, spot.X, spot.Y)).Ok);
+        Assert.Equal(wood - world.Data.WallTiers[0].Tower.Cost["wood"], town.Stock.Get("wood"));
+        sim.RunDays(4);
+        var tower = town.Walls[spot];
+        Assert.Equal(WallPiece.Tower, tower.Piece);
+        Assert.Equal(world.Data.WallTiers[0].Tower.HitPoints, tower.Hp);
+        Assert.True(world.Map.GetTile(spot.X, spot.Y).BlocksPassage);
+        Assert.True(WallSystem.IsStair(world, town, spot.X, spot.Y));
+        Assert.Equal(world.Data.WallTiers[0].Tower.Defenders, WallSystem.DefenderCapacity(world, town)); // a palisade's only post
+        Assert.Contains(spot, WallSystem.Towers(town));
+
+        // Upgrading the wall to stone upgrades the tower too, at the stone tower's price.
+        Assert.True(world.Execute(new PlaceWallCommand(town.Id, line, 1)).Ok);
+        Walls.FinishAllPlans(world, town);
+        Assert.Equal(WallPiece.Tower, town.Walls[spot].Piece);
+        Assert.Equal(world.Data.WallTiers[1].Tower.HitPoints, town.Walls[spot].Hp);
+        Assert.Equal(world.Data.WallTiers[1].Tower.Defenders + 4 * world.Data.WallTiers[1].DefendersPerTile,
+            WallSystem.DefenderCapacity(world, town));
+
+        // Removing it gives a quarter back.
+        int stone = town.Stock.Get("stone");
+        Assert.True(world.Execute(new RemoveWallCommand(town.Id, new[] { spot })).Ok);
+        Assert.Equal(stone + world.Data.WallTiers[1].Tower.Cost["stone"] / 4, town.Stock.Get("stone"));
+    }
+
+    [Fact]
+    public void GatehousesFortifyGatesAndStayOpen()
+    {
+        var (world, town, _) = Scenario.NewTown();
+        town.Stock.Add("wood", 500);
+        town.Stock.Add("stone", 1000);
+        var road = town.Roads.First(t => world.Map.GetTile(t.X, t.Y).BuildingId == 0);
+        Assert.True(world.Execute(new PlaceWallCommand(town.Id, new[] { road }, 1)).Ok);
+        Walls.FinishAllPlans(world, town);
+        Assert.Equal(WallPiece.Gate, town.Walls[road].Piece);
+
+        Assert.False(world.Execute(new PlaceTowerCommand(town.Id, road.X, road.Y)).Ok); // not on a gate
+        Assert.True(world.Execute(new PlaceGatehouseCommand(town.Id, road.X, road.Y)).Ok);
+        Walls.FinishAllPlans(world, town);
+        var gatehouse = town.Walls[road];
+        Assert.Equal(WallPiece.Gatehouse, gatehouse.Piece);
+        Assert.True(gatehouse.Gate);
+        var tile = world.Map.GetTile(road.X, road.Y);
+        Assert.NotNull(Pathfinder.StepCost(tile, Pathfinder.Mode.Walk));
+        Assert.NotNull(Pathfinder.StepCost(tile, Pathfinder.Mode.RoadOnly)); // caravans pass
+        Assert.Equal(world.Data.WallTiers[1].Gatehouse.Defenders, WallSystem.DefenderCapacity(world, town));
+
+        // A gatehouse needs a gate.
+        var line = FreeLine(world, town, 2);
+        Assert.True(world.Execute(new PlaceWallCommand(town.Id, line)).Ok);
+        Assert.False(world.Execute(new PlaceGatehouseCommand(town.Id, line[0].X, line[0].Y)).Ok);
+    }
+
+    [Fact]
+    public void FinishedRingsGetTowersAndGatehouses()
+    {
+        var (world, town, sim) = Scenario.NewTown(42, autoBuild: true);
+        sim.RunDays(560);
+        Assert.Contains(town.Walls.Values, w => w.Piece == WallPiece.Tower);
+        Assert.Contains(town.Walls.Values, w => w.Piece == WallPiece.Gatehouse);
+        Assert.DoesNotContain(town.Buildings, b => b.NoRoute);
+    }
+
+    [Fact]
+    public void SavesFromBeforeTowersStillLoad()
+    {
+        var (world, town, sim) = Scenario.NewTown(42, autoBuild: true);
+        sim.RunDays(260);
+        Assert.Contains(town.Walls.Values, w => w.Gate);
+        // A version 14 save stored a gate flag (0/1) where the piece now is, and plans with "Gate": true.
+        string json = SaveGame.ToJson(world).Replace("\"Version\":15", "\"Version\":14");
+        var copy = SaveGame.FromJson(json);
+        Assert.Equal(town.Walls.Values.Count(w => w.Piece == WallPiece.Gate), copy.Settlements[0].Walls.Values.Count(w => w.Piece == WallPiece.Gate));
+        var plan = System.Text.Json.JsonSerializer.Deserialize<WallPlan>("{\"X\":1,\"Y\":2,\"Tier\":0,\"Gate\":true,\"Progress\":0}")!;
+        Assert.Equal(WallPiece.Gate, plan.Piece);
+    }
 }

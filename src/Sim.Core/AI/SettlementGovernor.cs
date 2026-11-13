@@ -298,6 +298,9 @@ public static class SettlementGovernor
     /// <summary>Towns ring themselves with a palisade at this size, stone at the next, a large wall at the last.</summary>
     public static readonly int[] WallPopulation = { 150, 400, 700 };
 
+    /// <summary>A tower every this many ring tiles, once the ring is built.</summary>
+    public const int TowerSpacing = 16;
+
     /// <summary>Wall tiles planned per batch.</summary>
     public const int WallBatch = 30;
 
@@ -322,32 +325,60 @@ public static class SettlementGovernor
         if (s.WallRing.Count == 0 || s.WallPlans.Count > 0 || s.RoadPlans.Count > 0) return;
 
         var def = world.Data.WallTiers[tier];
-        // What a tile costs, and how much of each material may be spent.
+        // How much of each material may be spent: three quarters of the limit in store, keeping half.
         var budget = new Dictionary<string, int>();
-        foreach (string r in def.Cost.Keys.Concat(def.GateCost.Keys).Distinct())
+        foreach (string r in def.Cost.Keys.Concat(def.GateCost.Keys).Concat(def.Tower.Cost.Keys).Concat(def.Gatehouse.Cost.Keys).Distinct())
         {
             int limit = s.LimitOf(r);
             if (limit == int.MaxValue || s.Stock.Get(r) < limit * 0.75) return;
             budget[r] = s.Stock.Get(r) - limit / 2;
         }
+        var spend = new Dictionary<string, int>();
+        bool Afford(Dictionary<string, int> cost)
+        {
+            if (cost.Any(kv => spend.GetValueOrDefault(kv.Key) + kv.Value > budget.GetValueOrDefault(kv.Key))) return false;
+            foreach (var (r, n) in cost) spend[r] = spend.GetValueOrDefault(r) + n;
+            return true;
+        }
 
+        // First the ring itself, at this tier: plain walls and gates first, then the dearer towers and gatehouses.
         var batch = new List<(int X, int Y)>();
         var gates = new List<(int X, int Y)>();
-        var spend = new Dictionary<string, int>();
-        foreach (var (x, y, gate) in s.WallRing)
+        bool ringDone = true;
+        bool Strong((int X, int Y, bool Gate) r) => s.Walls.TryGetValue((r.X, r.Y), out var w) && w.Piece is WallPiece.Tower or WallPiece.Gatehouse;
+        foreach (var (x, y, gate) in s.WallRing.Where(r => !Strong(r)).Concat(s.WallRing.Where(Strong)))
         {
-            if (batch.Count >= WallBatch) break;
             var tile = world.Map.GetTile(x, y);
-            bool isGate = gate || tile.IsRoad;
+            WallPiece? want = gate ? WallPiece.Gate : null;
             if (!s.Walls.ContainsKey((x, y)) && Walls.Check(world, s, x, y) != null) continue;
-            if (!Walls.NeedsWork(s, tile, x, y, (byte)tier, isGate)) continue;
-            var cost = isGate ? def.GateCost : def.Cost;
-            if (cost.Any(kv => spend.GetValueOrDefault(kv.Key) + kv.Value > budget.GetValueOrDefault(kv.Key))) break;
-            foreach (var (r, n) in cost) spend[r] = spend.GetValueOrDefault(r) + n;
+            if (!Walls.NeedsWork(s, tile, x, y, (byte)tier, want)) continue;
+            ringDone = false;
+            if (batch.Count >= WallBatch) break;
+            s.Walls.TryGetValue((x, y), out var existing);
+            var piece = Walls.Resolve(tile, existing?.Piece, want);
+            if (!Afford(Walls.PieceCost(world, Math.Max(tier, existing?.Tier ?? 0), piece))) break;
             batch.Add((x, y));
             if (gate) gates.Add((x, y));
         }
-        if (batch.Count > 0) world.Execute(new PlaceWallCommand(s.Id, batch, (byte)tier, gates));
+        if (batch.Count > 0)
+        {
+            world.Execute(new PlaceWallCommand(s.Id, batch, (byte)tier, gates));
+            return;
+        }
+        if (!ringDone) return;
+
+        // Then strong points on the finished ring: a tower every few tiles, a gatehouse on each gate a road runs through.
+        for (int i = 0; i < s.WallRing.Count; i++)
+        {
+            var (x, y, _) = s.WallRing[i];
+            if (!s.Walls.TryGetValue((x, y), out var wall)) continue;
+            var tile = world.Map.GetTile(x, y);
+            WallPiece? want = wall.Piece == WallPiece.Wall && i % TowerSpacing == TowerSpacing / 4 ? WallPiece.Tower
+                : wall.Piece == WallPiece.Gate && tile.IsRoad ? WallPiece.Gatehouse : null;
+            if (want is not { } piece || !Afford(Walls.PieceCost(world, wall.Tier, piece))) continue;
+            world.Execute(piece == WallPiece.Tower ? new PlaceTowerCommand(s.Id, x, y) : new PlaceGatehouseCommand(s.Id, x, y));
+            return; // one strong point at a time
+        }
     }
 
     /// <summary>

@@ -286,10 +286,24 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - A home whose doorstep is enclosed gets "Safe behind walls", the mood of the weakest wall facing outside.
   - The result is cached by wall, territory and building versions, so it's derived and identical after a load.
 - **Hit points** are stored and saved per tile for the future siege phase; nothing uses them yet.
+- **Towers and gatehouses (`WallPiece`: wall, gate, tower, gatehouse):** placed on a wall (towers) or a gate (gatehouses), paid up front and built by the crew. Each kind of wall has its own, set in `walls.json`:
+
+  | Wall | Tower | Cost | Hit points | Defenders | Gatehouse | Cost | Hit points | Defenders |
+  |---|---|---|---|---|---|---|---|---|
+  | Palisade | Wooden watchtower | 25 wood | 300 | 3 | Timber gatehouse | 30 wood | 300 | 2 |
+  | Stone wall | Stone tower | 60 stone, 10 wood | 1,500 | 6 | Stone gatehouse | 80 stone, 15 wood | 1,800 | 6 |
+  | Large stone wall | Great tower | 120 stone, 20 wood | 3,500 | 10 | Great gatehouse | 160 stone, 30 wood | 4,000 | 10 |
+
+  - **Passage:** towers block passage. Gatehouses let traffic through, caravans included.
+  - **Wall-walk:** both are walkway tiles (timber platforms on a palisade) and access points to it.
+  - **Defenders:** both add their defenders to `DefenderCapacity`. `WallSystem.Towers` lists tower tiles for the archers to come.
+  - **Upgrades:** upgrading a wall upgrades its pieces at the new kind's price.
+  - **Governor:** once a ring is fully built at its current kind, it adds a tower every 16 ring tiles and a gatehouse on every gate a road runs through, one at a time. When upgrading, it does plain walls and gates first, so the dearer pieces don't stall the batches.
+  - **Saves:** v15. The piece is stored where v14 kept its gate flag, so old saves read the same.
 - **Wall-walk (stone and large stone walls):** these walls are built to hold soldiers. `walkway` and `defendersPerTile` (2 and 3) are set in `walls.json`.
   - **Sizes:** the walk is about 0.8–0.95 of a tile wide, two soldiers abreast. A soldier is about 0.4 tall. Stone walls stand 1.4 high and large walls 2.2.
   - **Parapets:** crenellated on the outside, chest-high on the inside.
-  - **Getting up:** gatehouses carry the walk over the passage. Stairs lead up from inside the town every 12 tiles.
+  - **Getting up:** gates and gatehouses carry the walk over the passage, and towers have their own stairs. Stairs also lead up from inside the town every 12 tiles.
   - **`WallSystem.WalkPath`:** finds the way along the top between wall tiles, including diagonal corners. Gates continue the walk and gaps break it.
   - **`DefenderCapacity`:** totals how many soldiers the walls hold; seed 7 ends with 212 tiles of wall-walk for 429 defenders.
   - Palisades have no walk.

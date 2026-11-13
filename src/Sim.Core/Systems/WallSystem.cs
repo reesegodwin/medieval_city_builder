@@ -99,15 +99,27 @@ public static class WallSystem
 
     /// <summary>Whether soldiers can stand and walk on top of this tile (stone walls, and gates in them).</summary>
     public static bool HasWalkway(GameWorld world, Settlement s, int x, int y) =>
-        s.Walls.TryGetValue((x, y), out var wall) && Commands.Walls.Def(world, wall.Tier).Walkway;
+        s.Walls.TryGetValue((x, y), out var wall) &&
+        (Commands.Walls.Def(world, wall.Tier).Walkway || wall.Piece is WallPiece.Tower or WallPiece.Gatehouse);
 
     /// <summary>Where people get up onto the wall-walk: gatehouses, and stairs spaced along it.</summary>
     public static bool IsStair(GameWorld world, Settlement s, int x, int y) =>
-        HasWalkway(world, s, x, y) && (s.Walls[(x, y)].Gate || Math.Abs(x + 3 * y) % StairSpacing == 0);
+        HasWalkway(world, s, x, y) && (s.Walls[(x, y)].Piece != WallPiece.Wall || Math.Abs(x + 3 * y) % StairSpacing == 0);
 
     /// <summary>Soldiers the town's walls can hold on their walkways.</summary>
-    public static int DefenderCapacity(GameWorld world, Settlement s) =>
-        s.Walls.Values.Sum(w => Commands.Walls.Def(world, w.Tier).Walkway ? Commands.Walls.Def(world, w.Tier).DefendersPerTile : 0);
+    public static int DefenderCapacity(GameWorld world, Settlement s) => s.Walls.Values.Sum(w =>
+    {
+        var def = Commands.Walls.Def(world, w.Tier);
+        return w.Piece switch
+        {
+            WallPiece.Tower => def.Tower.Defenders,
+            WallPiece.Gatehouse => def.Gatehouse.Defenders,
+            _ => def.Walkway ? def.DefendersPerTile : 0,
+        };
+    });
+
+    /// <summary>Tower tiles (for archers, later).</summary>
+    public static IEnumerable<(int X, int Y)> Towers(Settlement s) => s.Walls.Where(kv => kv.Value.Piece == WallPiece.Tower).Select(kv => kv.Key);
 
     /// <summary>Tiles of wall-walk.</summary>
     public static int WalkwayTiles(GameWorld world, Settlement s) => s.Walls.Keys.Count(t => HasWalkway(world, s, t.X, t.Y));
