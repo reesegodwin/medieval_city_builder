@@ -173,6 +173,7 @@
   },
   {
     "id": "woodcutter",
+    "outdoor": true,
     "ownStorage": 40,
     "name": "Woodcutter's Hut",
     "width": 2,
@@ -197,6 +198,7 @@
   },
   {
     "id": "firewood_hut",
+    "outdoor": true,
     "name": "Firewood Hut",
     "width": 2,
     "height": 2,
@@ -220,6 +222,7 @@
   },
   {
     "id": "quarry",
+    "outdoor": true,
     "ownStorage": 40,
     "name": "Quarry",
     "width": 3,
@@ -411,6 +414,7 @@
   },
   {
     "id": "mine",
+    "outdoor": true,
     "ownStorage": 20,
     "name": "Iron Mine",
     "width": 3,

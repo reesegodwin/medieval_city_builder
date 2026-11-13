@@ -63,6 +63,7 @@ public partial class Main : Node3D
     private static bool _saveLoadTestDone;
     private static bool _justLoaded;
     private bool _followCaravan;
+    private DirectionalLight3D? _sun;
     private readonly HashSet<int> _renderedSettlements = new();
     private Node3D _world3D = null!;
 
@@ -334,7 +335,7 @@ public partial class Main : Node3D
         };
         AddChild(new WorldEnvironment { Environment = env });
 
-        var sun = new DirectionalLight3D
+        var sun = _sun = new DirectionalLight3D
         {
             LightColor = new Color(1f, 0.95f, 0.85f),
             LightEnergy = 0.85f,
@@ -392,6 +393,7 @@ public partial class Main : Node3D
         }
         _session.Advance(delta);
         SeasonLook.Update(_session.World);
+        if (_sun != null) SeasonLook.LightSun(_sun, _session.World.Time);
         if (_session.World.Settlements.Count != _renderedSettlements.Count) AddNewSettlements();
         if (_followCaravan && _session.World.Trade.Caravans.FirstOrDefault() is { } caravan)
         {

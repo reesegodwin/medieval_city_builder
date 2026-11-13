@@ -248,6 +248,9 @@ public sealed class BuildingDef
     /// <summary>Extra output multiplier scaled by the fraction of fertile tiles under the footprint.</summary>
     public double FertileBonus { get; set; }
 
+    /// <summary>Outdoor work (woodcutting, quarrying...): slowed by short winter days (see SeasonDef.Daylight).</summary>
+    public bool Outdoor { get; set; }
+
     public NearTerrainRequirement? NearTerrain { get; set; }
 
     public ServiceDef? Service { get; set; }
@@ -482,6 +485,18 @@ public sealed class SeasonDef
 
     /// <summary>How fast food rots outside granaries (1 = each food's own rate; 0 in winter, when it freezes).</summary>
     public double Spoilage { get; set; } = 1;
+
+    /// <summary>Work speed outdoors (building sites, roads, outdoor workplaces): short winter days, long summer ones.</summary>
+    public double Daylight { get; set; } = 1;
+
+    /// <summary>Extra mood from a covered need this season (a warm tavern on winter nights), by need id.</summary>
+    public Dictionary<string, double> ServiceMood { get; set; } = new();
+
+    /// <summary>Goods a service uses per person, multiplied by this season (more ale in winter), by need id.</summary>
+    public Dictionary<string, double> ServiceUse { get; set; } = new();
+
+    /// <summary>Mood of people with none of the <see cref="ServiceMood"/> needs covered ("Long winter nights").</summary>
+    public double LongNightsMood { get; set; }
 
     public double OutputOf(string buildingId) => Output.TryGetValue(buildingId, out double f) ? f : 1;
 }

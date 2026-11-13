@@ -264,6 +264,21 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - Idle adults are near 0. When people are free (e.g. 41 on seed 7 at day 500) they gather berries, firewood and stones.
   - Late in the game, storage is often full, which limits what can be gathered.
 
+## Winter life (`seasons.json`)
+- **Short days:** outdoor work speed (`daylight`) is 100% in spring, 105% in summer, 95% in autumn and 80% in winter.
+  - It slows building sites, road work, and workplaces marked `"outdoor": true`: woodcutters, quarries, mines and firewood huts.
+  - Farms, gardens, fishing and pastures already have their own seasonal yields, so they aren't slowed twice.
+- **Winter evenings**
+  - In winter, people covered by a tavern get +3 mood ("Tavern on winter evenings") and by a chapel +2 (`serviceMood`).
+  - Adults with neither get −3 ("Long winter nights", `longNightsMood`).
+  - Taverns pour 1.5× the ale per person (`serviceUse`).
+- **Look (client):** the sun eases lower, dimmer and cooler through early winter (long shadows) and back with the thaw, with a hint in late autumn (`SeasonLook.LightSun`).
+- **Result over 720 days:**
+  - Winter is the happiest season in governed towns (mood 92–95, against 84–93 in summer), because taverns and chapels cover nearly everyone.
+  - Taverns pour 200–235 ale a day in winter.
+  - No home went cold.
+  - Populations end at 710/769/780 and treasuries at 5,086 / 11,790 / 3,726.
+
 ## Smokehouse
 - **Smokehouse:** 3×3, 20 wood and 10 stone, two smokers. It turns 3 mutton **or** 3 fish, plus 1 firewood, into 3 smoked meat.
 - **Smoked meat:** nutrition 1.1, meal mood +7 (the tastiest food), rotting at only 0.2% a day, so it keeps for months.

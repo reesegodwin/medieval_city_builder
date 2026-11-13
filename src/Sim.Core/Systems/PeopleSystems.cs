@@ -126,6 +126,20 @@ public static class Needs
             else if (population >= need.MinPopulation) Add(labels != null ? $"No {need.Name.ToLowerInvariant()}" : "", need.MissingMood);
         }
 
+        // Winter evenings: people gather at the tavern and chapel; without either the nights are long.
+        var season = SeasonSystem.Current(world);
+        if (season.ServiceMood.Count > 0 && c.IsAdult)
+        {
+            bool any = false;
+            foreach (var (needId, mood) in season.ServiceMood)
+            {
+                if (!c.CoveredNeeds.Contains(needId)) continue;
+                any = true;
+                Add(labels != null ? $"{world.Data.Needs.FirstOrDefault(n => n.Id == needId)?.Name ?? needId} on {season.Name.ToLowerInvariant()} evenings" : "", mood);
+            }
+            if (!any) Add(labels != null ? $"Long {season.Name.ToLowerInvariant()} nights" : "", season.LongNightsMood);
+        }
+
         if (c.Has(Trait.Cheerful)) Add("Cheerful", 8);
         if (c.Has(Trait.Gloomy)) Add("Gloomy", -8);
         if (c.IsStarving) Add("Starving", -35);
@@ -168,7 +182,9 @@ public static class ServiceSystem
             if (open.Count == 0) continue;
 
             // Goods a service uses up (e.g. ale): how many people the stock can serve today.
-            var consumes = open[0].Def.Service!.ConsumesPerPersonDay;
+            // More ale goes down on long winter nights (seasons.json).
+            double seasonUse = SeasonSystem.Current(world).ServiceUse.GetValueOrDefault(need.Id, 1);
+            var consumes = open[0].Def.Service!.ConsumesPerPersonDay.ToDictionary(kv => kv.Key, kv => kv.Value * seasonUse);
             int canServe = consumes.Count == 0
                 ? int.MaxValue
                 : consumes.Min(kv => (int)(settlement.Stock.Get(kv.Key) / kv.Value));
