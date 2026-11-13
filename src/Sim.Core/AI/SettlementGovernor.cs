@@ -544,9 +544,10 @@ public static class SettlementGovernor
         double reserveRoom = season is Season.Summer or Season.Autumn
             ? SeasonSystem.WinterReserve(world, s) - SeasonSystem.FoodStock(world, s)
             : 0;
-        bool granaryWanted = population >= GranaryPopulation && s.CountIncludingPlanned("granary") < 1 + population / 60;
+        bool granaryWanted = population >= GranaryPopulation && s.CountIncludingPlanned("granary") < 1 + population / 40;
         bool foodRotting = SeasonSystem.FoodStock(world, s) > s.FoodStoreCapacity + 100;
-        if (s.FreeStorage < 80 || s.FreeStorage < reserveRoom || (granaryWanted && foodRotting))
+        // Build storage ahead of need: a tenth of it free, not just the last few places.
+        if (s.FreeStorage < Math.Max(80, s.StorageCapacity / 10) || s.FreeStorage < reserveRoom || (granaryWanted && foodRotting))
             Wish(granaryWanted ? "granary" : "stockpile");
         if (population >= TradingPostPopulation && !s.Buildings.Any(b => b.Def.Trade)) Wish("trading_post");
 

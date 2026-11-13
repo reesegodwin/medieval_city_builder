@@ -153,6 +153,7 @@
   },
   {
     "id": "farm",
+    "ownStorage": 50,
     "name": "Wheat Farm",
     "width": 4,
     "height": 4,
@@ -172,6 +173,7 @@
   },
   {
     "id": "woodcutter",
+    "ownStorage": 40,
     "name": "Woodcutter's Hut",
     "width": 2,
     "height": 2,
@@ -218,6 +220,7 @@
   },
   {
     "id": "quarry",
+    "ownStorage": 40,
     "name": "Quarry",
     "width": 3,
     "height": 3,
@@ -278,6 +281,7 @@
   },
   {
     "id": "garden",
+    "ownStorage": 40,
     "name": "Vegetable Garden",
     "width": 3,
     "height": 3,
@@ -407,6 +411,7 @@
   },
   {
     "id": "mine",
+    "ownStorage": 20,
     "name": "Iron Mine",
     "width": 3,
     "height": 3,

@@ -264,6 +264,21 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - Idle adults are near 0. When people are free (e.g. 41 on seed 7 at day 500) they gather berries, firewood and stones.
   - Late in the game, storage is often full, which limits what can be gathered.
 
+## Workplace stores
+- **Problem:** late in the game, storage filled completely. At day 500 on seed 42 it was 18,499 / 18,500. Farms, bakeries, fishing huts and pastures stalled with "Storage full", and gatherers had no room. Per-person stock limits (winter food, firewood, mutton) had outgrown the stockpiles and granaries.
+- **Fix:** each workplace keeps some of its own products on site, outside the stockpiles.
+  - **Amount:** `BuildingDef.OwnStorageCapacity` is 30 of each output by default, with `ownStorage` overrides in `buildings.json`: farm 50, garden 40, woodcutter 40, quarry 40, mine 20.
+  - **How it's counted:** stock is still one town-wide inventory. Each good first fills the stores of the workplaces that make it (`Settlement.OwnStorage`), and only the rest takes general space. `FreeStorage` is general space only. `RoomFor(good)` adds that good's free workplace space.
+  - **Production:** a cycle's output fits if the overflow beyond its products' own stores fits in general space.
+  - **No new save data:** everything is derived from buildings and stock, so saves and multiplayer are unchanged.
+  - **Rot:** food kept at farms is outside granaries, so it can rot like any other food outside them.
+- **Governor:** builds storage while less than a tenth of general storage is free (it used to wait for under 80 places), and allows one granary per 40 people (was 60).
+- **Result over 720 days:**
+  - No workplace ends with "Storage full".
+  - Stockpiles end 83–86% used, with 5,400–5,800 goods kept at workplaces.
+  - Populations 760/714/777, treasuries 4,521 / 12,708 / 3,155.
+  - No rot, cold homes or starvation. Seed 7 just grew a little slower in this run.
+
 ## Disasters (`Systems/DisasterSystem.cs`, `disasters.json`)
 - **Mild:** nothing is lost for good except some goods in a burning stockpile. Each settlement can switch disasters off in the Rules panel (`SetDisastersCommand`). The setting is on by default and saved (save v11).
 - **Fire:** each working building has a 0.01% daily chance, halved within reach of a well. A burning building drops back to half-built: builders repair it with labour only, its workers and residents leave, and its work in progress is lost. A stockpile fire burns a quarter of its share of the stored goods (booked as `disaster:fire`). The town centre never burns.
