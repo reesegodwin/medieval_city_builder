@@ -140,7 +140,8 @@ public partial class ArmyPanel : PanelContainer
             string gear = unit.Gear.Count == 0 ? "no gear" : string.Join(" + ", unit.Gear.Select(kv => $"{kv.Value * war.SquadSize} {kv.Key}"));
             string id = unit.Id;
             ActionButton($"{unit.Name} ({gear}, {unit.PayPerSoldierDay * war.SquadSize:0.#} coin/day)",
-                $"{unit.Description}\nAttack {unit.Attack:0.#}, defence {unit.Defence:0.#}{(unit.Ranged ? ", ranged" : "")}.",
+                $"{unit.Description}\nAttack {unit.Attack:0.#}, defence {unit.Defence:0.#}{(unit.Ranged ? ", ranged" : "")}." +
+                (unit.Gear.Count > 0 ? $"\nOnly recruits whose families have {Sim.Core.Economy.HouseholdSystem.GearPrice(World, unit):0.#} coin saved take up this gear." : ""),
                 () => Report(_session.Execute(new RecruitSquadCommand(s.Id, id)), $"Raised a squad of {unit.Name.ToLowerInvariant()}"));
         }
         Line("Gear in stock: " + string.Join(", ", war.Units.SelectMany(u => u.Gear.Keys).Distinct()

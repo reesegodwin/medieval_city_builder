@@ -343,6 +343,7 @@ public partial class LedgerPanel : PanelContainer
             LedgerKeys.Taxes => "Taxes",
             LedgerKeys.Upkeep => "Upkeep",
             LedgerKeys.TradeIn => "Sales and deliveries",
+            Sim.Core.Economy.HouseholdSystem.SalesKey => "What families paid for food, warmth and services",
             LedgerKeys.TradeOut => "Purchases",
             LedgerKeys.Offers => "Set aside for offers",
             LedgerKeys.Building => "Building and roads",
@@ -378,7 +379,16 @@ public partial class LedgerPanel : PanelContainer
         double net = flows.Values.Sum();
         sb.AppendLine();
         sb.AppendLine($"[b]Balance:[/b] {(net >= 0 ? "[color=#90e090]" : "[color=#ff9070]")}{net:+0.#;-0.#;0} coin a day[/color]");
-        sb.AppendLine($"Taxes today would bring {EconomySystem.DailyTax(World, s):0.#}; upkeep costs {EconomySystem.DailyUpkeep(World, s):0.#}.");
+        sb.AppendLine($"Income tax today would bring {EconomySystem.DailyTax(World, s):0.#}; upkeep (with city wages and the army's pay) costs {EconomySystem.DailyUpkeep(World, s):0.#}.");
+        var homes = s.Buildings.Where(b => b.Def.Home != null && b.IsOperational && b.ResidentIds.Count > 0).ToList();
+        if (homes.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"[b]Households[/b] ({World.Data.Households.Government(s.Rules.Government).Name})");
+            foreach (var group in homes.GroupBy(h => h.Def.Home!.Class).OrderBy(g => g.Key, StringComparer.Ordinal))
+                sb.AppendLine($"  {World.Data.ClassOf(group.Key).Name}: {group.Count()} homes, {group.Average(h => Sim.Core.Economy.HouseholdSystem.Purse(s, h)):0.#} coin saved on average");
+            sb.AppendLine($"  {s.PoorHouseholds} homes went without something yesterday; {s.ReliefHouseholds} were helped by the town; {s.Crimes} thefts so far.");
+        }
         _treasury.Text = sb.ToString();
 
         // Income and spending per day, and the treasury itself, over the books' history.

@@ -27,6 +27,9 @@ public static class HomeSystem
     public const int UpkeepDaysReserve = 10;
     public const int MinCoinReserve = 100;
 
+    /// <summary>A family pays for its own upgrade when it has this many times the coin cost saved.</summary>
+    public const double FamilyPaysMargin = 2;
+
     /// <summary>Whether every resident has all these needs covered (and there is at least one).</summary>
     public static bool NeedsMet(Settlement s, Building home, IReadOnlyList<string> needs)
     {
@@ -70,10 +73,23 @@ public static class HomeSystem
             }
             home.UpgradeReadyDays++;
             if (!s.Rules.AutoUpgradeHomes || home.UpgradeReadyDays < UpgradeAfterDays || upgrades >= MaxUpgradesPerDay) continue;
-            if (!CanAfford(world, s, next.Cost)) continue;
 
-            s.Stock.TryTakeAll(next.Cost);
-            s.Ledger.RecordAll(next.Cost, -1, Economy.LedgerKeys.Building);
+            // A family with savings pays the coin part itself (builders' pay); the town only gives materials.
+            const string coin = Economy.Inventory.Coin;
+            int coinCost = next.Cost.GetValueOrDefault(coin);
+            double purse = Economy.HouseholdSystem.Purse(s, home);
+            bool familyPays = coinCost > 0 && purse >= coinCost * FamilyPaysMargin;
+            var townCost = familyPays ? next.Cost.Where(kv => kv.Key != coin).ToDictionary(kv => kv.Key, kv => kv.Value) : next.Cost;
+            if (!CanAfford(world, s, townCost)) continue;
+
+            s.Stock.TryTakeAll(townCost);
+            s.Ledger.RecordAll(townCost, -1, Economy.LedgerKeys.Building);
+            if (familyPays)
+            {
+                double keep = 1 - coinCost / purse;
+                foreach (int id in home.ResidentIds)
+                    if (s.FindCitizen(id) is { IsAdult: true } c) c.Coin *= keep;
+            }
             Change(world, s, home, next);
             upgrades++;
             world.Log(EventKind.BuildingCompleted, s, $"A home became a {next.Name}: its people are now {world.Data.ClassOf(next.Home.Class).Name.ToLowerInvariant()}");
