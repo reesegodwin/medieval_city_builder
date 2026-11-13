@@ -95,6 +95,7 @@ public static class SaveGame
             Raids = s.Rules.Raids,
             MusterPercent = s.Rules.MusterPercent,
             Government = s.Rules.Government,
+            Crime = s.Rules.Crime,
         },
         Buildings = s.Buildings.Select(b => new BuildingSave
         {
@@ -165,6 +166,8 @@ public static class SaveGame
         SalesAccrued = s.SalesAccrued,
         ReliefHouseholds = s.ReliefHouseholds,
         PoorHouseholds = s.PoorHouseholds,
+        CrimeDays = s.CrimeDays,
+        Crimes = s.Crimes,
         UpkeepOwed = s.UpkeepOwed,
         UpkeepUnpaid = s.UpkeepUnpaid,
         ShortageWarnings = s.ShortageWarnings.ToList(),
@@ -228,6 +231,7 @@ public static class SaveGame
         s.Rules.Raids = save.Rules.Raids ?? true;
         s.Rules.MusterPercent = save.Rules.MusterPercent ?? 10;
         s.Rules.Government = save.Rules.Government ?? "free_traders"; // version 17 and older: free traders
+        s.Rules.Crime = save.Rules.Crime ?? true;
         // Goods added since the save was made (e.g. fish) get the default limits.
         var defaults = new SettlementRules();
         foreach (var (k, v) in defaults.ProductionLimits) s.Rules.ProductionLimits.TryAdd(k, v);
@@ -333,6 +337,8 @@ public static class SaveGame
         s.SalesAccrued = save.SalesAccrued;
         s.ReliefHouseholds = save.ReliefHouseholds;
         s.PoorHouseholds = save.PoorHouseholds;
+        s.CrimeDays = save.CrimeDays;
+        s.Crimes = save.Crimes;
         s.UpkeepOwed = save.UpkeepOwed;
         s.UpkeepUnpaid = save.UpkeepUnpaid;
         foreach (string warning in save.ShortageWarnings ?? new()) s.ShortageWarnings.Add(warning);
@@ -419,6 +425,8 @@ public static class SaveGame
         public double SalesAccrued { get; set; }
         public int ReliefHouseholds { get; set; }
         public int PoorHouseholds { get; set; }
+        public int CrimeDays { get; set; }
+        public int Crimes { get; set; }
         public double UpkeepOwed { get; set; }
         public bool UpkeepUnpaid { get; set; }
         public List<string>? ShortageWarnings { get; set; }
@@ -444,6 +452,7 @@ public static class SaveGame
         public bool? Raids { get; set; }
         public int? MusterPercent { get; set; }
         public string? Government { get; set; }
+        public bool? Crime { get; set; }
     }
 
     private sealed class BuildingSave

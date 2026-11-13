@@ -506,6 +506,28 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - per-government moods and laws;
   - migration drawn to high wages.
 
+## Health, cleanliness and the watch (`Systems/CrimeSystem.cs`, `disasters.json`)
+- **Herbalist's Hut** (healing; 1 herbalist, reach 24, 150 people). People it reaches recover from sickness twice as fast, and full coverage lowers outbreaks by 20%. Mood +2, and families pay 0.004 a day.
+- **Bathhouse** (hygiene; 1 bath keeper, reach 16, 60 people, burns 0.02 firewood per person). Full coverage lowers outbreaks by 40%. Mood +3, and families pay 0.006 a day.
+- **Guardhouse** (law; 2 guards paid by the treasury as city workers, reach 22, 150 people). Mood +2.
+- **Crime:**
+  - From 100 people, troubled adults may steal: those out of the watch's reach who are unhappy (mood under 40) or whose family has under 0.5 coin saved. Each adds 0.2% to the day's chance of a theft, up to 40%.
+  - A thief takes 25% (at most 20 coin) from the richest home the watch doesn't cover. If no family has a coin, they rob the treasury instead, unless a guardhouse reaches the town centre.
+  - The loot goes to the thief's family, so poverty, the household economy and the watch feed into each other.
+  - A theft unsettles everyone the watch doesn't reach ("Thieves about", −2 mood) for 10 days.
+  - A per-town rule switches crime off (`SetCrimeCommand`, Rules panel).
+- **Governor:** it builds about one of each per 150 people (the first anywhere, later ones where people aren't reached). The jobs have middling priority, so these comforts don't drain the workforce.
+- **Also fixed:** after a building's site search fails, the governor skips that building's other spots for the day. A crowded old town that keeps failing to find a tavern site no longer uses up every daily search.
+- 720-day checks:
+
+  | Seed | Townhouses | Treasury | Thefts in two years |
+  |---|---|---|---|
+  | 42 | 37 | 2,494 | 18 |
+  | 7 | 77 | 8,058 | 26 |
+  | 1234 | 58 | 682 | 15 |
+
+  No starvation, and every raid was beaten.
+
 ## Battles: individual units + destructible structures (hybrid LOD simulation)
 
 **Two battle simulators that share the same stats:**

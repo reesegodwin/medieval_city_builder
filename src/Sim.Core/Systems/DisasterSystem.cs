@@ -17,8 +17,9 @@ public static class DisasterSystem
     public static void Daily(GameWorld world, Settlement s)
     {
         // Recovery happens even with disasters switched off.
+        // Herbalists help the sick they reach get well sooner.
         foreach (var c in s.Citizens)
-            if (c.SickDays > 0) c.SickDays--;
+            if (c.SickDays > 0) c.SickDays = Math.Max(0, c.SickDays - (c.CoveredNeeds.Contains("healing") ? world.Data.Disasters.HealingRecovery : 1));
         if (s.PoorHarvestDays > 0) s.PoorHarvestDays--;
 
         if (!s.Rules.Disasters) return;
@@ -91,7 +92,9 @@ public static class DisasterSystem
         double crowding = Math.Clamp(population / (double)Math.Max(1, s.HousingCapacity), 0.5, 2.0);
         double chance = rules.SicknessChancePerDay * crowding *
                         (1 - rules.WaterProtection * ServiceSystem.Coverage(s, "water")) *
-                        (1 - rules.FaithProtection * ServiceSystem.Coverage(s, "faith"));
+                        (1 - rules.FaithProtection * ServiceSystem.Coverage(s, "faith")) *
+                        (1 - rules.HygieneProtection * ServiceSystem.Coverage(s, "hygiene")) *
+                        (1 - rules.HealingProtection * ServiceSystem.Coverage(s, "healing"));
         if (!world.Rng.Chance(chance)) return;
 
         double share = rules.SickShareMin + world.Rng.NextDouble() * (rules.SickShareMax - rules.SickShareMin);

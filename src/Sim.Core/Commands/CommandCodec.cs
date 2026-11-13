@@ -20,7 +20,7 @@ public static class CommandCodec
         typeof(PlaceTowerCommand), typeof(PlaceGatehouseCommand),
         typeof(War.RecruitSquadCommand), typeof(War.DisbandSquadCommand), typeof(War.PromoteGeneralCommand),
         typeof(War.SetRaidsCommand), typeof(War.SetMusterCommand),
-        typeof(Economy.SetGovernmentCommand),
+        typeof(Economy.SetGovernmentCommand), typeof(Systems.SetCrimeCommand),
         typeof(Trade.PostOfferCommand), typeof(Trade.CancelOfferCommand), typeof(Trade.AcceptOfferCommand),
         typeof(Trade.ProposeRouteCommand), typeof(Trade.AcceptRouteCommand), typeof(Trade.EndRouteCommand),
     };

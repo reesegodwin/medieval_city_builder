@@ -106,5 +106,5 @@ The plan is also copied to `docs/AUTONOMOUS_PLAN.md` with a progress log, so the
 - [x] 1–5. Military economy, squads from townsfolk, generals, the aggregate battle resolver, raids with Watch/Muster/Call to arms and stand-down (with rough-to-exact scouting descriptions for item 6). Balance: garrison only from spare hands, lowest job priority for military crafts, tavern gaps by nearby fullness, brewery ratio, off-season food sales. 720 days: seeds 42/7/1234 end with 69/77/73 townhouses, coin 1444/6126/770, every raid beaten, no starvation.
 - [x] 6–7. Fog of war in the client (warbands drawn only within watch radius; rough-to-exact descriptions), army panel (K), alert banner, warband and soldier rendering. PR after #14.
 - [x] 11. Household economy: wages by job tier and skill, family purses, cost of living, going without, relief, income tax, city wages for builders/haulers, soldiers paid by gear, gear by affordability (also in the muster), inheritance, four governments, Rules picker, 5,000-citizen performance test.
-- [ ] 8. Bathhouse, herbalist, law and crime.
+- [x] 8. Herbalist (healing), bathhouse (hygiene), guardhouse (law) and crime (thefts by the troubled, from the richest unguarded homes), crime rule; governor builds a few of each.
 - [ ] 9. Server accounts.
