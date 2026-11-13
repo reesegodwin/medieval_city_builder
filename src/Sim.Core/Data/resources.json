@@ -14,6 +14,9 @@
   {"id": "tools", "name": "Tools", "workBonus": 0.25, "wearPerWorkerDay": 0.01, "value": 12},
   {"id": "wool", "name": "Wool", "value": 2},
   {"id": "cloth", "name": "Cloth", "value": 6},
+  {"id": "weapons", "name": "Weapons", "value": 8},
+  {"id": "bows", "name": "Bows", "value": 6},
+  {"id": "armour", "name": "Armour", "value": 14},
   {"id": "furniture", "name": "Furniture", "value": 10},
   {"id": "coin", "name": "Coin", "value": 1}
 ]

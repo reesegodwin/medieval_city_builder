@@ -27,6 +27,9 @@ public sealed class SettlementRules
         ["smoker"] = 3,
         ["weaver"] = 2,
         ["carpenter"] = 2,
+        ["weaponsmith"] = 1,
+        ["bowyer"] = 1,
+        ["armourer"] = 1,
         [JobKinds.Roadworker] = 4,
         [JobKinds.Hauler] = 1, // only people nobody else needs; the first to be pulled into other work
     };
@@ -59,6 +62,9 @@ public sealed class SettlementRules
         ["wool"] = 60,
         ["cloth"] = 60,
         ["furniture"] = 40,
+        ["weapons"] = 30,
+        ["bows"] = 30,
+        ["armour"] = 15,
     };
 
     /// <summary>Per-citizen stock targets; the effective limit is the larger of this and the flat limit.</summary>
@@ -87,6 +93,12 @@ public sealed class SettlementRules
 
     /// <summary>Whether fires, sickness and poor harvests can strike this settlement.</summary>
     public bool Disasters { get; set; } = true;
+
+    /// <summary>Whether bandit warbands raid this settlement.</summary>
+    public bool Raids { get; set; } = true;
+
+    /// <summary>Share of adults (percent) who arm as militia when the town musters (twice that at a call to arms).</summary>
+    public int MusterPercent { get; set; } = 10;
 
     /// <summary>
     /// Whether spare territory allowance is claimed automatically, evenly around the centre. Turn it off to
@@ -151,6 +163,18 @@ public sealed class Settlement
 
     /// <summary>Bumped whenever walls change (renderers and the enclosure check rebuild on it).</summary>
     public int WallVersion { get; set; }
+
+    /// <summary>Squads of townsfolk under arms.</summary>
+    public List<War.Squad> Squads { get; } = new();
+
+    /// <summary>How alarmed the town is about raiders (the offline call to arms).</summary>
+    public War.Alert Alert { get; set; }
+
+    /// <summary>Days in a row without a threat (militia stand down after a few).</summary>
+    public int QuietDays { get; set; }
+
+    /// <summary>The town's general, if one has been appointed.</summary>
+    public War.General? General { get; set; }
 
     /// <summary>The ring of walls the governor has laid out for this town (tile, gate?), built in batches.</summary>
     public List<(int X, int Y, bool Gate)> WallRing { get; } = new();

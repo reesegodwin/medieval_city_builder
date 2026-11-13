@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 15;
+    public const int CurrentVersion = 17;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -62,6 +62,7 @@ public static class SaveGame
         Settings = world.Settings.Clone(),
         LastActiveUtc = world.LastActiveUtc,
         Trade = world.Trade,
+        War = world.War,
         Settlements = world.Settlements.Select(s => CaptureSettlement(world, s)).ToList(),
         Events = world.Events.Select(e => new EventSave(e.Time.Tick, e.Kind, e.SettlementId, e.Message)).ToList(),
     };
@@ -91,6 +92,8 @@ public static class SaveGame
             AutoUpgradeHomes = s.Rules.AutoUpgradeHomes,
             AutoExpandTerritory = s.Rules.AutoExpandTerritory,
             Disasters = s.Rules.Disasters,
+            Raids = s.Rules.Raids,
+            MusterPercent = s.Rules.MusterPercent,
         },
         Buildings = s.Buildings.Select(b => new BuildingSave
         {
@@ -135,6 +138,7 @@ public static class SaveGame
             StarvingTicks = c.StarvingTicks,
             UnhappyDays = c.UnhappyDays,
             SickDays = c.SickDays,
+            SquadId = c.SquadId,
             History = c.History.ToList(),
         }).ToList(),
         Roads = s.Roads.Select(r => new[] { r.X, r.Y, (int)tierOf(r) }).ToList(),
@@ -145,6 +149,11 @@ public static class SaveGame
         WallPlans = s.WallPlans.Select(p => new WallPlan { X = p.X, Y = p.Y, Tier = p.Tier, Piece = p.Piece, Progress = p.Progress }).ToList(),
         WallVersion = s.WallVersion,
         WallRing = s.WallRing.Select(r => new[] { r.X, r.Y, r.Gate ? 1 : 0 }).ToList(),
+        Squads = s.Squads.Select(q => new War.Squad { Id = q.Id, UnitId = q.UnitId, SoldierIds = q.SoldierIds.ToList(), Xp = q.Xp, Levy = q.Levy }).ToList(),
+        Alert = s.Alert,
+        QuietDays = s.QuietDays,
+        General = s.General == null ? null : new War.General
+            { CitizenId = s.General.CitizenId, Skill = s.General.Skill, Xp = s.General.Xp, Traits = s.General.Traits.ToList(), Battles = s.General.Battles },
         Territory = TerritoryRuns(s),
         TerritoryVersion = s.TerritoryVersion,
         TerritoryCap = s.TerritoryCap,
@@ -189,6 +198,7 @@ public static class SaveGame
         world.LastActiveUtc = file.LastActiveUtc;
         // Version 5 and older had no trade.
         world.Trade = file.Trade ?? new Trade.TradeBook();
+        world.War = file.War ?? new War.WarBook(); // version 16 and older had no raids
 
         foreach (var save in file.Settlements) world.Settlements.Add(RestoreSettlement(world, save));
         foreach (var e in file.Events)
@@ -210,6 +220,8 @@ public static class SaveGame
         s.Rules.AutoUpgradeHomes = save.Rules.AutoUpgradeHomes ?? true;
         s.Rules.AutoExpandTerritory = save.Rules.AutoExpandTerritory ?? true;
         s.Rules.Disasters = save.Rules.Disasters ?? true; // version 10 and older had none
+        s.Rules.Raids = save.Rules.Raids ?? true;
+        s.Rules.MusterPercent = save.Rules.MusterPercent ?? 10;
         // Goods added since the save was made (e.g. fish) get the default limits.
         var defaults = new SettlementRules();
         foreach (var (k, v) in defaults.ProductionLimits) s.Rules.ProductionLimits.TryAdd(k, v);
@@ -258,6 +270,7 @@ public static class SaveGame
                 StarvingTicks = c.StarvingTicks,
                 UnhappyDays = c.UnhappyDays,
                 SickDays = c.SickDays,
+                SquadId = c.SquadId,
             };
             citizen.Traits.AddRange(c.Traits);
             CopyInto(c.Skills, citizen.Skills);
@@ -294,6 +307,10 @@ public static class SaveGame
         }
         s.WallVersion = save.WallVersion;
         foreach (var r in save.WallRing ?? new()) s.WallRing.Add((r[0], r[1], r[2] != 0));
+        s.Squads.AddRange(save.Squads ?? new()); // version 15 and older had no armies
+        s.General = save.General;
+        s.Alert = save.Alert;
+        s.QuietDays = save.QuietDays;
         foreach (var plan in save.RoadPlans) // version 6 and older built roads instantly and have none
         {
             world.Map.GetTile(plan.X, plan.Y).RoadPlanned = true;
@@ -351,6 +368,7 @@ public static class SaveGame
         public WorldSettings? Settings { get; set; }
         public DateTimeOffset? LastActiveUtc { get; set; }
         public Trade.TradeBook? Trade { get; set; }
+        public War.WarBook? War { get; set; }
         public List<SettlementSave> Settlements { get; set; } = new();
         public List<EventSave> Events { get; set; } = new();
     }
@@ -375,6 +393,10 @@ public static class SaveGame
         public List<WallPlan>? WallPlans { get; set; }
         public int WallVersion { get; set; }
         public List<int[]>? WallRing { get; set; }
+        public List<War.Squad>? Squads { get; set; }
+        public War.General? General { get; set; }
+        public War.Alert Alert { get; set; }
+        public int QuietDays { get; set; }
 
         /// <summary>Row runs [y, firstX, lastX]; null in version-1 saves.</summary>
         public List<int[]>? Territory { get; set; }
@@ -405,6 +427,8 @@ public static class SaveGame
         public bool? AutoUpgradeHomes { get; set; }
         public bool? AutoExpandTerritory { get; set; }
         public bool? Disasters { get; set; }
+        public bool? Raids { get; set; }
+        public int? MusterPercent { get; set; }
     }
 
     private sealed class BuildingSave
@@ -451,6 +475,7 @@ public static class SaveGame
         public long StarvingTicks { get; set; }
         public int UnhappyDays { get; set; }
         public int SickDays { get; set; }
+        public int? SquadId { get; set; }
         public List<string> History { get; set; } = new();
     }
 }

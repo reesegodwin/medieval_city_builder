@@ -67,6 +67,9 @@ public sealed class Citizen
 
     public bool IsSick => SickDays > 0;
 
+    /// <summary>The squad this citizen serves in, if called up. Soldiers don't work.</summary>
+    public int? SquadId { get; set; }
+
     /// <summary>Notable life events, for the inspection panel and faction chronicle.</summary>
     public List<string> History { get; } = new();
 
@@ -83,8 +86,8 @@ public sealed class Citizen
     public double AgeYears => AgeDays / (double)TimeScale.DaysPerYear;
     public bool IsAdult => AgeYears >= AdultAgeYears;
 
-    /// <summary>Adults who aren't sick can take a job.</summary>
-    public bool CanWork => IsAdult && !IsSick;
+    /// <summary>Adults who aren't sick or serving can take a job (a general is excluded by the job system).</summary>
+    public bool CanWork => IsAdult && !IsSick && SquadId == null;
     public bool IsStarving => Satiation <= 0;
 
     public bool Has(Trait trait) => Traits.Contains(trait);

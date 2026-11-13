@@ -17,6 +17,9 @@ public static class CommandCodec
         typeof(ReleaseTerritoryCommand), typeof(ExpandTerritoryCommand), typeof(SetAutoExpandTerritoryCommand),
         typeof(UpgradeTownCentreCommand), typeof(FoundSettlementCommand), typeof(SetAutoUpgradeHomesCommand),
         typeof(SetDisastersCommand), typeof(PlaceWallCommand), typeof(PlaceGateCommand), typeof(RemoveWallCommand),
+        typeof(PlaceTowerCommand), typeof(PlaceGatehouseCommand),
+        typeof(War.RecruitSquadCommand), typeof(War.DisbandSquadCommand), typeof(War.PromoteGeneralCommand),
+        typeof(War.SetRaidsCommand), typeof(War.SetMusterCommand),
         typeof(Trade.PostOfferCommand), typeof(Trade.CancelOfferCommand), typeof(Trade.AcceptOfferCommand),
         typeof(Trade.ProposeRouteCommand), typeof(Trade.AcceptRouteCommand), typeof(Trade.EndRouteCommand),
     };

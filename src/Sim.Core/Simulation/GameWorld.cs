@@ -31,6 +31,9 @@ public sealed class GameWorld
     /// <summary>Offers, trade routes and caravans between towns.</summary>
     public Trade.TradeBook Trade { get; set; } = new();
 
+    /// <summary>Warbands on the map and recent battles.</summary>
+    public War.WarBook War { get; set; } = new();
+
     /// <summary>Speed and offline rules, chosen when the world is created.</summary>
     public WorldSettings Settings { get; set; } = new();
 
@@ -76,13 +79,24 @@ public sealed class GameWorld
             h.Add(s.Id).Add(s.Territory.Count).Add(s.TerritoryCap).Add(s.HaulCoverage).Add(s.Roads.Count)
                 .Add(s.TaxAccrued).Add(s.UpkeepOwed).Add(s.UpkeepUnpaid)
                 .Add(s.Ledger.History.Count).Add(s.Ledger.Today.Flows.Sum(f => f.Value.Values.Sum()))
-                .Add(s.Rules.Disasters).Add(s.PoorHarvestDays).Add(s.HeatingOwed);
+                .Add(s.Rules.Disasters).Add(s.PoorHarvestDays).Add(s.HeatingOwed)
+                .Add(s.Rules.Raids).Add(s.Rules.MusterPercent).Add((int)s.Alert).Add(s.QuietDays);
             foreach (string warning in s.ShortageWarnings) h.Add(warning);
             foreach (var (food, owed) in s.SpoilageOwed) h.Add(food).Add(owed);
             foreach (var plan in s.RoadPlans) h.Add(plan.X).Add(plan.Y).Add(plan.Progress).Add(plan.Tier);
             foreach (var ((x, y), wall) in s.Walls) h.Add(x).Add(y).Add(wall.Tier).Add((int)wall.Piece).Add(wall.Hp);
             foreach (var plan in s.WallPlans) h.Add(plan.X).Add(plan.Y).Add(plan.Tier).Add((int)plan.Piece).Add(plan.Progress);
             foreach (var (x, y, gate) in s.WallRing) h.Add(x).Add(y).Add(gate);
+            foreach (var q in s.Squads)
+            {
+                h.Add(q.Id).Add(q.UnitId).Add(q.Xp).Add(q.Levy);
+                foreach (int id in q.SoldierIds) h.Add(id);
+            }
+            if (s.General is { } g)
+            {
+                h.Add(g.CitizenId).Add(g.Skill).Add(g.Xp).Add(g.Battles);
+                foreach (string t in g.Traits) h.Add(t);
+            }
             foreach (var (x, y) in s.Roads)
                 if (Map.GetTile(x, y).RoadTier > 0) h.Add(x).Add(y).Add(Map.GetTile(x, y).RoadTier);
             foreach (var (tool, wear) in s.ToolWear) h.Add(tool).Add(wear);
@@ -97,11 +111,13 @@ public sealed class GameWorld
             }
             foreach (var c in s.Citizens)
             {
-                h.Add(c.Id).Add(c.AgeDays).Add(c.Satiation).Add(c.Mood).Add(c.SickDays)
+                h.Add(c.Id).Add(c.AgeDays).Add(c.Satiation).Add(c.Mood).Add(c.SickDays).Add(c.SquadId ?? 0)
                     .Add(c.JobBuildingId ?? 0).Add(c.HomeBuildingId ?? 0).Add(c.SpouseId ?? 0);
                 foreach (var (kind, skill) in c.Skills) h.Add(kind).Add(skill);
             }
         }
+        foreach (var w in War.Warbands) h.Add(w.Id).Add(w.TargetId).Add(w.X).Add(w.Y).Add(w.Raiders).Add(w.Archers);
+        h.Add(War.Reports.Count);
         var trade = Trade;
         h.Add(trade.CompletedTrades).Add(trade.MerchantVisits);
         foreach (var o in trade.Offers)

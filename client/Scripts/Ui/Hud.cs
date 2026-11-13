@@ -307,7 +307,7 @@ public partial class Hud : CanvasLayer
             $"Pop {town.Citizens.Count} ({adults} adults, {haulers} hauling, {idle} on odd jobs{(homeless > 0 ? $", {homeless} homeless" : "")})   " +
             $"Food {Needs.FoodDays(world, town):0.0} days (grain {town.Stock.Get("grain")}, bread {town.Stock.Get("bread")}, " +
             $"veg {town.Stock.Get("vegetables")})   Ale {town.Stock.Get("ale")}   " +
-            $"Coin {town.Stock.Get("coin")} ({EconomySystem.DailyTax(world, town) - EconomySystem.DailyUpkeep(town):+0.#;-0.#}/day" +
+            $"Coin {town.Stock.Get("coin")} ({EconomySystem.DailyTax(world, town) - EconomySystem.DailyUpkeep(world, town):+0.#;-0.#}/day" +
             (town.UpkeepUnpaid ? ", UPKEEP UNPAID" : "") + $")   Wood {town.Stock.Get("wood")}   Stone {town.Stock.Get("stone")}   Tools {town.Stock.Get("tools")}   " +
             $"Cloth {town.Stock.Get("cloth")}   Furniture {town.Stock.Get("furniture")}\n" +
             $"Storage {town.Stock.Total - town.StoredAtWorkplaces}/{town.StorageCapacity} (+{town.StoredAtWorkplaces} at workplaces)   Land {town.Territory.Count}/{town.TerritoryAllowance} " +

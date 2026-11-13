@@ -444,6 +444,54 @@
     "upkeep": 0.5
   },
   {
+    "id": "weaponsmith",
+    "name": "Weaponsmith",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.6,
+    "cost": {"wood": 20, "stone": 15, "coin": 10},
+    "jobs": 1,
+    "jobKind": "weaponsmith",
+    "upkeep": 0.15,
+    "recipe": {"inputs": {"iron_ore": 2, "wood": 1}, "outputs": {"weapons": 1}, "workDays": 1.5},
+    "governor": {"minPopulation": 200, "populationPerBuilding": 400, "lowStock": 20}
+  },
+  {
+    "id": "bowyer",
+    "name": "Bowyer",
+    "width": 2,
+    "height": 2,
+    "buildDays": 0.3,
+    "cost": {"wood": 15},
+    "jobs": 1,
+    "jobKind": "bowyer",
+    "upkeep": 0.1,
+    "recipe": {"inputs": {"wood": 3}, "outputs": {"bows": 1}, "workDays": 1},
+    "governor": {"minPopulation": 150, "populationPerBuilding": 400, "lowStock": 20}
+  },
+  {
+    "id": "armourer",
+    "name": "Armourer",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.8,
+    "cost": {"wood": 20, "stone": 20, "coin": 20},
+    "jobs": 1,
+    "jobKind": "armourer",
+    "upkeep": 0.2,
+    "recipe": {"inputs": {"iron_ore": 3}, "outputs": {"armour": 1}, "workDays": 2},
+    "governor": {"minPopulation": 300, "populationPerBuilding": 600, "lowStock": 10}
+  },
+  {
+    "id": "barracks",
+    "name": "Barracks",
+    "width": 4,
+    "height": 4,
+    "buildDays": 1.0,
+    "cost": {"wood": 40, "stone": 40},
+    "upkeep": 0.2
+  },
+  {
     "id": "smithy",
     "name": "Smithy",
     "width": 3,

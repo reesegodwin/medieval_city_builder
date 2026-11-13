@@ -1,0 +1,142 @@
+{
+  "units": [
+    {
+      "id": "militia",
+      "name": "Militia",
+      "gear": {},
+      "attack": 1.0,
+      "defence": 1.0,
+      "ranged": false,
+      "upkeepPerSoldierDay": 0.01,
+      "description": "Townsfolk with tools and clubs: cheap, weak, raised fast."
+    },
+    {
+      "id": "spearmen",
+      "name": "Spearmen",
+      "gear": {
+        "weapons": 1
+      },
+      "attack": 1.6,
+      "defence": 1.5,
+      "ranged": false,
+      "upkeepPerSoldierDay": 0.02,
+      "description": "The backbone of the line: a spear and a shield each."
+    },
+    {
+      "id": "archers",
+      "name": "Archers",
+      "gear": {
+        "bows": 1
+      },
+      "attack": 1.4,
+      "defence": 0.9,
+      "ranged": true,
+      "upkeepPerSoldierDay": 0.02,
+      "description": "Shoot from behind the line, and from walls and towers."
+    },
+    {
+      "id": "men_at_arms",
+      "name": "Men-at-arms",
+      "gear": {
+        "weapons": 1,
+        "armour": 1
+      },
+      "attack": 2.1,
+      "defence": 2.6,
+      "ranged": false,
+      "upkeepPerSoldierDay": 0.04,
+      "description": "Armoured professionals: costly, hard to break."
+    },
+    {
+      "id": "raider",
+      "name": "Raiders",
+      "gear": {},
+      "attack": 1.3,
+      "defence": 1.1,
+      "ranged": false,
+      "upkeepPerSoldierDay": 0,
+      "raider": true,
+      "description": "Bandits with axes and spears."
+    },
+    {
+      "id": "raider_archer",
+      "name": "Raider archers",
+      "gear": {},
+      "attack": 1.2,
+      "defence": 0.8,
+      "ranged": true,
+      "upkeepPerSoldierDay": 0,
+      "raider": true,
+      "description": "Bandits with hunting bows."
+    }
+  ],
+  "squadSize": 10,
+  "squadsPerBarracks": 4,
+  "generalTraits": [
+    {
+      "id": "tactician",
+      "name": "Tactician",
+      "attack": 0.1,
+      "defence": 0.1
+    },
+    {
+      "id": "inspiring",
+      "name": "Inspiring",
+      "morale": 0.25
+    },
+    {
+      "id": "siege_expert",
+      "name": "Siege expert",
+      "walls": 0.25
+    },
+    {
+      "id": "bowmaster",
+      "name": "Bowmaster",
+      "ranged": 0.2
+    },
+    {
+      "id": "stubborn",
+      "name": "Stubborn",
+      "defence": 0.2
+    },
+    {
+      "id": "reckless",
+      "name": "Reckless",
+      "attack": 0.2,
+      "defence": -0.1
+    }
+  ],
+  "raids": {
+    "startDay": 75,
+    "chancePerDay": 0.011,
+    "minPopulation": 40,
+    "speedTilesPerDay": 12,
+    "spawnDistance": 70,
+    "baseSize": 6,
+    "perPopulation": 0.035,
+    "perThousandCoin": 4,
+    "maxSize": 60,
+    "archerShare": 0.3,
+    "lootCoinShare": 0.25,
+    "lootGoodsShare": 0.1,
+    "standDownDays": 2
+  },
+  "battle": {
+    "maxRounds": 10,
+    "lethality": 0.07,
+    "routMorale": 0.3,
+    "routRemaining": 0.35,
+    "rangedOpening": 1.25,
+    "wallDefence": 0.3,
+    "wallDefencePerTier": 0.25,
+    "wallRanged": 0.3,
+    "towerBonus": 0.02,
+    "maxTowerBonus": 0.3,
+    "veteranXp": 100,
+    "maxVeteranBonus": 0.3,
+    "squadXpPerBattle": 15,
+    "generalXpPerBattle": 20
+  },
+  "garrisonShare": 0.03,
+  "garrisonPopulation": 150
+}
