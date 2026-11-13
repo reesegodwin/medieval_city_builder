@@ -361,7 +361,7 @@ public partial class Hud : CanvasLayer
         _alert.Visible = town.Alert != Alert.None && band != null;
         if (_alert.Visible && Siege.BandAt(world, town) is { } siege)
         {
-            var batter = siege.Engines.FirstOrDefault(e => e.Built);
+            var batter = siege.Engines.FirstOrDefault(e => e.InPlace);
             string doing = batter != null
                 ? $"{(world.Data.War.Siege.Engine(batter.Kind)?.Name ?? batter.Kind).ToLowerInvariant()} is battering the walls"
                 : "they are building siege engines";

@@ -237,6 +237,33 @@ public class SiegeTests
     }
 
     [Fact]
+    public void AiTownsHoldOutUntilTheWallsAreAboutToFall()
+    {
+        var (world, town, _) = WalledTown(1); // stone walls
+        town.Stock.Add("coin", 5000);
+        int coin = town.Stock.Get("coin");
+        var band = BandAtTheWalls(world, town, 30);
+        Siege.Begin(world, town, band);
+
+        MilitaryGovernor.Daily(world, town); // nothing built yet: wait
+        band.Engines.Add(new SiegeEngine { Kind = "catapult", Progress = 1, Hp = 80, InPlace = true });
+        band.SiegeDays = 3;
+        MilitaryGovernor.Daily(world, town); // the stone wall holds for days: hold out
+        Assert.True(Siege.Besieged(world, town));
+        Assert.Equal(coin, town.Stock.Get("coin"));
+
+        // The wall under attack is nearly down and the town has nobody to fight at the breach: pay.
+        var target = Siege.OuterWalls(world, town)[0];
+        town.Walls[target].Hp = 30;
+        band.HasTarget = true;
+        band.TargetX = target.X;
+        band.TargetY = target.Y;
+        MilitaryGovernor.Daily(world, town);
+        Assert.False(Siege.Besieged(world, town));
+        Assert.True(town.Stock.Get("coin") < coin);
+    }
+
+    [Fact]
     public void SiegesSurviveSaveAndLoad()
     {
         var (world, town, _) = WalledTown(1);

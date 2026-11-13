@@ -23,15 +23,45 @@ public static class MilitaryGovernor
         s.Citizens.Where(c => c.IsAdult && c.SquadId == null && c.AgeYears < 50 && c.Id != s.General?.CitizenId)
             .OrderByDescending(c => c.AgeDays).ThenBy(c => c.Id).FirstOrDefault();
 
-    /// <summary>Under siege, a governed town sallies if it clearly outnumbers the band, or pays it off if that's cheap.</summary>
+    /// <summary>
+    /// Under siege, a governed town holds out behind its walls and lets its archers work. It rides out only when it
+    /// clearly outnumbers the band and the engines are up, and pays the band off only as a last resort: once the wall
+    /// under attack is badly broken, or the siege has dragged on, and only if the price is cheap.
+    /// </summary>
     private static void Besieged(GameWorld world, Settlement s)
     {
-        // Once the band starts on its engines: ride out if clearly stronger, else buy it off if that's cheap.
-        if (Siege.BandAt(world, s) is not { } band || band.Engines.Count == 0) return;
+        if (Siege.BandAt(world, s) is not { } band || !band.Engines.Any(e => e.Built)) return;
         if (Armies.Soldiers(s) >= band.Size * SallyOdds && band.LastSallyDay != world.Time.Day)
+        {
             world.Execute(new SallyCommand(s.Id));
-        else if (Siege.Tribute(world, band) <= s.Stock.Get(Economy.Inventory.Coin) * TributeShare)
+            return;
+        }
+        if (Siege.Tribute(world, band) > s.Stock.Get(Economy.Inventory.Coin) * TributeShare) return; // too dear: hold out
+
+        // A long siege pinches the town: pay to end it. Otherwise pay only if the walls are about to fall and the
+        // fight at the breach looks risky (everyone called up still wouldn't clearly outnumber the band).
+        bool longSiege = band.SiegeDays >= HoldOutDays;
+        bool wallFailing = band.HasTarget && s.Walls.TryGetValue((band.TargetX, band.TargetY), out var wall) &&
+                           wall.Hp < Commands.Walls.PieceHitPoints(world, wall.Tier, wall.Piece) * WallFailingShare;
+        int adults = s.Citizens.Count(c => c.IsAdult);
+        int callUp = Math.Max(Armies.Soldiers(s), (int)(adults * Math.Min(0.8, s.Rules.MusterPercent * 2 / 100.0)));
+        bool risky = callUp < band.Size * SafeAssaultOdds;
+        if (longSiege || (wallFailing || BreachImminent(world, s, band)) && risky)
             world.Execute(new PayTributeCommand(s.Id));
+    }
+
+    /// <summary>Whether the band's finished engines would knock a wall tile down within a day.</summary>
+    private static bool BreachImminent(GameWorld world, Settlement s, Warband band)
+    {
+        var rules = world.Data.War.Siege;
+        var engines = band.Engines.Where(e => e.Built).Select(e => rules.Engine(e.Kind)).OfType<EngineDef>().ToList();
+        if (engines.Count == 0) return false;
+        foreach (var pos in Siege.OuterWalls(world, s))
+        {
+            var wall = s.Walls[pos];
+            if (engines.Sum(e => Siege.Rate(e, wall)) >= wall.Hp) return true;
+        }
+        return false;
     }
 
     /// <summary>Pays tribute when it costs at most this share of the treasury.</summary>
@@ -39,6 +69,15 @@ public static class MilitaryGovernor
 
     /// <summary>Sallies when its soldiers outnumber the band this many times.</summary>
     public const double SallyOdds = 1.25;
+
+    /// <summary>Considers paying only once the wall under attack is below this share of its strength...</summary>
+    public const double WallFailingShare = 0.35;
+
+    /// <summary>...or the siege has lasted this many days.</summary>
+    public const int HoldOutDays = 15;
+
+    /// <summary>A fight at the breach is safe enough when everyone called up outnumbers the band this many times.</summary>
+    public const double SafeAssaultOdds = 1.5;
 
     public static void Daily(GameWorld world, Settlement s)
     {

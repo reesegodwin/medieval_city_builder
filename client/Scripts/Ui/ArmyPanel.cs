@@ -176,7 +176,7 @@ public partial class ArmyPanel : PanelContainer
     }
 
     private string SiegeSignature(Settlement s) => Siege.BandAt(World, s) is { } b
-        ? $"{b.SiegeDays}:{b.Size}:{string.Join(",", b.Engines.Select(e => $"{e.Kind}{(int)(e.Progress * 10)}h{e.Hp}"))}:" +
+        ? $"{b.SiegeDays}:{b.Size}:{string.Join(",", b.Engines.Select(e => $"{e.Kind}{(int)(e.Progress * 10)}h{e.Hp}{e.InPlace}"))}:" +
           (b.HasTarget && s.Walls.TryGetValue((b.TargetX, b.TargetY), out var w) ? w.Hp : -1) + $":{b.LastSallyDay}"
         : "";
 
@@ -195,6 +195,7 @@ public partial class ArmyPanel : PanelContainer
             var def = rules.Engine(engine.Kind);
             bool inRange = def != null && Siege.InArcherRange(rules, def);
             Line(!engine.Built ? $"• {name}: being built out of bowshot ({engine.Progress:P0})"
+                : !engine.InPlace ? $"• {name}: being moved into place" + (inRange ? $", within our archers' range ({Math.Max(0, engine.Hp)}/{def!.Hp})" : "")
                 : inRange ? $"• {name}: battering the walls, within our archers' range ({Math.Max(0, engine.Hp)}/{def!.Hp})"
                 : $"• {name}: battering the walls from beyond bowshot");
         }
