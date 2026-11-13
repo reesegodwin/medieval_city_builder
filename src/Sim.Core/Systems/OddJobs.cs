@@ -49,9 +49,10 @@ public static class OddJobs
             crew.Sites.Add((b, helpers));
             left -= helpers;
         }
-        if (s.RoadPlans.Count > 0 && s.TownCentre is { IsOperational: true })
+        int plans = s.RoadPlans.Count + s.WallPlans.Count; // roads and walls
+        if (plans > 0 && s.TownCentre is { IsOperational: true })
         {
-            int wanted = (s.RoadPlans.Count + rules.PlannedRoadsPerHelper - 1) / Math.Max(1, rules.PlannedRoadsPerHelper);
+            int wanted = (plans + rules.PlannedRoadsPerHelper - 1) / Math.Max(1, rules.PlannedRoadsPerHelper);
             crew.Roads = Math.Min(left, Math.Min(wanted, rules.MaxRoadHelpers));
             left -= crew.Roads;
         }
@@ -73,7 +74,7 @@ public static class OddJobs
     /// <summary>Whether someone without a job would find anything to do (for mood).</summary>
     public static bool Available(GameWorld world, Settlement s) =>
         s.Buildings.Any(b => b.State == BuildingState.UnderConstruction && b.WorkerIds.Count < b.Def.BuilderSlots) ||
-        (s.RoadPlans.Count > 0 && s.TownCentre is { IsOperational: true }) ||
+        (s.RoadPlans.Count + s.WallPlans.Count > 0 && s.TownCentre is { IsOperational: true }) ||
         (RoomForGathering(s) > 0 && GatherTasks(world, s).Count > 0);
 
     /// <summary>Daily: the gatherers' haul, dealt out in turn across the goods still wanted.</summary>

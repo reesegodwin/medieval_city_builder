@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 13;
+    public const int CurrentVersion = 14;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -140,6 +140,10 @@ public static class SaveGame
         Roads = s.Roads.Select(r => new[] { r.X, r.Y, (int)tierOf(r) }).ToList(),
         RoadPlans = s.RoadPlans.Select(p => new RoadPlan { X = p.X, Y = p.Y, Progress = p.Progress, Tier = p.Tier }).ToList(),
         RoadVersion = s.RoadVersion,
+        Walls = s.Walls.Select(kv => new[] { kv.Key.X, kv.Key.Y, kv.Value.Tier, kv.Value.Gate ? 1 : 0, kv.Value.Hp }).ToList(),
+        WallPlans = s.WallPlans.Select(p => new WallPlan { X = p.X, Y = p.Y, Tier = p.Tier, Gate = p.Gate, Progress = p.Progress }).ToList(),
+        WallVersion = s.WallVersion,
+        WallRing = s.WallRing.Select(r => new[] { r.X, r.Y, r.Gate ? 1 : 0 }).ToList(),
         Territory = TerritoryRuns(s),
         TerritoryVersion = s.TerritoryVersion,
         TerritoryCap = s.TerritoryCap,
@@ -271,6 +275,23 @@ public static class SaveGame
             s.Roads.Add((r[0], r[1]));
         }
         s.RoadVersion = save.RoadVersion;
+        // Version 13 and older had no walls.
+        foreach (var w in save.Walls ?? new())
+        {
+            ref var tile = ref world.Map.GetTile(w[0], w[1]);
+            tile.WallTier = (byte)(w[2] + 1);
+            tile.IsGate = w[3] != 0;
+            s.Walls[(w[0], w[1])] = new WallSegment { Tier = (byte)w[2], Gate = w[3] != 0, Hp = w[4] };
+        }
+        foreach (var plan in save.WallPlans ?? new())
+        {
+            ref var tile = ref world.Map.GetTile(plan.X, plan.Y);
+            tile.WallPlanned = true;
+            if (plan.Gate && !s.Walls.ContainsKey((plan.X, plan.Y))) tile.IsGate = true;
+            s.WallPlans.Add(plan);
+        }
+        s.WallVersion = save.WallVersion;
+        foreach (var r in save.WallRing ?? new()) s.WallRing.Add((r[0], r[1], r[2] != 0));
         foreach (var plan in save.RoadPlans) // version 6 and older built roads instantly and have none
         {
             world.Map.GetTile(plan.X, plan.Y).RoadPlanned = true;
@@ -348,6 +369,10 @@ public static class SaveGame
         public List<int[]> Roads { get; set; } = new();
         public int RoadVersion { get; set; }
         public List<RoadPlan> RoadPlans { get; set; } = new();
+        public List<int[]>? Walls { get; set; }
+        public List<WallPlan>? WallPlans { get; set; }
+        public int WallVersion { get; set; }
+        public List<int[]>? WallRing { get; set; }
 
         /// <summary>Row runs [y, firstX, lastX]; null in version-1 saves.</summary>
         public List<int[]>? Territory { get; set; }

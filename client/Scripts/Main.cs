@@ -23,7 +23,7 @@ namespace MedievalClient;
 ///   --ledger [TAB]        open the town ledger on start (tab 0-3)
 ///   --ledger-good ID      open the ledger's Goods tab with a good's 30-day charts (e.g. wood)
 ///   --follow-caravan      keep the camera on a caravan on the road (automated checks)
-///   --look-at ID          start with the camera on the town's first building of type ID (e.g. fishing_hut)
+///   --look-at ID          start with the camera on the town's first building of type ID (e.g. fishing_hut), or "wall"/"gate"
 ///   --territory           open the territory paint tool on start
 ///   --zoom N              start with the camera N units away (6-90)
 ///   --place ID            start placing building ID with the cursor mid-screen (automated checks)
@@ -42,6 +42,7 @@ public partial class Main : Node3D
     private PlacementTool _placement = null!;
     private RoadTool _roadTool = null!;
     private DemolishTool _demolishTool = null!;
+    private WallTool _wallTool = null!;
     private TerritoryTool _territoryTool = null!;
     private TerritoryRenderer _territory = null!;
     private Hud _hud = null!;
@@ -178,6 +179,10 @@ public partial class Main : Node3D
         AddChild(_roadTool);
         _roadTool.Initialize(_session, _camera);
 
+        _wallTool = new WallTool { Name = "WallTool" };
+        AddChild(_wallTool);
+        _wallTool.Initialize(_session, _camera);
+
         _demolishTool = new DemolishTool { Name = "DemolishTool" };
         AddChild(_demolishTool);
         _demolishTool.Initialize(_session, _camera);
@@ -211,6 +216,8 @@ public partial class Main : Node3D
             _roadTool.Begin(tier);
         };
         _hud.DemolishRequested += StartDemolishTool;
+        _hud.WallRequested += tier => StartWallTool(tier, gate: false);
+        _hud.GateRequested += () => StartWallTool(0, gate: true);
         _hud.SpeedRequested += speed =>
         {
             _session.Speed = speed;
@@ -296,9 +303,14 @@ public partial class Main : Node3D
         if (SimSession.UserArg("--territory") != null) StartTerritoryTool();
         if (float.TryParse(SimSession.UserArg("--zoom"), out float zoom)) _camera.SetDistance(zoom);
         _followCaravan = SimSession.UserArg("--follow-caravan") != null;
-        if (SimSession.UserArg("--look-at") is { Length: > 0 } lookAt &&
-            _session.PlayerTown.Buildings.FirstOrDefault(b => b.Def.Id == lookAt) is { } sight)
-            _camera.LookAtTile(sight.CenterX, sight.CenterY);
+        if (SimSession.UserArg("--look-at") is { Length: > 0 } lookAt)
+        {
+            var player = _session.PlayerTown;
+            if (lookAt is "wall" or "gate" && player.Walls.FirstOrDefault(w => lookAt == "wall" || w.Value.Gate) is { Value: not null } wall)
+                _camera.LookAtTile(wall.Key.X, wall.Key.Y);
+            else if (player.Buildings.FirstOrDefault(b => b.Def.Id == lookAt) is { } sight)
+                _camera.LookAtTile(sight.CenterX, sight.CenterY);
+        }
         if (SimSession.UserArg("--place") is { Length: > 0 } placeId && _session.World.Data.Buildings.TryGetValue(placeId, out var placeDef))
             _placement.Begin(placeDef);
         if (SimSession.UserArg("--inspect") != null)
@@ -370,6 +382,10 @@ public partial class Main : Node3D
             root.AddChild(roads);
             roads.Initialize(map, settlement);
 
+            var walls = new WallRenderer { Name = "Walls" };
+            root.AddChild(walls);
+            walls.Initialize(_session.World, settlement);
+
             var territory = new TerritoryRenderer { Name = "Territory" };
             if (!mine) territory.BorderColor = TerritoryRenderer.OtherPlayerColor(settlement.Id);
             root.AddChild(territory);
@@ -424,6 +440,7 @@ public partial class Main : Node3D
         _hud.SetStatus(_flash ?? (_placement.Active is { } def
             ? _placement.Problem is { } p ? $"{def.Name}: {p}" : $"Place {def.Name} (right-click to stop)"
             : _roadTool.Active ? _roadTool.Status
+            : _wallTool.Active ? _wallTool.Status
             : _demolishTool.Active ? _demolishTool.Status
             : _territoryTool.Active ? _territoryTool.Status
             : null));
@@ -475,6 +492,13 @@ public partial class Main : Node3D
                     if (road is { Ok: true }) _sound.Placed();
                     else if (road == null) _sound.Click();
                 }
+                else if (_wallTool.Active)
+                {
+                    var wall = _wallTool.Click();
+                    Report(wall, "Can't build wall");
+                    if (wall is { Ok: true }) _sound.Placed();
+                    else if (wall == null) _sound.Click();
+                }
                 else if (_territoryTool.Active) _territoryTool.BeginStroke(Input.IsKeyPressed(Key.Shift));
                 else if (_demolishTool.Active)
                 {
@@ -497,6 +521,14 @@ public partial class Main : Node3D
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.R }:
                 StartRoadTool();
+                break;
+
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.V }:
+                StartWallTool(_wallTool.Active && !_wallTool.GateMode ? (byte)((_wallTool.Tier + 1) % _session.World.Data.WallTiers.Count) : (byte)0, gate: false);
+                break;
+
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.G }:
+                StartWallTool(0, gate: true);
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.X }:
@@ -570,12 +602,13 @@ public partial class Main : Node3D
         _ledger.Toggle();
     }
 
-    private bool AnyToolActive => _placement.Active != null || _roadTool.Active || _demolishTool.Active || _territoryTool.Active;
+    private bool AnyToolActive => _placement.Active != null || _roadTool.Active || _wallTool.Active || _demolishTool.Active || _territoryTool.Active;
 
     private void CancelTools()
     {
         _placement.Cancel();
         _roadTool.Cancel();
+        _wallTool.Cancel();
         _demolishTool.Cancel();
         _territoryTool.Cancel();
     }
@@ -592,6 +625,14 @@ public partial class Main : Node3D
         CancelTools();
         ClearSelection();
         _roadTool.Begin();
+    }
+
+    /// <summary>V picks a palisade, and pressing it again moves up to stone and large stone walls.</summary>
+    private void StartWallTool(byte tier, bool gate)
+    {
+        CancelTools();
+        ClearSelection();
+        _wallTool.Begin(tier, gate);
     }
 
     private void StartDemolishTool()

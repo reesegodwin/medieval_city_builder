@@ -85,6 +85,34 @@ public sealed class RoadTierDef
     public Dictionary<string, int> Cost { get; set; } = new();
 }
 
+/// <summary>A kind of town wall (walls.json): palisade, stone wall, large stone wall.</summary>
+public sealed class WallTierDef
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+
+    /// <summary>Materials per tile, paid when the wall is planned.</summary>
+    public Dictionary<string, int> Cost { get; set; } = new();
+
+    /// <summary>Crew-days to build (or upgrade to) one tile next to the town centre.</summary>
+    public double WorkDays { get; set; } = 0.4;
+
+    /// <summary>Strength per tile, for sieges (not used yet).</summary>
+    public int HitPoints { get; set; } = 100;
+
+    /// <summary>Mood of people whose home lies inside a closed ring of walls at least this strong.</summary>
+    public double SafetyMood { get; set; }
+
+    /// <summary>Materials for a gate in this kind of wall (instead of the wall's own cost).</summary>
+    public Dictionary<string, int> GateCost { get; set; } = new();
+
+    /// <summary>Wide enough on top for soldiers to stand and walk along behind a parapet (stone walls).</summary>
+    public bool Walkway { get; set; }
+
+    /// <summary>Soldiers a tile of wall-walk holds (for the coming battle phase).</summary>
+    public int DefendersPerTile { get; set; }
+}
+
 /// <summary>Trade tuning (trade.json).</summary>
 public sealed class TradeRules
 {
@@ -313,10 +341,15 @@ public sealed class GameData
     /// <summary>What adults without a job do (oddjobs.json).</summary>
     public OddJobRules OddJobs { get; }
 
+    /// <summary>Town walls from palisade (index 0) upwards.</summary>
+    public IReadOnlyList<WallTierDef> WallTiers { get; }
+
     public GameData(IEnumerable<ResourceDef> resources, IEnumerable<BuildingDef> buildings, IEnumerable<NeedDef>? needs = null,
         TradeRules? trade = null, IEnumerable<RoadTierDef>? roadTiers = null, IEnumerable<SocialClassDef>? classes = null,
-        DisasterRules? disasters = null, SeasonRules? seasons = null, OddJobRules? oddJobs = null)
+        DisasterRules? disasters = null, SeasonRules? seasons = null, OddJobRules? oddJobs = null,
+        IEnumerable<WallTierDef>? wallTiers = null)
     {
+        WallTiers = wallTiers?.ToList() ?? new List<WallTierDef> { new() { Id = "palisade", Name = "Palisade" } };
         OddJobs = oddJobs ?? new OddJobRules();
         Disasters = disasters ?? new DisasterRules();
         Seasons = seasons ?? new SeasonRules();
@@ -355,7 +388,8 @@ public sealed class GameData
         var disasters = LoadEmbedded<DisasterRules>("disasters.json");
         var seasons = LoadEmbedded<SeasonRules>("seasons.json");
         var oddJobs = LoadEmbedded<OddJobRules>("oddjobs.json");
-        return new GameData(resources, buildings, needs, trade, roads, classes, disasters, seasons, oddJobs);
+        var walls = LoadEmbedded<List<WallTierDef>>("walls.json");
+        return new GameData(resources, buildings, needs, trade, roads, classes, disasters, seasons, oddJobs, walls);
     }
 
     private static T LoadEmbedded<T>(string fileName)

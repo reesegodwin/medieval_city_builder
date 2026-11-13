@@ -257,6 +257,7 @@ public static class SettlementGovernor
         if (!settlement.Rules.AutoBuild) return;
         TradeGovernor.Daily(world, settlement);
         UpgradeRoads(world, settlement);
+        BuildWalls(world, settlement);
         int maxSites = MaxActiveConstructionSites + settlement.Citizens.Count / 100;
         if (settlement.Buildings.Count(b => b.IsConstructionSite) >= maxSites) return;
 
@@ -292,6 +293,94 @@ public static class SettlementGovernor
             settlement.FailedSiteSearches[key] = today;
             if (++attempts >= MaxAttemptsPerDay) return;
         }
+    }
+
+    /// <summary>Towns ring themselves with a palisade at this size, stone at the next, a large wall at the last.</summary>
+    public static readonly int[] WallPopulation = { 150, 400, 700 };
+
+    /// <summary>Wall tiles planned per batch.</summary>
+    public const int WallBatch = 30;
+
+    /// <summary>A gate every this many ring tiles, so later roads can get out.</summary>
+    public const int RingGateSpacing = 24;
+
+    /// <summary>Margin around the town's buildings that the ring encloses (within the territory).</summary>
+    public const int RingMargin = 4;
+
+    /// <summary>
+    /// Rings the town with walls, in batches while materials are plentiful (three quarters of the stock limit,
+    /// keeping half): a palisade first, upgraded to stone and then a large stone wall as the town grows.
+    /// </summary>
+    private static void BuildWalls(GameWorld world, Settlement s)
+    {
+        int population = s.Citizens.Count;
+        int tier = -1;
+        for (int i = 0; i < Math.Min(WallPopulation.Length, world.Data.WallTiers.Count); i++)
+            if (population >= WallPopulation[i]) tier = i;
+        if (tier < 0) return;
+        if (s.WallRing.Count == 0) PlanRing(world, s);
+        if (s.WallRing.Count == 0 || s.WallPlans.Count > 0 || s.RoadPlans.Count > 0) return;
+
+        var def = world.Data.WallTiers[tier];
+        // What a tile costs, and how much of each material may be spent.
+        var budget = new Dictionary<string, int>();
+        foreach (string r in def.Cost.Keys.Concat(def.GateCost.Keys).Distinct())
+        {
+            int limit = s.LimitOf(r);
+            if (limit == int.MaxValue || s.Stock.Get(r) < limit * 0.75) return;
+            budget[r] = s.Stock.Get(r) - limit / 2;
+        }
+
+        var batch = new List<(int X, int Y)>();
+        var gates = new List<(int X, int Y)>();
+        var spend = new Dictionary<string, int>();
+        foreach (var (x, y, gate) in s.WallRing)
+        {
+            if (batch.Count >= WallBatch) break;
+            var tile = world.Map.GetTile(x, y);
+            bool isGate = gate || tile.IsRoad;
+            if (!s.Walls.ContainsKey((x, y)) && Walls.Check(world, s, x, y) != null) continue;
+            if (!Walls.NeedsWork(s, tile, x, y, (byte)tier, isGate)) continue;
+            var cost = isGate ? def.GateCost : def.Cost;
+            if (cost.Any(kv => spend.GetValueOrDefault(kv.Key) + kv.Value > budget.GetValueOrDefault(kv.Key))) break;
+            foreach (var (r, n) in cost) spend[r] = spend.GetValueOrDefault(r) + n;
+            batch.Add((x, y));
+            if (gate) gates.Add((x, y));
+        }
+        if (batch.Count > 0) world.Execute(new PlaceWallCommand(s.Id, batch, (byte)tier, gates));
+    }
+
+    /// <summary>
+    /// Lays out the ring once: the edge of the town's land around its buildings (the territory, cut to the buildings'
+    /// extent plus a margin). Being the edge of a region it closes on itself; water and buildings fill any gaps.
+    /// Ordered around the town centre (with whole-number maths, so every machine agrees), with gates spaced out.
+    /// </summary>
+    private static void PlanRing(GameWorld world, Settlement s)
+    {
+        if (s.Buildings.Count == 0) return;
+        int x0 = s.Buildings.Min(b => b.X) - RingMargin, x1 = s.Buildings.Max(b => b.X + b.Def.Width - 1) + RingMargin;
+        int y0 = s.Buildings.Min(b => b.Y) - RingMargin, y1 = s.Buildings.Max(b => b.Y + b.Def.Height - 1) + RingMargin;
+        bool InRegion(int x, int y) => x >= x0 && x <= x1 && y >= y0 && y <= y1 && s.OwnsTile(world.Map, x, y);
+
+        var ring = new List<(int X, int Y)>();
+        foreach (var (x, y) in s.Territory)
+        {
+            if (!InRegion(x, y) || world.Map.GetTile(x, y).Terrain == Terrain.Water) continue;
+            if (!InRegion(x + 1, y) || !InRegion(x - 1, y) || !InRegion(x, y + 1) || !InRegion(x, y - 1)) ring.Add((x, y));
+        }
+        int cx = s.CenterX, cy = s.CenterY;
+        int Half(int dx, int dy) => dy < 0 || (dy == 0 && dx >= 0) ? 0 : 1;
+        ring.Sort((a, b) =>
+        {
+            int ax = a.X - cx, ay = a.Y - cy, bx = b.X - cx, by = b.Y - cy;
+            int ha = Half(ax, ay), hb = Half(bx, by);
+            if (ha != hb) return ha.CompareTo(hb);
+            long cross = (long)ax * by - (long)ay * bx;
+            if (cross != 0) return cross > 0 ? -1 : 1;
+            return (Math.Abs(ax) + Math.Abs(ay)).CompareTo(Math.Abs(bx) + Math.Abs(by));
+        });
+        for (int i = 0; i < ring.Count; i++)
+            s.WallRing.Add((ring[i].X, ring[i].Y, i % RingGateSpacing == RingGateSpacing / 2));
     }
 
     /// <summary>Roads within this distance of a stockpile carry the most hauling, so they're resurfaced first.</summary>

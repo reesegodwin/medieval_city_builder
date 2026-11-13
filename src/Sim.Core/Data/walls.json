@@ -1,0 +1,8 @@
+[
+  {"id": "palisade", "name": "Palisade", "cost": {"wood": 4}, "workDays": 0.4, "hitPoints": 100, "safetyMood": 2,
+   "gateCost": {"wood": 10}, "walkway": false, "defendersPerTile": 0},
+  {"id": "stone_wall", "name": "Stone wall", "cost": {"stone": 6}, "workDays": 1.2, "hitPoints": 400, "safetyMood": 4,
+   "gateCost": {"stone": 20, "wood": 5}, "walkway": true, "defendersPerTile": 2},
+  {"id": "large_wall", "name": "Large stone wall", "cost": {"stone": 12, "wood": 2}, "workDays": 2.5, "hitPoints": 1000, "safetyMood": 6,
+   "gateCost": {"stone": 40, "wood": 10}, "walkway": true, "defendersPerTile": 3}
+]

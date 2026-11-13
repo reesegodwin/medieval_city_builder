@@ -157,6 +157,14 @@ internal static class Report
         double spoiled = world.Data.FoodsByPreference.Sum(f => -s.Ledger.History.Sum(d => d.Get(f.Id, Sim.Core.Economy.LedgerKeys.Spoiled)));
         Console.WriteLine($"Food: {SeasonSystem.FoodStock(world, s)} stored, granaries keep {s.FoodStoreCapacity} from rot; " +
                           $"{spoiled:0} rotted in the last {s.Ledger.History.Count} days. Firewood {s.Stock.Get("firewood")}.");
+        var enclosure = WallSystem.Enclose(world, s);
+        int safeHomes = s.Buildings.Count(b => b.Def.Housing > 0 && b.IsOperational && WallSystem.IsInside(world, s, b));
+        Console.WriteLine($"Walls: {s.Walls.Count} tiles (" + string.Join(", ", s.Walls.Values.GroupBy(w => w.Tier).OrderBy(g => g.Key)
+                              .Select(g => $"{g.Count()} {world.Data.WallTiers[g.Key].Name.ToLowerInvariant()}")) +
+                          $"), {s.Walls.Values.Count(w => w.Gate)} gates, {s.WallPlans.Count} planned, ring {s.WallRing.Count} tiles; " +
+                          $"{safeHomes} homes safe behind {(enclosure.RingTier >= 0 ? world.Data.WallTiers[enclosure.RingTier].Name.ToLowerInvariant() : "no closed ring")}; " +
+                          $"wall-walk {WallSystem.WalkwayTiles(world, s)} tiles for {WallSystem.DefenderCapacity(world, s)} defenders; " +
+                          $"{s.Buildings.Count(b => b.NoRoute)} buildings cut off.");
         var odd = OddJobs.Allocate(world, s);
         string gathered = string.Join(", ", world.Data.OddJobs.Gather.Select(g =>
             $"{s.Ledger.History.Sum(d => d.Get(g.Resource, Sim.Core.Economy.LedgerKeys.Gathered)):0} {g.Resource}"));

@@ -14,6 +14,7 @@ public partial class DemolishTool : Node3D
     private MeshInstance3D _highlight = null!;
     private Building? _building;
     private (int X, int Y)? _road;
+    private (int X, int Y)? _wall;
 
     public bool Active { get; private set; }
 
@@ -37,7 +38,8 @@ public partial class DemolishTool : Node3D
 
     public string Status => _building is { } b
         ? $"Demolish {b.Def.Name}? Refund: {RefundText(b)} (right-click to stop)"
-        : _road != null ? "Remove this road tile" : "Demolish: point at a building or road (right-click to stop)";
+        : _wall != null ? "Remove this wall tile (a planned wall is refunded; a finished one gives a quarter back)"
+        : _road != null ? "Remove this road tile" : "Demolish: point at a building, road or wall (right-click to stop)";
 
     public override void _Process(double delta)
     {
@@ -55,6 +57,11 @@ public partial class DemolishTool : Node3D
             _building = b;
             Show(new Vector3(b.Def.Width + 0.1f, 1.6f, b.Def.Height + 0.1f), Coords.BuildingCenter(b) + new Vector3(0, 0.8f, 0));
         }
+        else if (town.Walls.ContainsKey((x, y)) || tile.WallPlanned)
+        {
+            _wall = (x, y);
+            Show(new Vector3(1f, 1.4f, 1f), Coords.TileCenter(x, y) + new Vector3(0, 0.7f, 0));
+        }
         else if (tile.IsRoad && town.Roads.Contains((x, y)))
         {
             _road = (x, y);
@@ -66,6 +73,7 @@ public partial class DemolishTool : Node3D
     {
         var town = _session.PlayerTown;
         if (_building is { } b) return _session.Execute(new DemolishBuildingCommand(town.Id, b.Id));
+        if (_wall is { } w) return _session.Execute(new RemoveWallCommand(town.Id, new[] { w }));
         if (_road is { } r) return _session.Execute(new RemoveRoadCommand(town.Id, new[] { r }));
         return null;
     }

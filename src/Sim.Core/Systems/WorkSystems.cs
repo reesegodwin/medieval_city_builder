@@ -505,11 +505,12 @@ public static class RoadSystem
 {
     public static void Tick(GameWorld world, Settlement settlement)
     {
-        if (settlement.RoadPlans.Count == 0) return;
+        if (settlement.RoadPlans.Count == 0 && settlement.WallPlans.Count == 0) return;
         var crew = settlement.TownCentre;
         if (crew == null)
         {
             Commands.Roads.FinishAllPlans(world, settlement);
+            Commands.Walls.FinishAllPlans(world, settlement);
             return;
         }
         if (!crew.IsOperational || crew.CurrentJobKind != JobKinds.Roadworker) return; // being upgraded
@@ -536,6 +537,26 @@ public static class RoadSystem
         // Hauling distances are recomputed every few tiles and when the plans are done (derived from saved state,
         // so a loaded game recomputes at the same moments).
         if (built && (settlement.Roads.Count % 8 == 0 || settlement.RoadPlans.Count == 0))
+            Logistics.UpdateHaulFactors(world, settlement);
+
+        // Then walls, with what's left of the crew's time.
+        bool walled = false;
+        while (labour > 1e-12 && settlement.RoadPlans.Count == 0 && settlement.WallPlans.Count > 0)
+        {
+            var plan = settlement.WallPlans[0];
+            double distance = Math.Abs(plan.X - settlement.CenterX) + Math.Abs(plan.Y - settlement.CenterY);
+            double slowdown = 1 + distance / Commands.Roads.WalkHalfDistance;
+            double needed = (Commands.Walls.Def(world, plan.Tier).WorkDays - plan.Progress) * slowdown;
+            if (labour < needed)
+            {
+                plan.Progress += labour / slowdown;
+                break;
+            }
+            labour -= needed;
+            Commands.Walls.Finish(world, settlement, plan);
+            walled = true;
+        }
+        if (walled && (settlement.Walls.Count % 8 == 0 || settlement.WallPlans.Count == 0))
             Logistics.UpdateHaulFactors(world, settlement);
     }
 }
