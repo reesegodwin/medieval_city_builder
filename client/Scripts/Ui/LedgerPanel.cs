@@ -184,7 +184,10 @@ public partial class LedgerPanel : PanelContainer
             sb.AppendLine("[b]Walls:[/b] " + string.Join(", ", s.Walls.Values.GroupBy(w => w.Tier).OrderBy(g => g.Key)
                               .Select(g => $"{g.Count()} {World.Data.WallTiers[g.Key].Name.ToLowerInvariant()}")) +
                           $", {s.Walls.Values.Count(w => w.Gate)} gates" + (s.WallPlans.Count > 0 ? $", {s.WallPlans.Count} planned" : "") +
-                          (ring >= 0 ? $"; {safe} homes safe behind the {World.Data.WallTiers[ring].Name.ToLowerInvariant()}" : "; no closed ring yet"));
+                          (ring >= 0 ? $"; {safe} homes safe behind the {World.Data.WallTiers[ring].Name.ToLowerInvariant()}" : "; no closed ring yet") +
+                          (WallSystem.WalkwayTiles(World, s) > 0
+                              ? $"; wall-walk {WallSystem.WalkwayTiles(World, s)} tiles for up to {WallSystem.DefenderCapacity(World, s)} defenders"
+                              : ""));
         }
         if (s.PoorHarvestDays > 0)
             sb.AppendLine($"[color=#ffb060]Poor harvest:[/color] farms and gardens yield less for {s.PoorHarvestDays} more days");

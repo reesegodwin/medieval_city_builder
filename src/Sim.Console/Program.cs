@@ -163,6 +163,7 @@ internal static class Report
                               .Select(g => $"{g.Count()} {world.Data.WallTiers[g.Key].Name.ToLowerInvariant()}")) +
                           $"), {s.Walls.Values.Count(w => w.Gate)} gates, {s.WallPlans.Count} planned, ring {s.WallRing.Count} tiles; " +
                           $"{safeHomes} homes safe behind {(enclosure.RingTier >= 0 ? world.Data.WallTiers[enclosure.RingTier].Name.ToLowerInvariant() : "no closed ring")}; " +
+                          $"wall-walk {WallSystem.WalkwayTiles(world, s)} tiles for {WallSystem.DefenderCapacity(world, s)} defenders; " +
                           $"{s.Buildings.Count(b => b.NoRoute)} buildings cut off.");
         var odd = OddJobs.Allocate(world, s);
         string gathered = string.Join(", ", world.Data.OddJobs.Gather.Select(g =>

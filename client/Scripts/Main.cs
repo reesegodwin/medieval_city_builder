@@ -384,7 +384,7 @@ public partial class Main : Node3D
 
             var walls = new WallRenderer { Name = "Walls" };
             root.AddChild(walls);
-            walls.Initialize(map, settlement);
+            walls.Initialize(_session.World, settlement);
 
             var territory = new TerritoryRenderer { Name = "Territory" };
             if (!mine) territory.BorderColor = TerritoryRenderer.OtherPlayerColor(settlement.Id);

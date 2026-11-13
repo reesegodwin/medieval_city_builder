@@ -105,6 +105,12 @@ public sealed class WallTierDef
 
     /// <summary>Materials for a gate in this kind of wall (instead of the wall's own cost).</summary>
     public Dictionary<string, int> GateCost { get; set; } = new();
+
+    /// <summary>Wide enough on top for soldiers to stand and walk along behind a parapet (stone walls).</summary>
+    public bool Walkway { get; set; }
+
+    /// <summary>Soldiers a tile of wall-walk holds (for the coming battle phase).</summary>
+    public int DefendersPerTile { get; set; }
 }
 
 /// <summary>Trade tuning (trade.json).</summary>

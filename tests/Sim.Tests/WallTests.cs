@@ -207,4 +207,32 @@ public class WallTests
         new Simulator(copy).RunDays(20);
         Assert.Equal(world.ComputeStateHash(), copy.ComputeStateHash());
     }
+
+    [Fact]
+    public void SoldiersCanWalkAlongTheTopOfStoneWallsButNotPalisades()
+    {
+        var (world, town, _) = Scenario.NewTown();
+        town.Stock.Add("wood", 500);
+        town.Stock.Add("stone", 500);
+        var line = FreeLine(world, town, 6);
+        Assert.True(world.Execute(new PlaceWallCommand(town.Id, line)).Ok);
+        Walls.FinishAllPlans(world, town);
+        Assert.Null(WallSystem.WalkPath(world, town, line[0], line[^1])); // a palisade has no walk on top
+        Assert.Equal(0, WallSystem.DefenderCapacity(world, town));
+
+        Assert.True(world.Execute(new PlaceWallCommand(town.Id, line, 1)).Ok);
+        Walls.FinishAllPlans(world, town);
+        var path = WallSystem.WalkPath(world, town, line[0], line[^1]);
+        Assert.NotNull(path);
+        Assert.Equal(line.Count, path!.Count);
+        Assert.Equal(line.Count * world.Data.WallTiers[1].DefendersPerTile, WallSystem.DefenderCapacity(world, town));
+
+        // A gate keeps the walk going (over the gatehouse); a gap breaks it.
+        Assert.True(world.Execute(new PlaceGateCommand(town.Id, line[2].X, line[2].Y)).Ok);
+        Walls.FinishAllPlans(world, town);
+        Assert.True(WallSystem.IsStair(world, town, line[2].X, line[2].Y), "Gatehouses lead up to the walk");
+        Assert.NotNull(WallSystem.WalkPath(world, town, line[0], line[^1]));
+        Assert.True(world.Execute(new RemoveWallCommand(town.Id, new[] { line[3] })).Ok);
+        Assert.Null(WallSystem.WalkPath(world, town, line[0], line[^1]));
+    }
 }

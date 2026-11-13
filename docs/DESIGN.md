@@ -286,6 +286,13 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - A home whose doorstep is enclosed gets "Safe behind walls", the mood of the weakest wall facing outside.
   - The result is cached by wall, territory and building versions, so it's derived and identical after a load.
 - **Hit points** are stored and saved per tile for the future siege phase; nothing uses them yet.
+- **Wall-walk (stone and large stone walls):** these walls are built to hold soldiers. `walkway` and `defendersPerTile` (2 and 3) are set in `walls.json`.
+  - **Sizes:** the walk is about 0.8–0.95 of a tile wide, two soldiers abreast. A soldier is about 0.4 tall. Stone walls stand 1.4 high and large walls 2.2.
+  - **Parapets:** crenellated on the outside, chest-high on the inside.
+  - **Getting up:** gatehouses carry the walk over the passage. Stairs lead up from inside the town every 12 tiles.
+  - **`WallSystem.WalkPath`:** finds the way along the top between wall tiles, including diagonal corners. Gates continue the walk and gaps break it.
+  - **`DefenderCapacity`:** totals how many soldiers the walls hold; seed 7 ends with 212 tiles of wall-walk for 429 defenders.
+  - Palisades have no walk.
 - **Governor:**
   - At population 150 it lays out a ring once: the edge of the town's territory cut to its buildings' extent plus 4 tiles. Being the edge of a region it closes on itself.
   - The ring is ordered around the centre with whole-number maths, so every machine agrees. Gates go where it crosses roads, plus one every 24 tiles.
