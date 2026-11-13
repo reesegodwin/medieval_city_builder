@@ -18,6 +18,9 @@ public static class LedgerKeys
     public const string Taxes = "taxes";
     public const string Upkeep = "upkeep";
 
+    /// <summary>Coin paid to besiegers to make them leave.</summary>
+    public const string Tribute = "tribute";
+
     /// <summary>Goods brought in by adults without a job (berries, firewood, stones).</summary>
     public const string Gathered = "gathered";
 

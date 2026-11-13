@@ -161,6 +161,16 @@ public static class Walls
         Logistics.UpdateHaulFactors(world, settlement);
     }
 
+    /// <summary>A wall tile knocked down in a siege: gone, with nothing to salvage. The ring opens until rebuilt.</summary>
+    public static void Breach(GameWorld world, Settlement settlement, int x, int y)
+    {
+        if (!settlement.Walls.Remove((x, y))) return;
+        ref var tile = ref world.Map.GetTile(x, y);
+        tile.WallTier = 0;
+        tile.IsGate = false;
+        settlement.WallVersion++;
+    }
+
     internal static void Remove(GameWorld world, Settlement settlement, int x, int y)
     {
         if (!settlement.Walls.TryGetValue((x, y), out var wall)) return;

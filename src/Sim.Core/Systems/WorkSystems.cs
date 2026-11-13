@@ -593,6 +593,7 @@ public static class EconomySystem
     /// <summary>Output factor for a building, given the state of the treasury.</summary>
     public static double OutputFactor(GameWorld world, Settlement s, Building b) =>
         (s.UpkeepUnpaid && b.Def.Upkeep > 0 ? world.Data.Trade.UnpaidOutput : 1) *
+        (War.Siege.Besieged(world, s) && !WallSystem.IsInside(world, s, b) ? world.Data.War.Siege.OutsideOutput : 1) *
         (s.PoorHarvestDays > 0 && b.Def.FertileBonus > 0 ? world.Data.Disasters.PoorHarvestOutput : 1) *
         SeasonSystem.Current(world).OutputOf(b.Def.Id) *
         (b.Def.Outdoor ? SeasonSystem.Current(world).Daylight : 1);

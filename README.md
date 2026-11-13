@@ -15,6 +15,7 @@ What works today:
 - **Jobs.** People are assigned by settlement rules (job priorities). The rules give priority to food during shortages, to producers of scarce goods, and to builders.
 - **Production chains** defined in JSON: farm → grain, then mill & bakery → bread; vegetable garden → vegetables; fishing hut (by water) → fish; sheep pasture → wool and mutton; smokehouse: mutton or fish (+ firewood) → smoked meat; brewery: grain → ale; woodcutter → wood; firewood hut → firewood; quarry → stone. They respect stock reserves and stock limits (like Dwarf Fortress work orders), and workers are freed once stores are full.
 - **Walls and gates:** draw a palisade, stone wall or large stone wall like a road; walls stop everyone except at gates, homes inside a closed ring feel safe, and towns ring themselves as they grow. Stone walls have a wall-walk behind battlements, reached by stairs and gatehouses, ready for defenders; towers and gatehouses add strong points.
+- **Sieges:** big bandit warbands dig in before walled towns and build battering rams, catapults and trebuchets, battering the weakest stretch of wall until it breaks and they storm in. Sally out to burn their engines, pay them to leave, or hold out until they give up. Battered walls are repaired afterwards.
 - **Health and the watch:** herbalists speed recovery, bathhouses keep sickness down, and guardhouses keep thieves away from the homes around them. Poor or unhappy people out of the watch's reach steal from the richest homes.
 - **Household economy:** families earn wages by their job and skill, pay income tax, and buy their food, warmth and services; what they can't afford they go without, so classes come from income. The treasury pays builders, haulers and soldiers. Choose how the town is run in the rules: Free Traders, Common Weal, Commune or Iron Rule.
 - **Armies and raids:** weaponsmiths, bowyers and armourers make gear; a barracks trains squads of townsfolk (militia, spearmen, archers, men-at-arms) led by a general with traits. Bandit warbands march on growing towns: the alert climbs from watch to muster to call to arms, the militia arm, and the battle is fought with walls and towers helping the defenders. The fallen are real townsfolk.
@@ -130,6 +131,7 @@ These go after `--` on Godot's command line:
 | `--ledger-good ID` | Open the ledger's Goods tab with a good's 30-day charts (e.g. `wood`) |
 | `--look-at ID` | Start with the camera on the town's first building of type ID (e.g. `fishing_hut`), or `wall`, `gate`, `tower`, `gatehouse` |
 | `--army` | Open the army panel at start |
+| `--demo-siege` | Single-player: put a besieging band with engines before the town's walls (needs a walled town, e.g. `--warmup-days 330`) |
 | `--demo-raid` | Single-player: raise a squad of each kind and put a warband in sight, close enough to muster (screenshots) |
 | `--demo-walls` | Lay a stone wall and a large wall, each with a tower and gatehouse, near the centre (screenshots) |
 | `--follow-caravan` | Keep the camera on a caravan on the road |

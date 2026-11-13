@@ -24,8 +24,11 @@ public partial class WallRenderer : Node3D
     private GameWorld _world = null!;
     private WorldMap _map = null!;
     private HashSet<(int X, int Y)> _inside = new();
-    private MeshInstance3D _mesh = null!, _plans = null!;
+    private MeshInstance3D _mesh = null!, _plans = null!, _damage = null!;
     private int _builtVersion = -1;
+    private long _damageSignature = -1;
+    private static readonly Color Soot = new(0.2f, 0.18f, 0.17f);
+    private static readonly Color Rubble = new(0.5f, 0.48f, 0.44f);
 
     public void Initialize(GameWorld world, Settlement settlement)
     {
@@ -34,15 +37,56 @@ public partial class WallRenderer : Node3D
         _settlement = settlement;
         _mesh = new MeshInstance3D();
         _plans = new MeshInstance3D { CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        _damage = new MeshInstance3D { CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         AddChild(_mesh);
         AddChild(_plans);
+        AddChild(_damage);
+    }
+
+    /// <summary>
+    /// Siege damage: a battered tile gets soot-dark cracks on its face and stones (or broken stakes) fallen at its
+    /// foot, more of them the weaker it is. Rebuilt only when some tile's strength changes.
+    /// </summary>
+    private void UpdateDamage()
+    {
+        long signature = _settlement.WallVersion;
+        foreach (var (pos, wall) in _settlement.Walls)
+            if (wall.Hp < Sim.Core.Commands.Walls.PieceHitPoints(_world, wall.Tier, wall.Piece))
+                signature = signature * 31 + pos.X * 7919 + pos.Y * 104729 + wall.Hp;
+        if (signature == _damageSignature) return;
+        _damageSignature = signature;
+
+        var mb = new MeshBuilder();
+        foreach (var ((x, y), wall) in _settlement.Walls)
+        {
+            int max = Sim.Core.Commands.Walls.PieceHitPoints(_world, wall.Tier, wall.Piece);
+            double left = wall.Hp / (double)Math.Max(1, max);
+            if (left >= 0.9) continue;
+            float g = TerrainShape.HeightAt(_map, x + 0.5f, y + 0.5f);
+            float h = wall.Tier == 0 ? 0.8f : StoneHeight(wall.Tier);
+            int pieces = left < 0.3 ? 6 : left < 0.6 ? 4 : 2;
+            var fallen = wall.Tier == 0 ? Stake : Rubble;
+            for (int i = 0; i < pieces; i++)
+            {
+                // Cracks up the face, and fallen stones scattered at the foot on both sides.
+                float u = ((x * 13 + y * 7 + i * 5) % 9) / 9f, v = ((x * 3 + y * 11 + i * 7) % 7) / 7f;
+                float side = i % 2 == 0 ? -0.62f : 0.48f;
+                mb.Box(new Vector3(x + 0.15f + u * 0.6f, g + h * (0.2f + 0.6f * v), y + 0.1f + v * 0.8f),
+                       new Vector3(x + 0.25f + u * 0.6f, g + h * (0.35f + 0.6f * v), y + 0.18f + v * 0.8f), Soot);
+                mb.Box(new Vector3(x + 0.5f + side + u * 0.1f, g, y + 0.2f + v * 0.6f),
+                       new Vector3(x + 0.5f + side + u * 0.1f + 0.18f, g + 0.12f, y + 0.36f + v * 0.6f), fallen);
+            }
+        }
+        _damage.Mesh = mb.Commit(SeasonLook.Default);
     }
 
     private bool IsWall(int x, int y) => _settlement.Walls.ContainsKey((x, y));
 
     public override void _Process(double delta)
     {
-        if (_settlement == null || _settlement.WallVersion == _builtVersion) return;
+        if (_settlement == null) return;
+        UpdateDamage();
+        if (_settlement.WallVersion == _builtVersion) return;
         _builtVersion = _settlement.WallVersion;
 
         _inside = WallSystem.Enclose(_world, _settlement).Inside;

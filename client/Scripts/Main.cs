@@ -321,6 +321,7 @@ public partial class Main : Node3D
         _followCaravan = SimSession.UserArg("--follow-caravan") != null;
         if (SimSession.UserArg("--demo-walls") != null) DemoWalls();
         if (SimSession.UserArg("--demo-raid") != null && _session.Mode == SessionMode.Local) DemoRaid();
+        if (SimSession.UserArg("--demo-siege") != null && _session.Mode == SessionMode.Local) DemoSiege();
         if (SimSession.UserArg("--look-at") is { Length: > 0 } lookAt)
         {
             var player = _session.PlayerTown;
@@ -699,6 +700,43 @@ public partial class Main : Node3D
         world.War.Warbands.Add(band);
         Raids.Daily(world);
         if (SimSession.UserArg("--look-at") == null) _camera.LookAtTile((int)band.X, (int)band.Y);
+    }
+
+    /// <summary>
+    /// Screenshots: a big band camped before the town's walls with a ram and catapult built and a trebuchet going
+    /// up, and the stretch of wall they batter half knocked down. Needs a town that has ringed itself with walls
+    /// (e.g. --warmup-days 330).
+    /// </summary>
+    private void DemoSiege()
+    {
+        var world = _session.World;
+        var town = _session.PlayerTown;
+        var outer = Siege.OuterWalls(world, town);
+        if (outer.Count == 0)
+        {
+            Flash("No closed ring of walls to besiege yet: warm up longer");
+            return;
+        }
+        // The outer wall tile furthest from the centre along +Y, and a band camped beyond it.
+        var target = outer.OrderByDescending(t => t.Y - town.CenterY).ThenBy(t => Math.Abs(t.X - town.CenterX)).First();
+        double r = Raids.ArriveRadius(town) - 1;
+        var band = new Warband
+        {
+            Id = world.NextId(), TargetId = town.Id, X = target.X, Y = town.CenterY + r, Raiders = 34, Archers = 12,
+        };
+        world.War.Warbands.Add(band);
+        Siege.Begin(world, town, band);
+        band.SiegeDays = 9;
+        band.Engines.Add(new SiegeEngine { Kind = "ram", Progress = 1 });
+        band.Engines.Add(new SiegeEngine { Kind = "catapult", Progress = 1 });
+        band.Engines.Add(new SiegeEngine { Kind = "trebuchet", Progress = 0.5 });
+        band.HasTarget = true;
+        band.TargetX = target.X;
+        band.TargetY = target.Y;
+        foreach (var (pos, wall) in town.Walls.Where(kv => Math.Abs(kv.Key.X - target.X) + Math.Abs(kv.Key.Y - target.Y) <= 2).ToList())
+            wall.Hp = Math.Max(1, wall.Hp * (pos == target ? 2 : 5) / 10);
+        town.Alert = Alert.CallToArms; // for the banner (the real alert follows at the next day)
+        if (SimSession.UserArg("--look-at") == null) _camera.LookAtTile(target.X, target.Y + 7);
     }
 
     private void DemoWalls()
