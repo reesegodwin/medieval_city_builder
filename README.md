@@ -94,6 +94,7 @@ dotnet test
 | V | Walls: palisade, then stone wall, then large stone wall (press again to cycle); click start and end |
 | G | Gate: click a wall to put a gate in it; press again for a gatehouse (fortify a gate) |
 | B | Tower: click a wall to raise a tower on it |
+| K | Army: alert level and warbands in sight, the general, squads (recruit, disband), gear, raid and muster rules, recent battles |
 | L | Town ledger: people and complaints, goods made and used per day (and what will run out, with 30-day charts), coin in and out, jobs |
 | Right-click / Esc | Cancel the current tool or close the inspector |
 | P | Rules panel: job priorities, stock limits, reserves, home upgrades, disasters on/off |
@@ -126,6 +127,8 @@ These go after `--` on Godot's command line:
 | `--ledger [TAB]` | Open the town ledger at start (0 Overview, 1 Goods, 2 Treasury, 3 Work) |
 | `--ledger-good ID` | Open the ledger's Goods tab with a good's 30-day charts (e.g. `wood`) |
 | `--look-at ID` | Start with the camera on the town's first building of type ID (e.g. `fishing_hut`), or `wall`, `gate`, `tower`, `gatehouse` |
+| `--army` | Open the army panel at start |
+| `--demo-raid` | Single-player: raise a squad of each kind and put a warband in sight, close enough to muster (screenshots) |
 | `--demo-walls` | Lay a stone wall and a large wall, each with a tower and gatehouse, near the centre (screenshots) |
 | `--follow-caravan` | Keep the camera on a caravan on the road |
 | `--territory` | Open the territory tool at start |

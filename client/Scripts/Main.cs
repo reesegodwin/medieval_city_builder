@@ -1,3 +1,4 @@
+using Sim.Core.War;
 using Godot;
 using Sim.Core.Settlements;
 using MedievalClient.Audio;
@@ -52,6 +53,7 @@ public partial class Main : Node3D
     private RulesPanel _rules = null!;
     private TradePanel _trade = null!;
     private LedgerPanel _ledger = null!;
+    private ArmyPanel _army = null!;
     private SoundManager _sound = null!;
     private MeshInstance3D _marker = null!;
 
@@ -173,6 +175,10 @@ public partial class Main : Node3D
         AddChild(caravans);
         caravans.Initialize(_session.World);
 
+        var warbands = new WarbandRenderer { Name = "Warbands" };
+        AddChild(warbands);
+        warbands.Initialize(_session);
+
         _placement = new PlacementTool { Name = "Placement" };
         AddChild(_placement);
         _placement.Initialize(_session, _camera);
@@ -260,7 +266,7 @@ public partial class Main : Node3D
         _rules = new RulesPanel { Name = "Rules" };
         _rules.Initialize(_session);
         _hud.AddChild(_rules);
-        _hud.RulesRequested += _rules.Toggle;
+        _hud.RulesRequested += () => ShowOnly(_rules, _rules.Toggle);
 
         _trade = new TradePanel { Name = "Trade" };
         _trade.Initialize(_session);
@@ -271,6 +277,11 @@ public partial class Main : Node3D
         _ledger.Initialize(_session);
         _hud.AddChild(_ledger);
         _hud.LedgerRequested += ToggleLedger;
+
+        _army = new ArmyPanel { Name = "Army" };
+        _army.Initialize(_session);
+        _hud.AddChild(_army);
+        _hud.ArmyRequested += ToggleArmy;
         _hud.SaveRequested += SaveGame;
         _hud.LoadRequested += LoadGame;
         _hud.SoundToggled += _sound.ToggleMute;
@@ -289,6 +300,7 @@ public partial class Main : Node3D
             _session.RunDays(warmup);
         _screenshotPath = SimSession.UserArg("--screenshot");
         if (SimSession.UserArg("--rules") != null) _rules.Toggle();
+        if (SimSession.UserArg("--army") != null) _army.Toggle();
         if (SimSession.UserArg("--ledger") is { } ledgerTab)
         {
             _ledger.Toggle();
@@ -308,6 +320,7 @@ public partial class Main : Node3D
         if (float.TryParse(SimSession.UserArg("--zoom"), out float zoom)) _camera.SetDistance(zoom);
         _followCaravan = SimSession.UserArg("--follow-caravan") != null;
         if (SimSession.UserArg("--demo-walls") != null) DemoWalls();
+        if (SimSession.UserArg("--demo-raid") != null && _session.Mode == SessionMode.Local) DemoRaid();
         if (SimSession.UserArg("--look-at") is { Length: > 0 } lookAt)
         {
             var player = _session.PlayerTown;
@@ -437,7 +450,8 @@ public partial class Main : Node3D
             RefreshInspector();
             if (_rules.Visible) _rules.Refresh();
             _trade.Refresh();
-            _hud.FeedVisible = !_rules.Visible && !_trade.Visible && !_ledger.Visible;
+            _army.Refresh();
+            _hud.FeedVisible = !_rules.Visible && !_trade.Visible && !_ledger.Visible && !_army.Visible;
         }
 
         if (_flashTimer > 0)
@@ -561,9 +575,11 @@ public partial class Main : Node3D
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.P }:
-                if (_trade.Visible) _trade.Toggle();
-                if (_ledger.Visible) _ledger.Toggle();
-                _rules.Toggle();
+                ShowOnly(_rules, _rules.Toggle);
+                break;
+
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.K }:
+                ToggleArmy();
                 break;
 
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.J }:
@@ -601,19 +617,19 @@ public partial class Main : Node3D
         }
     }
 
-    private void ToggleTrade()
+    /// <summary>The rules, trade, ledger and army panels share the left side of the screen: one at a time.</summary>
+    private void ShowOnly(Control panel, Action toggle)
     {
-        if (_rules.Visible) _rules.Toggle(); // they share the left side of the screen
-        if (_ledger.Visible) _ledger.Toggle();
-        _trade.Toggle();
+        if (_rules != panel && _rules.Visible) _rules.Toggle();
+        if (_trade != panel && _trade.Visible) _trade.Toggle();
+        if (_ledger != panel && _ledger.Visible) _ledger.Toggle();
+        if (_army != panel && _army.Visible) _army.Toggle();
+        toggle();
     }
 
-    private void ToggleLedger()
-    {
-        if (_rules.Visible) _rules.Toggle();
-        if (_trade.Visible) _trade.Toggle();
-        _ledger.Toggle();
-    }
+    private void ToggleTrade() => ShowOnly(_trade, _trade.Toggle);
+    private void ToggleLedger() => ShowOnly(_ledger, _ledger.Toggle);
+    private void ToggleArmy() => ShowOnly(_army, _army.Toggle);
 
     private bool AnyToolActive => _placement.Active != null || _roadTool.Active || _wallTool.Active || _demolishTool.Active || _territoryTool.Active;
 
@@ -652,6 +668,39 @@ public partial class Main : Node3D
     /// For screenshots: a stone wall and a large stone wall near the centre, each with a tower and a gatehouse,
     /// placed with the same commands a player uses and finished at once. The camera looks at the first.
     /// </summary>
+    /// <summary>Screenshots: raise a squad of each kind the town can and put a warband in sight, close enough to muster.</summary>
+    private void DemoRaid()
+    {
+        var world = _session.World;
+        var town = _session.PlayerTown;
+        town.Stock.Add("weapons", 30);
+        town.Stock.Add("bows", 10);
+        town.Stock.Add("armour", 10);
+        if (!town.Buildings.Any(b => b.Def.Id == "barracks"))
+        {
+            town.Stock.Add("wood", 60);
+            town.Stock.Add("stone", 60);
+            var def = world.Data.Building("barracks");
+            if (Sim.Core.AI.SiteFinder.Find(world, town, def) is { } site &&
+                _session.Execute(new PlaceBuildingCommand(town.Id, def.Id, site.X, site.Y)) is { Ok: true, CreatedId: int id } &&
+                town.FindBuilding(id) is { } barracks)
+            {
+                barracks.State = BuildingState.UnderConstruction;
+                Sim.Core.Systems.ConstructionSystem.Complete(world, town, barracks);
+            }
+        }
+        if (town.General == null && MilitaryGovernor.GeneralCandidate(town) is { } general)
+            _session.Execute(new PromoteGeneralCommand(town.Id, general.Id));
+        foreach (string unit in new[] { "spearmen", "archers", "men_at_arms" })
+            _session.Execute(new RecruitSquadCommand(town.Id, unit));
+        // Demo only (single-player): a warband just inside the muster radius, marching in.
+        double d = Raids.MusterRadius(town) - 1;
+        var band = new Warband { Id = world.NextId(), TargetId = town.Id, X = town.CenterX + d * 0.6, Y = town.CenterY + d, Raiders = 24, Archers = 9 };
+        world.War.Warbands.Add(band);
+        Raids.Daily(world);
+        if (SimSession.UserArg("--look-at") == null) _camera.LookAtTile((int)band.X, (int)band.Y);
+    }
+
     private void DemoWalls()
     {
         var world = _session.World;

@@ -1,3 +1,4 @@
+using Sim.Core.War;
 using Godot;
 using Sim.Core.Data;
 using Sim.Core.Events;
@@ -18,6 +19,7 @@ public partial class Hud : CanvasLayer
     private Label _stock = null!;
     private Label _feedLabel = null!;
     private Label _status = null!;
+    private Label _alert = null!;
     private Button _pause = null!;
     private CheckBox _autoBuild = null!;
     private CheckBox _autoTerritory = null!;
@@ -39,6 +41,7 @@ public partial class Hud : CanvasLayer
     public event Action? RulesRequested;
     public event Action? TradeRequested;
     public event Action? LedgerRequested;
+    public event Action? ArmyRequested;
     public event Action? SaveRequested;
     public event Action? LoadRequested;
     public event Action? SoundToggled;
@@ -112,6 +115,7 @@ public partial class Hud : CanvasLayer
                      ("Rules", "Job priorities, stock limits and reserves (P)", () => RulesRequested?.Invoke()),
                      ("Trade", "Offers, trade routes and caravans (J). Needs a Trading Post.", () => TradeRequested?.Invoke()),
                      ("Ledger", "The town's books: people and complaints, goods made and used, coin in and out, jobs (L)", () => LedgerRequested?.Invoke()),
+                     ("Army", "Squads, the general, raids and the muster (K)", () => ArmyRequested?.Invoke()),
                      ("Save", "Quick-save (F5)", () => SaveRequested?.Invoke()),
                      ("Load", "Load the quick-save (F9)", () => LoadRequested?.Invoke()),
                      ("Sound", "Sound on/off (M)", () => SoundToggled?.Invoke()),
@@ -230,10 +234,29 @@ public partial class Hud : CanvasLayer
         _status.AddThemeConstantOverride("shadow_offset_y", 1);
         feedBox.AddChild(_status);
 
+        // --- Alert banner (top centre, under the bar) while raiders are about ---
+        _alert = new Label
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            Visible = false,
+        };
+        // Right of the side panels (which take the left 490 pixels), under the controls help.
+        _alert.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopRight);
+        _alert.OffsetTop = 112;
+        _alert.OffsetLeft = -1080;
+        _alert.OffsetRight = -20;
+        _alert.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _alert.AddThemeFontSizeOverride("font_size", 22);
+        _alert.AddThemeColorOverride("font_shadow_color", Colors.Black);
+        _alert.AddThemeConstantOverride("shadow_offset_x", 2);
+        _alert.AddThemeConstantOverride("shadow_offset_y", 2);
+        AddChild(_alert);
+
         // --- Controls help (top-right, under the bar) ---
         var help = new Label
         {
-            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   V: walls   G: gate   B: tower   X: demolish   T: territory   P: rules   J: trade   L: ledger\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
+            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   V: walls   G: gate   B: tower   X: demolish   T: territory   P: rules   J: trade   L: ledger   K: army\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
             HorizontalAlignment = HorizontalAlignment.Right,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
@@ -300,11 +323,12 @@ public partial class Hud : CanvasLayer
         _date.Text = $"{town.Name}  ·  {world.Time}{where}\nMood {moodNow:0}/100  ·  {session.Speed:0.#}x{behind}";
 
         int adults = town.Citizens.Count(c => c.IsAdult);
-        int idle = town.Citizens.Count(c => c.IsAdult && c.JobBuildingId == null);
+        int idle = town.Citizens.Count(c => c.CanWork && c.JobBuildingId == null && c.Id != town.General?.CitizenId);
+        int soldiers = town.Squads.Sum(q => q.SoldierIds.Count);
         int homeless = town.Citizens.Count(c => c.HomeBuildingId == null);
         int haulers = town.Buildings.Where(b => b.CurrentJobKind == JobKinds.Hauler).Sum(b => b.WorkerIds.Count);
         _stock.Text =
-            $"Pop {town.Citizens.Count} ({adults} adults, {haulers} hauling, {idle} on odd jobs{(homeless > 0 ? $", {homeless} homeless" : "")})   " +
+            $"Pop {town.Citizens.Count} ({adults} adults, {haulers} hauling, {idle} on odd jobs{(soldiers > 0 ? $", {soldiers} soldiers" : "")}{(homeless > 0 ? $", {homeless} homeless" : "")})   " +
             $"Food {Needs.FoodDays(world, town):0.0} days (grain {town.Stock.Get("grain")}, bread {town.Stock.Get("bread")}, " +
             $"veg {town.Stock.Get("vegetables")})   Ale {town.Stock.Get("ale")}   " +
             $"Coin {town.Stock.Get("coin")} ({EconomySystem.DailyTax(world, town) - EconomySystem.DailyUpkeep(world, town):+0.#;-0.#}/day" +
@@ -313,6 +337,15 @@ public partial class Hud : CanvasLayer
             $"Storage {town.Stock.Total - town.StoredAtWorkplaces}/{town.StorageCapacity} (+{town.StoredAtWorkplaces} at workplaces)   Land {town.Territory.Count}/{town.TerritoryAllowance} " +
             $"(cap {town.TerritoryCap})   Needs met: " +
             string.Join("   ", world.Data.Needs.Select(n => $"{n.Name} {ServiceSystem.Coverage(town, n.Id):P0}"));
+
+        // Alert banner: the nearest warband in sight, as well as the watch can tell.
+        var band = world.War.Warbands.Where(w => ArmyPanel.InSight(town, w)).OrderBy(w => Raids.Distance(town, w)).FirstOrDefault();
+        _alert.Visible = town.Alert != Alert.None && band != null;
+        if (_alert.Visible)
+        {
+            _alert.Text = $"{ArmyPanel.AlertText(town.Alert)}: {Raids.Describe(town, band!)}, {Raids.Distance(town, band!):0} tiles out (K)";
+            _alert.AddThemeColorOverride("font_color", ArmyPanel.AlertColor(town.Alert));
+        }
 
         _pause.SetPressedNoSignal(session.Paused);
         foreach (var (speed, button) in _speedButtons)

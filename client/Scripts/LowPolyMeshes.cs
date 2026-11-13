@@ -455,6 +455,17 @@ public static class LowPolyMeshes
         return mb.Commit();
     }
 
+    /// <summary>A tall pole with a square flag (white, tinted per instance), origin at the foot of the pole.</summary>
+    public static readonly ArrayMesh WarBanner = BuildWarBanner();
+
+    private static ArrayMesh BuildWarBanner()
+    {
+        var mb = new MeshBuilder();
+        mb.Box(new Vector3(-0.04f, 0, -0.04f), new Vector3(0.04f, 2.6f, 0.04f), new Color(0.35f, 0.35f, 0.35f)); // pole
+        mb.Box(new Vector3(0.04f, 1.8f, -0.02f), new Vector3(0.9f, 2.5f, 0.02f), Colors.White); // flag
+        return mb.Commit();
+    }
+
     public static readonly ArrayMesh Tree = BuildTree();
     public static readonly ArrayMesh Rock = BuildRock();
     public static readonly ArrayMesh CitizenBody = BuildCitizenBody();

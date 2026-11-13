@@ -104,5 +104,7 @@ The plan is also copied to `docs/AUTONOMOUS_PLAN.md` with a progress log, so the
 ## Progress log
 - [x] 0. PR #13 (towers and gatehouses) merged.
 - [x] 1–5. Military economy, squads from townsfolk, generals, the aggregate battle resolver, raids with Watch/Muster/Call to arms and stand-down (with rough-to-exact scouting descriptions for item 6). Balance: garrison only from spare hands, lowest job priority for military crafts, tavern gaps by nearby fullness, brewery ratio, off-season food sales. 720 days: seeds 42/7/1234 end with 69/77/73 townhouses, coin 1444/6126/770, every raid beaten, no starvation.
-- [ ] 7. Client for war — next.
-- [ ] 11. Household economy — queued (after 7).
+- [x] 6–7. Fog of war in the client (warbands drawn only within watch radius; rough-to-exact descriptions), army panel (K), alert banner, warband and soldier rendering. PR after #14.
+- [ ] 11. Household economy — next (the biggest item).
+- [ ] 8. Bathhouse, herbalist, law and crime.
+- [ ] 9. Server accounts.
