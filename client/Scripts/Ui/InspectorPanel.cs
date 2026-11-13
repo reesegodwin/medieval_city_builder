@@ -177,7 +177,7 @@ public partial class InspectorPanel : PanelContainer
         sb.AppendLine("Paint territory with the Territory tool (T), or tick \"Auto land\" to grow it evenly.");
         sb.AppendLine($"[b]Roads:[/b] {town.RoadPlans.Count} tiles planned; roadworkers here build them (free, but they take time).");
         sb.AppendLine($"[b]Treasury:[/b] {town.Stock.Get("coin")} coin, taxes {EconomySystem.DailyTax(world, town):0.#} and upkeep " +
-                      $"{EconomySystem.DailyUpkeep(town):0.#} a day.");
+                      $"{EconomySystem.DailyUpkeep(world, town):0.#} a day.");
 
         if (b.Def.TownCentre!.UpgradeTo is not { } nextId)
         {

@@ -362,11 +362,15 @@ public sealed class GameData
     /// <summary>Town walls from palisade (index 0) upwards.</summary>
     public IReadOnlyList<WallTierDef> WallTiers { get; }
 
+    /// <summary>Soldiers, squads and generals (units.json).</summary>
+    public War.WarRules War { get; }
+
     public GameData(IEnumerable<ResourceDef> resources, IEnumerable<BuildingDef> buildings, IEnumerable<NeedDef>? needs = null,
         TradeRules? trade = null, IEnumerable<RoadTierDef>? roadTiers = null, IEnumerable<SocialClassDef>? classes = null,
         DisasterRules? disasters = null, SeasonRules? seasons = null, OddJobRules? oddJobs = null,
-        IEnumerable<WallTierDef>? wallTiers = null)
+        IEnumerable<WallTierDef>? wallTiers = null, War.WarRules? war = null)
     {
+        War = war ?? new War.WarRules();
         WallTiers = wallTiers?.ToList() ?? new List<WallTierDef> { new() { Id = "palisade", Name = "Palisade" } };
         OddJobs = oddJobs ?? new OddJobRules();
         Disasters = disasters ?? new DisasterRules();
@@ -407,7 +411,8 @@ public sealed class GameData
         var seasons = LoadEmbedded<SeasonRules>("seasons.json");
         var oddJobs = LoadEmbedded<OddJobRules>("oddjobs.json");
         var walls = LoadEmbedded<List<WallTierDef>>("walls.json");
-        return new GameData(resources, buildings, needs, trade, roads, classes, disasters, seasons, oddJobs, walls);
+        var war = LoadEmbedded<War.WarRules>("units.json");
+        return new GameData(resources, buildings, needs, trade, roads, classes, disasters, seasons, oddJobs, walls, war);
     }
 
     private static T LoadEmbedded<T>(string fileName)

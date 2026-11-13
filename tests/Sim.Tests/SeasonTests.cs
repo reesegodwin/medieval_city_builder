@@ -153,13 +153,15 @@ public class SeasonTests
     // ---------- autumn food sales ----------
 
     [Fact]
-    public void FoodAboveTheWinterReserveIsSoldInAutumnOnly()
+    public void FoodAboveTheWinterReserveIsSoldMostlyInAutumn()
     {
         var (world, town, sim) = Scenario.NewTown();
         town.Rules.Disasters = false;
         double reserve = SeasonSystem.WinterReserve(world, town);
-        OnlyGrain(town, (int)(reserve * SeasonSystem.ReserveMargin) + 500);
-        Assert.Equal(0, SeasonSystem.SellableFood(world, town, "grain")); // spring
+        OnlyGrain(town, (int)(reserve * SeasonSystem.OffSeasonReserveMargin));
+        Assert.Equal(0, SeasonSystem.SellableFood(world, town, "grain")); // spring: a usual surplus isn't sold
+        OnlyGrain(town, (int)(reserve * SeasonSystem.OffSeasonReserveMargin) + 500);
+        Assert.InRange(SeasonSystem.SellableFood(world, town, "grain"), 450, 500); // but a big store is
 
         RunToDayOfYear(world, sim, (int)Season.Autumn * TimeScale.DaysPerSeason + 2);
         OnlyGrain(town, (int)(SeasonSystem.WinterReserve(world, town) * SeasonSystem.ReserveMargin) + 500);

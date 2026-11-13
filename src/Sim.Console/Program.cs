@@ -166,6 +166,14 @@ internal static class Report
                           $"{safeHomes} homes safe behind {(enclosure.RingTier >= 0 ? world.Data.WallTiers[enclosure.RingTier].Name.ToLowerInvariant() : "no closed ring")}; " +
                           $"wall-walk {WallSystem.WalkwayTiles(world, s)} tiles for {WallSystem.DefenderCapacity(world, s)} defenders; " +
                           $"{s.Buildings.Count(b => b.NoRoute)} buildings cut off.");
+        var units = world.Data.War;
+        Console.WriteLine($"Army: {Sim.Core.War.Armies.Soldiers(s)} soldiers in {s.Squads.Count} squads (" +
+                          string.Join(", ", s.Squads.GroupBy(q => q.UnitId).Select(g => $"{g.Sum(q => q.SoldierIds.Count)} {g.Key}")) + ")" +
+                          (s.General is { } gen ? $"; general {s.FindCitizen(gen.CitizenId)?.FullName} (skill {gen.Skill:0}, {gen.Battles} battles)" : "; no general") +
+                          $"; battles {world.War.Reports.Count(r => r.SettlementId == s.Id)} " +
+                          $"(won {world.War.Reports.Count(r => r.SettlementId == s.Id && r.DefendersWon)}); " +
+                          $"fell defending {world.Events.Count(e => e.SettlementId == s.Id && e.Message.Contains("fell defending"))}; " +
+                          $"gear: {s.Stock.Get("weapons")} weapons, {s.Stock.Get("bows")} bows, {s.Stock.Get("armour")} armour.");
         var odd = OddJobs.Allocate(world, s);
         string gathered = string.Join(", ", world.Data.OddJobs.Gather.Select(g =>
             $"{s.Ledger.History.Sum(d => d.Get(g.Resource, Sim.Core.Economy.LedgerKeys.Gathered)):0} {g.Resource}"));
@@ -181,7 +189,7 @@ internal static class Report
         var classes = s.Citizens.GroupBy(c => HomeSystem.ClassOf(world, s, c).Name).Select(g => $"{g.Count()} {g.Key.ToLowerInvariant()}");
         Console.WriteLine($"Homes: {string.Join(", ", homes)}. People: {string.Join(", ", classes)}.");
         var trade = world.Trade;
-        Console.WriteLine($"Treasury: taxes {EconomySystem.DailyTax(world, s):0.#}/day, upkeep {EconomySystem.DailyUpkeep(s):0.#}/day" +
+        Console.WriteLine($"Treasury: taxes {EconomySystem.DailyTax(world, s):0.#}/day, upkeep {EconomySystem.DailyUpkeep(world, s):0.#}/day" +
                           (s.UpkeepUnpaid ? " (UNPAID)" : "") + ".");
         Console.WriteLine($"Trade: {trade.CompletedTrades} trades, {trade.MerchantVisits} merchant visits, coin {s.Stock.Get("coin")}, " +
                           $"{trade.Offers.Count(o => o.SettlementId == s.Id)} open offers, {trade.Caravans.Count} caravans on the road.");

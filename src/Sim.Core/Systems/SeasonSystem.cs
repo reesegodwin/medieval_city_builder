@@ -22,6 +22,9 @@ public static class SeasonSystem
     /// <summary>Towns keep this much more than the winter reserve before selling food in autumn.</summary>
     public const double ReserveMargin = 1.25;
 
+    /// <summary>Outside autumn, only food beyond this many winter reserves is sold (a big store, not the harvest).</summary>
+    public const double OffSeasonReserveMargin = 1.5;
+
     public static int FoodStock(GameWorld world, Settlement s) => world.Data.FoodsByPreference.Sum(f => s.Stock.Get(f.Id));
 
     /// <summary>Food items to keep for winter: <see cref="Data.SeasonRules.WinterReserveDays"/> days of the town's need.</summary>
@@ -29,14 +32,14 @@ public static class SeasonSystem
         s.Citizens.Sum(Needs.DailyFoodNeed) * world.Data.Seasons.WinterReserveDays / AverageFoodNutrition;
 
     /// <summary>
-    /// In autumn, how much of a food the town can sell and still keep its winter reserve (with a margin): the
-    /// food's share of everything above it. Zero in other seasons, and for anything that isn't food.
+    /// How much of a food the town can sell and still keep its winter reserve (with a margin, bigger outside
+    /// autumn): the food's share of everything above it. Zero for anything that isn't food.
     /// </summary>
     public static int SellableFood(GameWorld world, Settlement s, string resource)
     {
-        if (world.Time.Season != Season.Autumn || world.Data.Resources.GetValueOrDefault(resource)?.IsFood != true) return 0;
+        if (world.Data.Resources.GetValueOrDefault(resource)?.IsFood != true) return 0;
         int total = FoodStock(world, s);
-        double excess = total - WinterReserve(world, s) * ReserveMargin;
+        double excess = total - WinterReserve(world, s) * (world.Time.Season == Season.Autumn ? ReserveMargin : OffSeasonReserveMargin);
         return excess <= 0 || total == 0 ? 0 : (int)(excess * s.Stock.Get(resource) / total);
     }
     public static Data.SeasonDef Current(GameWorld world) => world.Data.Seasons.Of(world.Time.Season);

@@ -117,6 +117,8 @@ public static class Needs
         if (c.HomeBuildingId is int homeId && settlement.FindBuilding(homeId)?.Def is { Home.Mood: > 0 } fine)
             Add(labels != null ? $"Lives in a {fine.Name.ToLowerInvariant()}" : "", fine.Home!.Mood);
         if (c.IsSick) Add("Sick", world.Data.Disasters.SickMood);
+        else if (c.SquadId != null) Add("Serving in the army", 1);
+        else if (settlement.General?.CitizenId == c.Id) Add("Leading the army", 4);
         else if (c.IsAdult && c.JobBuildingId != null) Add("Has work", 3);
         else if (c.IsAdult && !(oddJobs ??= OddJobs.Available(world, settlement))) Add("Idle", -3); // odd jobs: neither pleased nor bored
         else if (c.IsAdult && labels != null) labels.Add(("Odd jobs", 0));
@@ -328,6 +330,7 @@ public static class LifeSystem
         if (c.HomeBuildingId is int home) settlement.FindBuilding(home)?.ResidentIds.Remove(c.Id);
         c.JobBuildingId = null;
         c.HomeBuildingId = null;
+        War.Armies.Forget(settlement, c);
         settlement.RemoveCitizen(c);
     }
 

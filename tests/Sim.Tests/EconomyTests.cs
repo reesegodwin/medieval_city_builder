@@ -13,7 +13,7 @@ public class EconomyTests
         Scenario.Finish(world, town, market);
         int coin = town.Stock.Get("coin");
         double tax = EconomySystem.DailyTax(world, town);
-        double upkeep = EconomySystem.DailyUpkeep(town);
+        double upkeep = EconomySystem.DailyUpkeep(world, town);
         Assert.True(tax > 0);
         Assert.Equal(world.Data.Building("market").Upkeep, upkeep, 6);
 

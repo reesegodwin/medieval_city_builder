@@ -86,7 +86,7 @@ Each phase ends with something you can play.
 1. **Phase 0, Prototype the simulation (no graphics):** `Sim.Core` with one settlement, 4 resources, 5 buildings, the economy tick, and a console printout. Unit tests for production chains. *(Done.)*
 2. **Phase 1, Visual settlement:** Godot client that renders a procedural map chunk, lets you place buildings and shows animated workers. *(In progress: client done; roads, demolition, services and food variety added in Phase 1b.)* Decision: the simulation runs in-process inside the client through `SimSession` until Phase 2, which swaps it for a connection to the dedicated server without changing the renderers.
 3. **Phase 2, Persistence & multiplayer:** PostgreSQL saves, accounts, several players, interest management, running on a cheap Linux VPS.
-4. **Phase 3, War:** armies from population, the formation battle resolver, generals, fog of war and scouting.
+4. **Phase 3, War:** armies from population, the formation battle resolver, generals, fog of war and scouting. *(In progress: military economy, squads, generals, the aggregate resolver, raids and the call to arms are in; see "War (Phase 3a)".)*
 5. **Phase 4, Sieges & walls:** walls and towers, siege engines, multi-day sieges, Discord/email alerts.
 6. **Phase 5, NPC factions & diplomacy:** utility AI, proposals with expiry, vassals and tribute.
 7. **Phase 6, Trade & sea:** roads, caravans, ports, ships, blockades.
@@ -427,6 +427,26 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - Result (720 days, three seeds): clothing and furniture reach about 99% of people, and mood rises from about 80 to 85–87. Population is unchanged because growth is limited by housing.
 - **Saves (version 2)** store territory as row runs. Version-1 saves load with the old diamond and the old maximum cap, and have no town centre to upgrade.
 - **Saves:** versioned JSON. Only changes are stored (terrain comes from the seed). Save and load are exact: a loaded world continues with the same state hash as the original.
+
+## War (Phase 3a) (`War/`, `units.json`)
+- **Military goods.** Weaponsmith (iron ore + wood → weapons), bowyer (wood → bows) and armourer (iron ore → armour; ore only, so armour doesn't compete with clothing for cloth). These jobs have the lowest priority (1), so they never pull workers from food, ale or services.
+- **Squads from townsfolk.** `RecruitSquadCommand` turns 10 adults into a squad of a unit kind from `units.json`: militia (no gear), spearmen (weapons), archers (bows), men-at-arms (weapons + armour). Gear comes out of stock and goes back when the squad is disbanded. Soldiers keep their homes and food, don't work and pay no tax. Each squad costs a little coin a day (by unit), booked as "Army" upkeep. A barracks holds 4 squads; levies (the muster) don't need one. The jobless, haulers and people on standby are called up first, and service workers last.
+- **Generals.** `PromoteGeneralCommand` appoints one general per town with two random traits (tactician, inspiring, siege expert, bowmaster, stubborn, reckless). Battles give XP, and skill = 10 + 3√XP. The general leads instead of working and gets a mood bonus.
+- **Battle resolver** (`War/Battle.cs`): up to 10 rounds, with an archers' opening volley. Damage comes from count × attack × veterancy, against the other side's defence. Defenders get walls (by ring tier) and towers. Losses fall mostly on the melee line. Morale drops with losses, and a side routs on broken morale or heavy losses. The fallen are specific citizens. Deterministic via `world.Rng`.
+- **Raids and the call to arms** (`War/Raids.cs`):
+  - From day 75, a town of 40+ people may be targeted by a bandit warband (about 1% a day). Its size scales with population and treasury.
+  - The band marches in at 12 tiles a day. The alert climbs *Watch* (towers extend sight) → *Muster* (a levy of `MusterPercent`% of adults, 10% by default) → *Call to arms* (twice that), and then the battle is fought.
+  - If the town loses, the raiders loot a share of coin and goods.
+  - Levies stand down after 2 quiet days. A `Raids` rule turns it off per town. Battle reports are kept (last 20).
+- **Scouting** (`Raids.Describe`): far bands give a rough size, nearer ones a rounded breakdown, and bands at the walls give exact numbers.
+- **Governor:**
+  - From 150 people, a governed town appoints a general and keeps a garrison of about 3% of its people (in squads, up to its barracks' room). It wishes for a barracks.
+  - It recruits only from spare hands, never during a muster.
+  - It picks men-at-arms when it has the gear, otherwise it alternates archers and spearmen.
+- **Balance findings:** a garrison that took real workers emptied taverns and breweries, homes slipped back, taxes fell and upkeep went unpaid in a spiral. Hence the spare-hands rule, the lowest job priority, and a 10-day upkeep reserve before home upgrades. The governor also now:
+  - builds another service building where a home's *nearby* providers are full, not only when every one in town is full;
+  - keeps about 1.25 breweries per tavern while ale is under half its limit;
+  - sells food beyond 1.5 winter reserves in any season (1.25 in autumn).
 
 ## Battles: individual units + destructible structures (hybrid LOD simulation)
 

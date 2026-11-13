@@ -64,6 +64,7 @@ public sealed class Simulator
                 Commands.TerritorySystem.Daily(World, s);
                 SettlementGovernor.Daily(World, s);
             }
+            War.Raids.Daily(World);
             DayEnded?.Invoke(World);
         }
     }

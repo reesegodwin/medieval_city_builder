@@ -18,6 +18,8 @@ public enum EventKind
     Trade,
     Disaster,
     Season,
+    Military,
+    Battle,
 }
 
 /// <summary>

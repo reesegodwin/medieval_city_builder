@@ -378,7 +378,7 @@ public partial class LedgerPanel : PanelContainer
         double net = flows.Values.Sum();
         sb.AppendLine();
         sb.AppendLine($"[b]Balance:[/b] {(net >= 0 ? "[color=#90e090]" : "[color=#ff9070]")}{net:+0.#;-0.#;0} coin a day[/color]");
-        sb.AppendLine($"Taxes today would bring {EconomySystem.DailyTax(World, s):0.#}; upkeep costs {EconomySystem.DailyUpkeep(s):0.#}.");
+        sb.AppendLine($"Taxes today would bring {EconomySystem.DailyTax(World, s):0.#}; upkeep costs {EconomySystem.DailyUpkeep(World, s):0.#}.");
         _treasury.Text = sb.ToString();
 
         // Income and spending per day, and the treasury itself, over the books' history.

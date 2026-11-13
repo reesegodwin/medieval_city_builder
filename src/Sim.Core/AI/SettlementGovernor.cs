@@ -242,6 +242,7 @@ public static class SettlementGovernor
     /// <summary>Towns this size and up keep sheep for mutton, one pasture per <see cref="PeoplePerPasture"/> people.</summary>
     public const int PasturePopulation = 40;
     public const int PeoplePerPasture = 70;
+    public const double BreweriesPerTavern = 1.25;
 
     /// <summary>Towns this size and up gather firewood (the first winter comes at day 271).</summary>
     public const int FirewoodPopulation = 15;
@@ -258,6 +259,7 @@ public static class SettlementGovernor
         TradeGovernor.Daily(world, settlement);
         UpgradeRoads(world, settlement);
         BuildWalls(world, settlement);
+        War.MilitaryGovernor.Daily(world, settlement);
         int maxSites = MaxActiveConstructionSites + settlement.Citizens.Count / 100;
         if (settlement.Buildings.Count(b => b.IsConstructionSite) >= maxSites) return;
 
@@ -613,8 +615,13 @@ public static class SettlementGovernor
 
             var outOfReach = uncoveredHomes
                 .Where(h => providers.All(p => p.DistanceTo(h) > p.Def.Service!.Radius)).ToList();
-            bool allFull = providers.Count > 0 && providers.All(p => p.ServedCount >= p.Def.Service!.Capacity);
-            var candidates = outOfReach.Count > 0 ? outOfReach : allFull ? uncoveredHomes : new List<Building>();
+            // Otherwise homes whose nearby providers are all full: busy taverns in the old town aren't
+            // helped by quiet ones on the edge.
+            var candidates = outOfReach.Count > 0
+                ? outOfReach
+                : uncoveredHomes.Where(h => providers
+                    .Where(p => p.DistanceTo(h) <= p.Def.Service!.Radius)
+                    .All(p => p.ServedCount >= p.Def.Service!.Capacity)).ToList();
 
             var picked = new List<(int, int)>();
             foreach (var h in candidates)
@@ -670,6 +677,9 @@ public static class SettlementGovernor
         if (s.FreeStorage < Math.Max(80, s.StorageCapacity / 10) || s.FreeStorage < reserveRoom || (granaryWanted && foodRotting))
             Wish(granaryWanted ? "granary" : "stockpile");
         if (population >= TradingPostPopulation && !s.Buildings.Any(b => b.Def.Trade)) Wish("trading_post");
+        // Barracks for the standing garrison.
+        int squads = War.MilitaryGovernor.WantedSquads(world, s);
+        if (squads > 0 && s.CountIncludingPlanned("barracks") * world.Data.War.SquadsPerBarracks < squads) Wish("barracks");
 
         // Production chains (mine -> smithy, pasture -> weaver, carpenter...), from each building's governor hint.
         foreach (var def in world.Data.BuildingList)
@@ -699,7 +709,11 @@ public static class SettlementGovernor
         {
             int taverns = s.CountIncludingPlanned("tavern");
             int breweries = s.CountIncludingPlanned("brewery");
-            if ((breweries == 0 || (s.Stock.Get("ale") < 20 && breweries <= taverns)) && !Understaffed("brewery"))
+            // A brewery makes about 8 ale a day and a busy tavern pours 10 (15 on winter nights), so keep
+            // about one and a half per tavern while the cellars aren't full.
+            int wantBreweries = (int)Math.Ceiling(taverns * BreweriesPerTavern);
+            bool aleLow = s.Stock.Get("ale") < 20 || (breweries < wantBreweries && s.Stock.Get("ale") < s.LimitOf("ale") / 2);
+            if ((breweries == 0 || aleLow) && breweries <= wantBreweries && !Understaffed("brewery"))
                 Wish("brewery");
             if (s.Stock.Get("ale") >= 10)
                 foreach (var spot in ServiceGaps("drink")) Wish("tavern", spot);
