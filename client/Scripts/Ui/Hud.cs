@@ -239,7 +239,7 @@ public partial class Hud : CanvasLayer
         if (def.Storage > 0) lines.Add($"Stores {def.Storage} goods");
         if (def.Recipe is { } r)
         {
-            string inputs = r.Inputs.Count == 0 ? "" : string.Join(", ", r.Inputs.Select(kv => $"{kv.Value} {kv.Key}")) + " -> ";
+            string inputs = RecipeText.Inputs(r);
             string outputs = string.Join(", ", r.Outputs.Select(kv => $"{kv.Value} {kv.Key}"));
             lines.Add($"{def.Jobs} x {def.JobKind}: {inputs}{outputs} per worker-day");
         }

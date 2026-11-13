@@ -494,6 +494,34 @@
     }
   },
   {
+    "id": "smokehouse",
+    "name": "Smokehouse",
+    "width": 3,
+    "height": 3,
+    "buildDays": 0.3,
+    "cost": {
+      "wood": 20,
+      "stone": 10
+    },
+    "jobs": 2,
+    "jobKind": "smoker",
+    "recipe": {
+      "inputChoices": [
+        {"mutton": 3, "firewood": 1},
+        {"fish": 3, "firewood": 1}
+      ],
+      "outputs": {
+        "smoked_meat": 3
+      },
+      "workDays": 1
+    },
+    "governor": {
+      "minPopulation": 100,
+      "populationPerBuilding": 150,
+      "lowStock": 150
+    }
+  },
+  {
     "id": "weaver",
     "name": "Weaver",
     "width": 3,

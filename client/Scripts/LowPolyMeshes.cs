@@ -73,6 +73,25 @@ public static class LowPolyMeshes
                     mb.Box(new Vector3(0.2f, i * 0.12f, h - 0.45f + i * 0.04f), new Vector3(w - 0.2f, i * 0.12f + 0.12f, h - 0.33f + i * 0.04f), Wood);
                 break;
 
+            case "smokehouse":
+                // A low stone smokehouse with a tall chimney, a woodpile and racks of hanging meat and fish.
+                mb.Box(new Vector3(0.3f, 0, 0.3f), new Vector3(w - 1.0f, 0.75f, h - 0.4f), Stone.Darkened(0.08f));
+                mb.GableRoof(new Vector3(0.22f, 0.75f, 0.22f), new Vector3(w - 0.92f, 0.75f, h - 0.32f), 0.45f, Slate.Lightened(0.05f));
+                mb.Box(new Vector3(0.6f, 0.75f, h / 2 - 0.15f), new Vector3(0.9f, 1.9f, h / 2 + 0.15f), Stone.Darkened(0.25f)); // chimney
+                mb.Box(new Vector3(0.55f, 1.9f, h / 2 - 0.2f), new Vector3(0.95f, 1.98f, h / 2 + 0.2f), Stone.Darkened(0.35f));
+                foreach (float z in new[] { 0.4f, 1.4f })
+                {
+                    mb.Box(new Vector3(w - 0.8f, 0, z), new Vector3(w - 0.74f, 0.7f, z + 0.06f), Timber);
+                    mb.Box(new Vector3(w - 0.2f, 0, z), new Vector3(w - 0.14f, 0.7f, z + 0.06f), Timber);
+                    mb.Box(new Vector3(w - 0.8f, 0.64f, z), new Vector3(w - 0.14f, 0.7f, z + 0.06f), Timber);
+                    for (float x = w - 0.7f; x < w - 0.25f; x += 0.14f)
+                        mb.Box(new Vector3(x, 0.35f, z), new Vector3(x + 0.07f, 0.62f, z + 0.05f),
+                            z < 1 ? new Color(0.55f, 0.25f, 0.18f) : new Color(0.62f, 0.62f, 0.55f)); // meat, fish
+                }
+                for (int i = 0; i < 3; i++)
+                    mb.Box(new Vector3(0.3f, i * 0.1f, h - 0.32f), new Vector3(w - 1.0f, i * 0.1f + 0.09f, h - 0.08f), i % 2 == 0 ? Wood : Wood.Lightened(0.1f));
+                break;
+
             case "firewood_hut":
                 // An open lean-to stacked with split logs, a chopping block and an axe.
                 mb.Box(new Vector3(0.15f, 0, 0.2f), new Vector3(0.25f, 0.75f, 0.3f), Timber);

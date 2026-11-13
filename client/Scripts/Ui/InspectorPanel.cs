@@ -79,7 +79,7 @@ public partial class InspectorPanel : PanelContainer
 
         if (b.Def.Recipe is { } recipe && b.IsOperational)
         {
-            string inputs = recipe.Inputs.Count == 0 ? "" : string.Join(", ", recipe.Inputs.Select(kv => $"{kv.Value} {kv.Key}")) + " -> ";
+            string inputs = RecipeText.Inputs(recipe);
             string outputs = string.Join(", ", recipe.Outputs.Select(kv => $"{kv.Value} {kv.Key}"));
             sb.AppendLine($"[b]Makes:[/b] {inputs}{outputs} per worker-day");
             sb.AppendLine($"[b]Current batch:[/b] {Math.Min(1, b.CycleProgress / recipe.WorkDays):P0}");

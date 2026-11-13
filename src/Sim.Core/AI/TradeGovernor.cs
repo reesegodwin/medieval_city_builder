@@ -99,7 +99,7 @@ public static class TradeGovernor
             if (def == null || r == Inventory.Coin) return false;
             return r is "wood" or "stone" || def.IsFood || def.IsTool ||
                    world.Data.Needs.Any(n => n.Goods.ContainsKey(r)) ||
-                   s.Buildings.Any(b => b.Def.Recipe?.Inputs.ContainsKey(r) == true);
+                   s.Buildings.Any(b => b.Def.Recipe?.Uses(r) == true);
         }
         bool Short(string r) => Used(r) && s.Stock.Get(r) < s.Rules.LowStockThreshold;
         // In autumn, food above the winter reserve is a surplus too: sell it before it rots.
