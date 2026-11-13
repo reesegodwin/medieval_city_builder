@@ -23,6 +23,15 @@ public sealed class EngineDef
 
     /// <summary>Extra multiplier against gates and gatehouses.</summary>
     public double VsGate { get; set; } = 1;
+
+    /// <summary>How far from the wall (tiles) it works once built: a ram must touch it, a trebuchet out-ranges archers.</summary>
+    public double Range { get; set; } = 1;
+
+    /// <summary>How much shooting it takes before it's wrecked.</summary>
+    public int Hp { get; set; } = 100;
+
+    /// <summary>Share of arrow damage it takes (a ram under its hide roof takes less).</summary>
+    public double ArrowFactor { get; set; } = 1;
 }
 
 /// <summary>Siege tuning (units.json "siege").</summary>
@@ -52,6 +61,16 @@ public sealed class SiegeRules
     /// <summary>Wall hit points restored a day per damaged tile once the siege is over (paid in materials).</summary>
     public int RepairHpPerDay { get; set; } = 40;
 
+    /// <summary>How far archers and towers on the walls can shoot (tiles). Engines are built beyond it.</summary>
+    public double ArcherRange { get; set; } = 8;
+
+    /// <summary>Tiles beyond archer range at which the band builds its engines.</summary>
+    public double BuildMargin { get; set; } = 3;
+
+    /// <summary>Damage a day to engines in range: per archer on the walls, and per tower.</summary>
+    public double ArrowDamagePerArcher { get; set; } = 1.5;
+    public double ArrowDamagePerTower { get; set; } = 6;
+
     public List<EngineDef> Engines { get; set; } = new();
 
     public EngineDef? Engine(string id) => Engines.FirstOrDefault(e => e.Id == id);
@@ -66,6 +85,9 @@ public sealed class SiegeEngine
     public double Progress { get; set; }
 
     public bool Built => Progress >= 1;
+
+    /// <summary>Strength left against arrows (set when it's finished and rolled up into range).</summary>
+    public int Hp { get; set; }
 }
 
 /// <summary>
@@ -175,11 +197,20 @@ public static class Siege
             band.Engines.Add(building = new SiegeEngine { Kind = next.Id });
         if (building != null && rules.Engine(building.Kind) is { } def)
         {
+            // Built out of bowshot, then rolled up to where it works from.
             building.Progress = Math.Min(1, building.Progress + 1 / Math.Max(0.1, def.BuildDays));
-            if (building.Built) world.Log(EventKind.Battle, s, $"Siege, day {band.SiegeDays}: the raiders finished a {def.Name.ToLowerInvariant()}");
+            if (building.Built)
+            {
+                building.Hp = def.Hp;
+                world.Log(EventKind.Battle, s, $"Siege, day {band.SiegeDays}: the raiders finished a {def.Name.ToLowerInvariant()} and " +
+                    (InArcherRange(rules, def) ? "rolled it up to the walls" : "set it up beyond bowshot"));
+            }
         }
 
-        // 2. Batter the outer wall tile the built engines bring down soonest.
+        // 2. Archers and towers on the walls shoot at engines that have come within their range.
+        ShootAtEngines(world, s, band);
+
+        // 3. Batter the outer wall tile the built engines bring down soonest.
         var engines = band.Engines.Where(e => e.Built).Select(e => rules.Engine(e.Kind)).OfType<EngineDef>().ToList();
         if (engines.Count == 0) return;
         (int X, int Y)? target = null;
@@ -209,6 +240,39 @@ public static class Siege
         };
         Commands.Walls.Breach(world, s, t.X, t.Y);
         Assault(world, s, band, $"Breach! The raiders broke through the {piece} and stormed in");
+    }
+
+    /// <summary>Whether an engine, once working, stands within bowshot of the walls.</summary>
+    public static bool InArcherRange(SiegeRules rules, EngineDef engine) => engine.Range <= rules.ArcherRange;
+
+    /// <summary>Archers in squads (on the walls during a siege, up to the wall-walk's room) and the towers.</summary>
+    public static double ArrowDamage(GameWorld world, Settlement s)
+    {
+        var rules = world.Data.War.Siege;
+        int archers = s.Squads.Where(q => world.Data.War.Unit(q.UnitId)?.Ranged == true).Sum(q => q.SoldierIds.Count);
+        int room = WallSystem.DefenderCapacity(world, s);
+        return Math.Min(archers, room) * rules.ArrowDamagePerArcher + WallSystem.Towers(s).Count() * rules.ArrowDamagePerTower;
+    }
+
+    /// <summary>
+    /// The defenders shoot at the nearest engine in range (only engines that have been finished and brought up within
+    /// bowshot; those still being built, and trebuchets working from beyond range, are safe). Wrecked engines are gone.
+    /// </summary>
+    public static void ShootAtEngines(GameWorld world, Settlement s, Warband band)
+    {
+        var rules = world.Data.War.Siege;
+        double damage = ArrowDamage(world, s);
+        if (damage <= 0) return;
+        var target = band.Engines
+            .Where(e => e.Built && rules.Engine(e.Kind) is { } d && InArcherRange(rules, d))
+            .OrderBy(e => rules.Engine(e.Kind)!.Range).FirstOrDefault();
+        if (target == null) return;
+        var def = rules.Engine(target.Kind)!;
+        if (target.Hp <= 0) target.Hp = def.Hp; // finished before engines had strength (older saves)
+        target.Hp -= (int)Math.Ceiling(damage * def.ArrowFactor);
+        if (target.Hp > 0) return;
+        band.Engines.Remove(target);
+        world.Log(EventKind.Battle, s, $"Siege, day {band.SiegeDays}: our archers wrecked the raiders' {def.Name.ToLowerInvariant()}");
     }
 
     private static void Assault(GameWorld world, Settlement s, Warband band, string message)

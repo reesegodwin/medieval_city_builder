@@ -122,7 +122,7 @@ public sealed class GameWorld
         {
             h.Add(w.Id).Add(w.TargetId).Add(w.X).Add(w.Y).Add(w.Raiders).Add(w.Archers)
                 .Add(w.Siege).Add(w.SiegeDays).Add(w.HasTarget).Add(w.TargetX).Add(w.TargetY).Add(w.LastSallyDay);
-            foreach (var e in w.Engines) h.Add(e.Kind).Add(e.Progress);
+            foreach (var e in w.Engines) h.Add(e.Kind).Add(e.Progress).Add(e.Hp);
         }
         h.Add(War.Reports.Count);
         var trade = Trade;

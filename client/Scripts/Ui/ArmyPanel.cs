@@ -176,7 +176,7 @@ public partial class ArmyPanel : PanelContainer
     }
 
     private string SiegeSignature(Settlement s) => Siege.BandAt(World, s) is { } b
-        ? $"{b.SiegeDays}:{b.Size}:{string.Join(",", b.Engines.Select(e => $"{e.Kind}{(int)(e.Progress * 10)}"))}:" +
+        ? $"{b.SiegeDays}:{b.Size}:{string.Join(",", b.Engines.Select(e => $"{e.Kind}{(int)(e.Progress * 10)}h{e.Hp}"))}:" +
           (b.HasTarget && s.Walls.TryGetValue((b.TargetX, b.TargetY), out var w) ? w.Hp : -1) + $":{b.LastSallyDay}"
         : "";
 
@@ -192,9 +192,14 @@ public partial class ArmyPanel : PanelContainer
         foreach (var engine in band.Engines)
         {
             string name = rules.Engine(engine.Kind)?.Name ?? engine.Kind;
-            Line(engine.Built ? $"• {name}: battering the walls" : $"• {name}: being built ({engine.Progress:P0})");
+            var def = rules.Engine(engine.Kind);
+            bool inRange = def != null && Siege.InArcherRange(rules, def);
+            Line(!engine.Built ? $"• {name}: being built out of bowshot ({engine.Progress:P0})"
+                : inRange ? $"• {name}: battering the walls, within our archers' range ({Math.Max(0, engine.Hp)}/{def!.Hp})"
+                : $"• {name}: battering the walls from beyond bowshot");
         }
         if (band.Engines.Count == 0) Line("• No engines yet");
+        Line($"• Our archers and towers shoot {Siege.ArrowDamage(World, s):0} damage a day at engines within {rules.ArcherRange:0} tiles");
         if (band.HasTarget && s.Walls.TryGetValue((band.TargetX, band.TargetY), out var wall))
         {
             int max = Sim.Core.Commands.Walls.PieceHitPoints(World, wall.Tier, wall.Piece);

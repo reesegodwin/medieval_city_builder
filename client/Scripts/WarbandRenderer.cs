@@ -131,7 +131,12 @@ public partial class WarbandRenderer : Node3D
         {
             var engine = band.Engines[i];
             if (!_engines.TryGetValue(engine.Kind, out var mm) || engineCounts[engine.Kind] >= mm.InstanceCount) continue;
-            float distance = engine.Kind == "ram" ? 1.6f : engine.Kind == "catapult" ? 5f : 7f;
+            // Built out of bowshot; once finished, rolled up to where it works from (a ram right against the wall).
+            var siegeRules = world.Data.War.Siege;
+            var def = siegeRules.Engine(engine.Kind);
+            float distance = !engine.Built
+                ? (float)(siegeRules.ArcherRange + siegeRules.BuildMargin)
+                : Mathf.Max(1.6f, (float)(def?.Range ?? 1));
             var p = target - toWall * distance + across * ((i - (band.Engines.Count - 1) / 2f) * 2.2f);
             // Half-built engines are drawn short.
             float build = engine.Built ? 1f : 0.35f + 0.65f * (float)engine.Progress;
