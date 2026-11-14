@@ -107,10 +107,10 @@ public partial class Main : Node3D
                 new WorldSettings { SecondsPerGameDay = secondsPerDay, WhenEmpty = EmptyWorldPolicy.CatchUp });
         }
         if (SimSession.UserArg("--menu") != null) return null;
-        string[] directStart = { "--seed", "--warmup-days", "--screenshot", "--place", "--inspect", "--rules",
+        string[] directStart = { "--seed", "--npc", "--warmup-days", "--screenshot", "--place", "--inspect", "--rules",
             "--territory", "--zoom", "--save-load-test", "--export-sounds" };
         return directStart.Any(a => SimSession.UserArg(a) != null)
-            ? SimSession.NewLocal(SimSession.SeedFromCommandLine(42), secondsPerDay)
+            ? SimSession.NewLocal(SimSession.SeedFromCommandLine(42), secondsPerDay, int.TryParse(SimSession.UserArg("--npc"), out int npc) ? npc : 0)
             : null;
     }
 
@@ -322,6 +322,11 @@ public partial class Main : Node3D
         if (SimSession.UserArg("--demo-walls") != null) DemoWalls();
         if (SimSession.UserArg("--demo-raid") != null && _session.Mode == SessionMode.Local) DemoRaid();
         if (SimSession.UserArg("--demo-siege") != null && _session.Mode == SessionMode.Local) DemoSiege();
+        if (int.TryParse(SimSession.UserArg("--look-at-town"), out int townIndex) && townIndex < _session.World.Settlements.Count)
+        {
+            var other = _session.World.Settlements[townIndex];
+            _camera.LookAtTile(other.CenterX, other.CenterY);
+        }
         if (SimSession.UserArg("--look-at") is { Length: > 0 } lookAt)
         {
             var player = _session.PlayerTown;
@@ -413,6 +418,10 @@ public partial class Main : Node3D
             root.AddChild(territory);
             territory.Initialize(map, settlement, () => _camera.Distance);
             if (mine) _territory = territory;
+
+            var banner = new TownBanner { Name = "Banner" };
+            root.AddChild(banner);
+            banner.Initialize(_session.World, settlement, mine ? null : territory);
         }
     }
 

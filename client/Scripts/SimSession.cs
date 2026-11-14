@@ -93,10 +93,11 @@ public sealed class SimSession : IDisposable
     private string? _pendingNotice;
 
     /// <summary>A new single-player world at a named speed.</summary>
-    public static SimSession NewLocal(ulong seed, double secondsPerGameDay)
+    public static SimSession NewLocal(ulong seed, double secondsPerGameDay, int npcTowns = 0)
     {
         var world = new GameWorld(seed);
         world.Settings.SecondsPerGameDay = secondsPerGameDay;
+        world.Settings.NpcTowns = npcTowns;
         world.Settings.WhenEmpty = EmptyWorldPolicy.Pause;
         SettlementFounder.Found(world);
         world.LastActiveUtc = DateTimeOffset.UtcNow;

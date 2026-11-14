@@ -1,0 +1,15 @@
+{
+  "_comment": "NPC factions (Phase 5). startTowns is the default for new worlds made in the game or on a server; the core default (WorldSettings.NpcTowns) is 0.",
+  "startTowns": 3,
+  "maxNpcTowns": 6,
+  "newTownEveryDays": 360,
+  "houseWords": ["House", "House", "House", "Clan", "The Free Town of", "Lordship of"],
+  "colours": [
+    "#b33a3a", "#3a6fb3", "#3a9a4c", "#c98a1e", "#7a4bb0", "#2f9a9a", "#b35a8a", "#6b6b2f", "#a0522d", "#4b5563"
+  ],
+  "personalities": [
+    {"id": "trader", "name": "Merchants", "description": "Prefer trade to war: quick to sign trade pacts, slow to anger.", "aggression": 0.2, "tradeBias": 1.0, "caution": 0.5},
+    {"id": "cautious", "name": "Cautious", "description": "Keep to themselves, value non-aggression and alliances, rarely start wars.", "aggression": 0.3, "tradeBias": 0.5, "caution": 1.0},
+    {"id": "warlike", "name": "Warlike", "description": "Respect only strength: demand tribute from the weak and go to war readily.", "aggression": 1.0, "tradeBias": 0.3, "caution": 0.2}
+  ]
+}

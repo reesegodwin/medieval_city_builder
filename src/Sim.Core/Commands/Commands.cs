@@ -408,6 +408,7 @@ public sealed record FoundSettlementCommand(string OwnerId) : ICommand
         var (dx, dy) = SpotOffset(world.Settlements.Count);
         var town = Simulation.SettlementFounder.Found(world, nearX: origin.Item1 + dx * Spacing, nearY: origin.Item2 + dy * Spacing);
         town.OwnerId = OwnerId;
+        Diplomacy.Factions.EnsureFactions(world); // the player's realm
         return CommandResult.Success(town.Id);
     }
 

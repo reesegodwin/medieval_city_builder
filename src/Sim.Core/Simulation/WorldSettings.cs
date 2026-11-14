@@ -47,6 +47,12 @@ public sealed class WorldSettings
     /// <summary>Fastest players may speed the world up to, as a multiple of normal speed.</summary>
     public double MaxSpeedMultiplier { get; set; } = 8;
 
+    /// <summary>
+    /// Computer-run (NPC) towns the world starts with; more are founded over time (factions.json). Zero for none.
+    /// New worlds made in the game or on a server use factions.json's startTowns; the default here is none.
+    /// </summary>
+    public int NpcTowns { get; set; }
+
     public WorldSettings Clone() => (WorldSettings)MemberwiseClone();
 }
 
