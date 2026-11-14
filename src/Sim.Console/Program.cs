@@ -98,6 +98,14 @@ if (world.Diplomacy.Factions.Count > 1)
     foreach (var r in book.Relations)
         Console.WriteLine($"  Opinion {Name(r.A)} / {Name(r.B)}: {r.Opinion:0}");
     Console.WriteLine($"  Diplomatic events: {world.Events.Count(e => e.Kind == Sim.Core.Events.EventKind.Diplomacy)}");
+    foreach (var w in book.Wars) Console.WriteLine($"  At war: {Name(w.Attacker)} on {Name(w.Defender)} since day {w.DeclaredDay}");
+    var said = world.Events.Select(e => e.Message).Distinct().ToList();
+    Console.WriteLine($"  Wars declared {said.Count(m => m.StartsWith("WAR:"))}, peace made {said.Count(m => m.StartsWith("PEACE:"))}, " +
+                      $"marches {said.Count(m => m.Contains(" marched on "))}, relief armies {said.Count(m => m.Contains(" to relieve "))}, " +
+                      $"armies home {world.Events.Count(e => e.Message.StartsWith("The army came home"))}");
+    foreach (var e in world.Events.Where(e => e.Message.StartsWith("WAR:") || e.Message.StartsWith("PEACE:") || e.Message.Contains(" marched on ") ||
+                                               e.Message.Contains("army") || e.Message.Contains("peace")).GroupBy(e => e.Message).Select(g => g.First()).Take(30))
+        Console.WriteLine($"    {e.Time}: {e.Message}");
 }
 if (options.ShowMap) Report.PrintMap(world, settlement);
 if (options.ShowCitizens) Report.PrintCitizens(settlement);

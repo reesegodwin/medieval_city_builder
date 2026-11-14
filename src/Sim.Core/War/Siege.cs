@@ -292,8 +292,10 @@ public static class Siege
 
     private static void End(GameWorld world, Settlement s, Warband band, string message)
     {
-        world.War.Warbands.Remove(band);
+        if (FactionWar.IsArmy(band)) message = message.Replace("The raiders", $"{band.Banner}'s army").Replace("raiders", "soldiers");
+        FactionWar.Disperse(world, band);
         world.Log(EventKind.Battle, s, message);
+        if (FactionWar.IsArmy(band) && world.FindSettlement(band.OwnerSettlementId) is { } home) world.Log(EventKind.Battle, home, $"At {s.Name}: {message}");
     }
 
     /// <summary>The town's soldiers fight the band outside the walls; a win burns its engines.</summary>
@@ -302,7 +304,7 @@ public static class Siege
         band.LastSallyDay = world.Time.Day;
         var result = BattleResolver.Resolve(world, Raids.AttackerBlocks(world, band), Raids.DefenderBlocks(world, s), default, s.General);
         Raids.Bury(world, s, result, "fell in a sally");
-        Raids.TakeLosses(band, result.AttackerLosses);
+        FactionWar.TakeAttackerLosses(world, band, result, s.Name);
         string summary;
         if (result.DefendersWon)
         {
@@ -372,8 +374,14 @@ public sealed record PayTributeCommand(int SettlementId) : Commands.ISettlementC
         int price = Siege.Tribute(world, band);
         if (!s.Stock.TryTake(Inventory.Coin, price)) return Commands.CommandResult.Fail($"The raiders want {price} coin");
         s.Ledger.Record(Inventory.Coin, -price, LedgerKeys.Tribute);
-        world.War.Warbands.Remove(band);
         world.Log(EventKind.Battle, s, $"The town paid the raiders {price} coin, and they lifted the siege");
+        if (FactionWar.IsArmy(band) && world.FindSettlement(band.OwnerSettlementId) is { } home)
+        {
+            // An army takes the coin home, and its realm makes peace.
+            band.Loot[Inventory.Coin] = band.Loot.GetValueOrDefault(Inventory.Coin) + price;
+            if (FactionWar.WarBetween(world, home.FactionId, s.FactionId) is { } war) FactionWar.MakePeace(world, war, $"{s.Name} paid {price} coin");
+        }
+        FactionWar.Disperse(world, band);
         return Commands.CommandResult.Success();
     }
 }

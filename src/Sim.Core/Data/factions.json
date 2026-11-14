@@ -26,6 +26,18 @@
     "treatyBrokenWitnessOpinion": -8,
     "npcActEveryDays": 20
   },
+  "war": {
+    "warningDays": 2,
+    "protectionDays": 90,
+    "peaceDays": 60,
+    "declareOpinion": -40,
+    "warOpinionPerDay": -0.2,
+    "npcWarOpinion": -50,
+    "npcWarStrength": 1.5,
+    "npcPeaceAfterDays": 90,
+    "npcArmyMin": 15,
+    "npcSquadsKept": 1
+  },
   "personalities": [
     {"id": "trader", "name": "Merchants", "description": "Prefer trade to war: quick to sign trade pacts, slow to anger.", "aggression": 0.2, "tradeBias": 1.0, "caution": 0.5},
     {"id": "cautious", "name": "Cautious", "description": "Keep to themselves, value non-aggression and alliances, rarely start wars.", "aggression": 0.3, "tradeBias": 0.5, "caution": 1.0},

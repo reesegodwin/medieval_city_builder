@@ -55,7 +55,13 @@ public partial class WarbandRenderer : Node3D
 
         foreach (var band in world.War.Warbands)
         {
-            if (!ArmyPanel.InSight(world, player, band) || flags >= _banners.InstanceCount) continue;
+            bool ours = band.OwnerSettlementId != 0 && world.FindSettlement(band.OwnerSettlementId)?.FactionId == player.FactionId;
+            if (!ours && !ArmyPanel.InSight(world, player, band) || flags >= _banners.InstanceCount) continue;
+            // Armies wear their realm's colours; bandits their own drab.
+            var realm = band.OwnerSettlementId != 0 && world.FindSettlement(band.OwnerSettlementId) is { } owner
+                ? Sim.Core.Diplomacy.Factions.Of(world, owner) : null;
+            var cloth = realm != null ? Color.FromHtml(realm.Colour).Darkened(0.2f) : RaiderCloth;
+            var flagColour = realm != null ? Color.FromHtml(realm.Colour) : Banner;
             var target = world.FindSettlement(band.TargetId);
             if (target == null) continue;
 
@@ -90,14 +96,14 @@ public partial class WarbandRenderer : Node3D
                 var xform = new Transform3D(new Basis(Vector3.Up, yaw).Scaled(Vector3.One * CitizenRenderer.FigureScale), new Vector3(p.X, y, p.Y));
                 bool archer = i < band.Archers * drawn / Math.Max(1, band.Size);
                 _bodies.SetInstanceTransform(n, xform);
-                _bodies.SetInstanceColor(n, archer ? ArcherCloth : RaiderCloth);
+                _bodies.SetInstanceColor(n, realm != null ? (archer ? cloth.Darkened(0.25f) : cloth) : archer ? ArcherCloth : RaiderCloth);
                 _heads.SetInstanceTransform(n, xform);
                 _heads.SetInstanceColor(n, Skin);
             }
 
             float by = Mathf.Max(TerrainShape.HeightAt(world.Map, at.X, at.Y), TerrainShape.WaterLevel);
             _banners.SetInstanceTransform(flags, new Transform3D(new Basis(Vector3.Up, yaw), new Vector3(at.X, by, at.Y)));
-            _banners.SetInstanceColor(flags, Banner);
+            _banners.SetInstanceColor(flags, flagColour);
             flags++;
             if (band.Siege) DrawCamp(world, band, at, dir, side, ref tents, engineCounts);
         }

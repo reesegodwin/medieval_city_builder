@@ -112,3 +112,4 @@ The plan is also copied to `docs/AUTONOMOUS_PLAN.md` with a progress log, so the
 - [x] Sieges (requested after the run): bandit warbands of 20+ besiege walled towns, build rams/catapults/trebuchets, breach and assault; sally, tribute, give-up after 30 days; mild pressure; wall repairs; AI responses; client camp, engines, wall damage, siege panel.
 - [x] Phase 5, PR 1: factions and NPC realms (founded at start and yearly, governed like Auto towns), banners, Realm list, start-menu Neighbours, server --npc-towns.
 - [x] Phase 5, PR 2: diplomacy: opinions, proposals (trade pact, non-aggression, alliance, vassalage, demands), gifts, treaty effects, NPC answers and moves, diplomacy panel (N).
+- [x] Phase 5, PR 3: war between realms: declarations with warning, armies from real squads, sieges and assaults, loot, peace and truces, relief armies, NPC war AI, war UI.

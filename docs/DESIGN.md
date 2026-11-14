@@ -88,7 +88,7 @@ Each phase ends with something you can play.
 3. **Phase 2, Persistence & multiplayer:** PostgreSQL saves, accounts, several players, interest management, running on a cheap Linux VPS.
 4. **Phase 3, War:** armies from population, the formation battle resolver, generals, fog of war and scouting. *(In progress: military economy, squads, generals, the aggregate resolver, raids and the call to arms are in; see "War (Phase 3a)".)*
 5. **Phase 4, Sieges & walls:** walls and towers, siege engines, multi-day sieges, Discord/email alerts. *(In progress: walls, towers, gatehouses and bandit sieges with rams, catapults and trebuchets are in; see "Sieges".)*
-6. **Phase 5, NPC factions & diplomacy:** utility AI, proposals with expiry, vassals and tribute. *(In progress: factions, NPC towns and diplomacy are in; war between realms is next.)*
+6. **Phase 5, NPC factions & diplomacy:** utility AI, proposals with expiry, vassals and tribute. *(Done: factions, NPC realms, diplomacy, and war between realms, with armies and relief.)*
 7. **Phase 6, Trade & sea:** roads, caravans, ports, ships, blockades.
 8. **Phase 7, Depth:** tech tree, instability and civil war, balance passes, content and art.
 
@@ -640,6 +640,39 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - each realm with its temperament, its opinion of you, its strength next to yours, shared treaties (with Break), and buttons to propose, give or demand.
 - **720 days (seed 42, 3 NPC realms):** the NPC realms signed 9 treaties among themselves: trade pacts, two alliances and non-aggression pacts. One warlike house is wary of its warlike neighbour. Nobody starved. 295 s for the run.
 - **Save** v21; relations, treaties (with owed tribute) and proposals are hashed.
+
+## War between realms (Phase 5, part 3: `War/FactionWar.cs`, factions.json "war")
+- **Declaring war** (`DeclareWarCommand`) is refused while the realms share a non-aggression pact, an alliance or vassalage: break it first, at a cost in opinion with everyone. A realm is also protected for its first 90 days.
+  - The declaration costs 40 opinion, and opinion keeps falling while the war lasts.
+  - The fighting may begin after a warning of at least 2 game days and at least `WorldSettings.MinWarWarningMinutes` real minutes (default 60). The real minutes are converted by the world's speed, so it stays deterministic, and offline players always get real notice. The HUD shows the countdown.
+- **Armies:** `MarchCommand` sends a town's regular squads at home (levies stay) against an enemy town.
+  - An army is a town-owned `Warband` that carries its squads (`Squad.ArmyId`). It marches, sets off the enemy's watch and muster (described as "House X's army"), lays siege with engines like a big band, and fights with its real soldiers.
+  - The fallen are the home town's people (`BattleResult.AttackersFallen`), and survivors gain experience. Squads away don't defend home and can't be disbanded.
+  - `RecallArmyCommand` brings an army home.
+- **Endings:**
+  - An army that wins its assault carries the loot home, and the war ends in peace.
+  - One that loses, gives up or is recalled marches home with its survivors and rejoins the garrison.
+  - Paying a besieging army off sends the coin home with it and also ends the war.
+  - Peace by proposal (`ProposalKind.Peace`) works too.
+  - Every peace brings a 60-day non-aggression pact (`Treaty.EndsDay`).
+- **Allies:** a relief army marches to an ally's besieged town and fights the besiegers in the open. If it wins, the siege is broken.
+- **NPC realms:**
+  - The warlike now and then declare war on a realm they despise (opinion −50 or lower) that they outweigh 1.5 times.
+  - They march with their spare squads: at least 15 soldiers, keeping one squad home if they have three or more.
+  - They relieve besieged allies.
+  - They offer peace after 90 days, or after 10 if clearly losing, and accept it on the same terms.
+- **Client:**
+  - Diplomacy panel: war status and countdown, "Declare war", "Offer peace", and when a peace pact runs out.
+  - Army panel: armies in the field with Recall, and "March on <town>" for every enemy town once the fighting may begin.
+  - HUD: a war banner.
+  - Map: armies drawn in their realm's colours (your own always visible).
+  - `--demo-war` sets up a war for screenshots.
+- **720 days with 3 NPC realms:**
+  - Seed 42: House Coldwell declared war on a weaker cautious realm. It sacked Millbrook and brought loot home (peace). When the peace lapsed it attacked again and was beaten off; a peace later followed.
+  - Relief armies marched in all three seeds.
+  - No starvation; about 300 s per run.
+  - The default checks without NPC realms are unchanged.
+- **Save** v22; wars, armies (owner, squads, loot, returning, relief), `Squad.ArmyId` and `Treaty.EndsDay` are hashed.
 
 ## Battles: individual units + destructible structures (hybrid LOD simulation)
 

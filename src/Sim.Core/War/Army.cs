@@ -70,6 +70,9 @@ public sealed class Squad
 
     /// <summary>Raised for an emergency (call to arms): sent home when the threat passes.</summary>
     public bool Levy { get; set; }
+
+    /// <summary>The army (a town-owned <see cref="Warband"/>) this squad is marching with, if away from home.</summary>
+    public int? ArmyId { get; set; }
 }
 
 /// <summary>The settlement's general: a citizen with skill that grows with battles, and traits.</summary>

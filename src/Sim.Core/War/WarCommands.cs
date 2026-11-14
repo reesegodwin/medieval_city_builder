@@ -142,6 +142,7 @@ public sealed record DisbandSquadCommand(int SettlementId, int SquadId) : ISettl
         if (s == null) return CommandResult.Fail("Unknown settlement");
         var squad = s.Squads.FirstOrDefault(q => q.Id == SquadId);
         if (squad == null) return CommandResult.Fail("No such squad");
+        if (squad.ArmyId != null) return CommandResult.Fail("That squad is away with the army: recall it first");
         Armies.Disband(world, s, squad);
         world.Log(Events.EventKind.Military, s, "A squad was stood down and went back to work");
         return CommandResult.Success();

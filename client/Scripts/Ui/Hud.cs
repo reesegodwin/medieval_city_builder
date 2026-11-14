@@ -376,6 +376,18 @@ public partial class Hud : CanvasLayer
             _alert.AddThemeColorOverride("font_color", ArmyPanel.AlertColor(town.Alert));
         }
 
+        // No raiders about: show a war, if there is one (the countdown to the fighting, or that it's on).
+        if (!_alert.Visible && world.Diplomacy.Wars.FirstOrDefault(w => w.Attacker == town.FactionId || w.Defender == town.FactionId) is { } war)
+        {
+            int enemy = war.Attacker == town.FactionId ? war.Defender : war.Attacker;
+            double left = (war.StartsTick - world.Time.Tick) / (double)Sim.Core.Time.TimeScale.TicksPerDay;
+            _alert.Visible = true;
+            _alert.Text = left > 0
+                ? $"War with {world.Diplomacy.Find(enemy)?.Name}: the fighting may begin in {left:0.#} days (N)"
+                : $"At war with {world.Diplomacy.Find(enemy)?.Name} (N, K)";
+            _alert.AddThemeColorOverride("font_color", new Color(1f, 0.5f, 0.45f));
+        }
+
         _pause.SetPressedNoSignal(session.Paused);
         foreach (var (speed, button) in _speedButtons)
             button.SetPressedNoSignal(!session.Paused && Math.Abs(session.Speed - speed) < 0.001);

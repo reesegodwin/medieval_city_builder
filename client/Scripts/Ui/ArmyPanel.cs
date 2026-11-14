@@ -77,6 +77,8 @@ public partial class ArmyPanel : PanelContainer
             string.Join(",", war.Units.SelectMany(u => u.Gear.Keys).Distinct().Select(g => s.Stock.Get(g))),
             string.Join(",", World.War.Warbands.Where(w => InSight(World, s, w)).Select(w => Raids.Describe(s, w) + (int)Raids.Distance(s, w))),
             World.War.Reports.Count, Armies.SquadCapacity(World, s), Armies.SpareHands(s), SiegeSignature(s),
+            string.Join(",", World.War.Warbands.Where(b => b.OwnerSettlementId == s.Id).Select(b => $"{b.Id}:{b.Size}:{b.Returning}:{(int)b.X}:{b.Siege}")),
+            World.Diplomacy.Wars.Count,
             s.Stock.Get(Sim.Core.Economy.Inventory.Coin) / 50);
         if (signature == _shown) return;
         _shown = signature;
@@ -100,6 +102,8 @@ public partial class ArmyPanel : PanelContainer
             foreach (var band in World.War.Warbands.Where(w => InSight(World, s, w)))
                 Line($"• {Capitalize(Raids.Describe(s, band))}, {Raids.Distance(s, band):0} tiles out");
         }
+
+        BuildArmies(s);
 
         // --- General ---
         Section("General", "Leads the town's soldiers. Traits shape battles; skill grows with every battle fought.");
@@ -126,7 +130,7 @@ public partial class ArmyPanel : PanelContainer
             var row = new HBoxContainer();
             row.AddChild(new Label
             {
-                Text = $"{unit?.Name ?? squad.UnitId}: {squad.SoldierIds.Count}{(squad.Levy ? " (levy)" : "")}, xp {squad.Xp:0}",
+                Text = $"{unit?.Name ?? squad.UnitId}: {squad.SoldierIds.Count}{(squad.Levy ? " (levy)" : "")}{(squad.ArmyId != null ? " (away with the army)" : "")}, xp {squad.Xp:0}",
                 SizeFlagsHorizontal = SizeFlags.ExpandFill,
             });
             int id = squad.Id;
@@ -172,6 +176,43 @@ public partial class ArmyPanel : PanelContainer
             Section("Recent battles", "");
             foreach (var r in reports)
                 Line($"Day {r.Day}: {r.Summary}", r.DefendersWon ? new Color(0.7f, 0.95f, 0.7f) : new Color(1f, 0.6f, 0.55f));
+        }
+    }
+
+    /// <summary>Armies in the field, and enemy towns the town's squads can march on.</summary>
+    private void BuildArmies(Settlement s)
+    {
+        var armies = World.War.Warbands.Where(b => b.OwnerSettlementId == s.Id).ToList();
+        var enemies = World.Settlements.Where(t => t.FactionId != s.FactionId &&
+                                                   Sim.Core.War.FactionWar.WarBetween(World, s.FactionId, t.FactionId) is { } w &&
+                                                   World.Time.Tick >= w.StartsTick).ToList();
+        if (armies.Count == 0 && enemies.Count == 0) return;
+        Section("Armies in the field", "Regular squads can march on an enemy town (levies stay home). They lay siege like any band, " +
+                                       "and the fallen are your people. Win, and they bring the loot home.");
+        foreach (var army in armies)
+        {
+            var target = World.FindSettlement(army.TargetId);
+            string doing = army.Returning ? "marching home" + (army.Loot.Count > 0 ? $" with {Sim.Core.Trade.Trading.Describe(army.Loot)}" : "")
+                : army.Relief ? $"marching to relieve {target?.Name}"
+                : army.Siege ? $"besieging {target?.Name} (day {army.SiegeDays})"
+                : $"marching on {target?.Name}, {(target != null ? Raids.Distance(target, army) : 0):0} tiles out";
+            var row = new HBoxContainer();
+            row.AddChild(new Label { Text = $"{army.Size} soldiers {doing}", SizeFlagsHorizontal = SizeFlags.ExpandFill, AutowrapMode = TextServer.AutowrapMode.WordSmart });
+            if (!army.Returning)
+            {
+                int id = army.Id;
+                var recall = new Button { Text = "Recall", FocusMode = FocusModeEnum.None };
+                recall.Pressed += () => Report(_session.Execute(new RecallArmyCommand(s.Id, id)), "The army is coming home");
+                row.AddChild(recall);
+            }
+            _body.AddChild(row);
+        }
+        int home = Sim.Core.War.FactionWar.HomeSquads(s).Sum(q => q.SoldierIds.Count);
+        foreach (var target in enemies)
+        {
+            int t = target.Id;
+            ActionButton($"March on {target.Name} with {home} soldiers", "Send every regular squad at home.",
+                () => Report(_session.Execute(new MarchCommand(s.Id, t)), $"Marching on {target.Name}"));
         }
     }
 

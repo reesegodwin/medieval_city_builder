@@ -94,7 +94,7 @@ public sealed class GameWorld
             foreach (var (x, y, gate) in s.WallRing) h.Add(x).Add(y).Add(gate);
             foreach (var q in s.Squads)
             {
-                h.Add(q.Id).Add(q.UnitId).Add(q.Xp).Add(q.Levy);
+                h.Add(q.Id).Add(q.UnitId).Add(q.Xp).Add(q.Levy).Add(q.ArmyId ?? 0);
                 foreach (int id in q.SoldierIds) h.Add(id);
             }
             if (s.General is { } g)
@@ -123,7 +123,8 @@ public sealed class GameWorld
         }
         foreach (var f in Diplomacy.Factions) h.Add(f.Id).Add(f.Name).Add(f.IsNpc).Add(f.Personality).Add(f.PlayerName ?? "");
         foreach (var r in Diplomacy.Relations) h.Add(r.A).Add(r.B).Add(r.Opinion);
-        foreach (var t in Diplomacy.Treaties) h.Add(t.Id).Add((int)t.Kind).Add(t.A).Add(t.B).Add(t.StartDay).Add(t.Owed);
+        foreach (var t in Diplomacy.Treaties) h.Add(t.Id).Add((int)t.Kind).Add(t.A).Add(t.B).Add(t.StartDay).Add(t.Owed).Add(t.EndsDay);
+        foreach (var w in Diplomacy.Wars) h.Add(w.Id).Add(w.Attacker).Add(w.Defender).Add(w.DeclaredDay).Add(w.StartsTick);
         foreach (var p in Diplomacy.Proposals)
         {
             h.Add(p.Id).Add((int)p.Kind).Add(p.FromFaction).Add(p.ToFaction).Add(p.ExpiresTick);
@@ -132,7 +133,10 @@ public sealed class GameWorld
         foreach (var w in War.Warbands)
         {
             h.Add(w.Id).Add(w.TargetId).Add(w.X).Add(w.Y).Add(w.Raiders).Add(w.Archers)
-                .Add(w.Siege).Add(w.SiegeDays).Add(w.HasTarget).Add(w.TargetX).Add(w.TargetY).Add(w.LastSallyDay);
+                .Add(w.Siege).Add(w.SiegeDays).Add(w.HasTarget).Add(w.TargetX).Add(w.TargetY).Add(w.LastSallyDay)
+                .Add(w.OwnerSettlementId).Add(w.Returning).Add(w.Relief).Add(w.Banner);
+            foreach (int q in w.SquadIds) h.Add(q);
+            foreach (var (r, n) in w.Loot) h.Add(r).Add(n);
             foreach (var e in w.Engines) h.Add(e.Kind).Add(e.Progress).Add(e.Hp).Add(e.InPlace);
         }
         h.Add(War.Reports.Count);

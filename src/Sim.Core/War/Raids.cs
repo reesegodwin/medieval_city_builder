@@ -47,6 +47,22 @@ public sealed class Warband
 
     /// <summary>Day the town last sallied against this band (one sally a day).</summary>
     public long LastSallyDay { get; set; } = -1;
+
+    /// <summary>The town whose army this is (0: bandits). An army's soldiers are that town's squads.</summary>
+    public int OwnerSettlementId { get; set; }
+    public List<int> SquadIds { get; set; } = new();
+
+    /// <summary>The realm's name, for describing the army.</summary>
+    public string Banner { get; set; } = "";
+
+    /// <summary>Marching home (its target is its own town).</summary>
+    public bool Returning { get; set; }
+
+    /// <summary>Marching to break the siege of an ally's town.</summary>
+    public bool Relief { get; set; }
+
+    /// <summary>What an army carries home from a sacked town.</summary>
+    public SortedDictionary<string, int> Loot { get; set; } = new(StringComparer.Ordinal);
 }
 
 /// <summary>A battle that was fought, for reports.</summary>
@@ -141,12 +157,16 @@ public static class Raids
             if (length > 0) { w.X += dx / length * step; w.Y += dy / length * step; }
         }
 
+        FactionWar.Arrivals(world);
         foreach (var s in world.Settlements)
         {
             UpdateAlert(world, s);
             Siege.Repair(world, s);
         }
     }
+
+    /// <summary>Bands that threaten a town: marching on it to fight (not armies going home or coming to help).</summary>
+    public static bool Threatens(Warband w, Settlement s) => w.TargetId == s.Id && !w.Returning && !w.Relief;
 
     private static void Spawn(GameWorld world, Settlement s, RaidRules rules)
     {
@@ -173,6 +193,12 @@ public static class Raids
     /// <summary>What the town knows of a warband: the further away, the rougher the count (fog of war).</summary>
     public static string Describe(Settlement s, Warband w)
     {
+        if (w.OwnerSettlementId != 0)
+        {
+            double d0 = Distance(s, w);
+            int shown = d0 > MusterRadius(s) ? Math.Max(10, (int)Math.Round(w.Size / 10.0) * 10) : w.Size;
+            return $"{w.Banner}'s army of {(d0 > MusterRadius(s) ? "about " : "")}{shown}";
+        }
         double d = Distance(s, w);
         if (d > MusterRadius(s))
         {
@@ -189,7 +215,7 @@ public static class Raids
 
     private static void UpdateAlert(GameWorld world, Settlement s)
     {
-        var band = world.War.Warbands.Where(w => w.TargetId == s.Id).OrderBy(w => w.Id).FirstOrDefault();
+        var band = world.War.Warbands.Where(w => Threatens(w, s)).OrderBy(w => w.Id).FirstOrDefault();
         var level = Alert.None;
         if (band != null)
         {
@@ -250,13 +276,13 @@ public static class Raids
     }
 
     /// <summary>The warband attacks: a battle with every squad behind the town's walls; the band is gone afterwards.</summary>
-    public static List<Block> AttackerBlocks(GameWorld world, Warband band) => new()
+    public static List<Block> AttackerBlocks(GameWorld world, Warband band) => FactionWar.IsArmy(band) ? FactionWar.Blocks(world, band) : new()
     {
         new() { Unit = world.Data.War.Unit("raider")!, Count = band.Raiders },
         new() { Unit = world.Data.War.Unit("raider_archer")!, Count = band.Archers },
     };
 
-    public static List<Block> DefenderBlocks(GameWorld world, Settlement s) => s.Squads.Select(q => new Block
+    public static List<Block> DefenderBlocks(GameWorld world, Settlement s) => s.Squads.Where(q => q.ArmyId == null).Select(q => new Block
     {
         Unit = world.Data.War.Unit(q.UnitId) ?? world.Data.War.Units[0], Count = q.SoldierIds.Count, Xp = q.Xp, Citizens = q.SoldierIds.ToList(),
     }).ToList();
@@ -300,9 +326,11 @@ public static class Raids
         var units = world.Data.War;
         var result = BattleResolver.Resolve(world, AttackerBlocks(world, band), DefenderBlocks(world, s), Fortification.Of(world, s), s.General);
         Bury(world, s, result, "fell defending the town");
+        FactionWar.TakeAttackerLosses(world, band, result, s.Name);
 
         var rules = units.Raids;
         string loot = "";
+        var carried = new Dictionary<string, int>();
         if (!result.DefendersWon)
         {
             var taken = new List<string>();
@@ -311,19 +339,24 @@ public static class Raids
                 int amount = (int)Math.Floor(n * (r == Inventory.Coin ? rules.LootCoinShare : rules.LootGoodsShare));
                 if (amount <= 0 || !s.Stock.TryTake(r, amount)) continue;
                 s.Ledger.Record(r, -amount, LedgerKeys.Disaster_("raid"));
+                carried[r] = amount;
                 if (taken.Count < 4) taken.Add($"{amount} {r}");
             }
             loot = taken.Count > 0 ? $"; they carried off {string.Join(", ", taken)}" + (s.Stock.Items.Count() > 4 ? " and more" : "") : "";
         }
 
+        string who = FactionWar.IsArmy(band) ? $"{band.Banner}'s army" : "The raiders";
         string summary = result.DefendersWon
-            ? $"The raiders were beaten off: {result.AttackerLosses} of {result.AttackersStart} fell; {result.DefenderLosses} of our {result.DefendersStart} defenders died"
+            ? $"{who} {(FactionWar.IsArmy(band) ? "was" : "were")} beaten off: {result.AttackerLosses} of {result.AttackersStart} fell; {result.DefenderLosses} of our {result.DefendersStart} defenders died"
             : result.DefendersStart == 0
-                ? $"Raiders sacked the town unopposed{loot}"
-                : $"The raiders broke our {result.DefendersStart} defenders ({result.DefenderLosses} died){loot}";
+                ? $"{who} sacked the town unopposed{loot}"
+                : $"{who} broke our {result.DefendersStart} defenders ({result.DefenderLosses} died){loot}";
         world.Log(EventKind.Battle, s, summary);
+        if (FactionWar.IsArmy(band) && world.FindSettlement(band.OwnerSettlementId) is { } home)
+            world.Log(EventKind.Battle, home, $"At {s.Name}: {summary.Replace("our ", "their ")}");
         Report(world, s, result, summary);
-        world.War.Warbands.Remove(band);
+        if (FactionWar.IsArmy(band) && !result.DefendersWon) FactionWar.Victory(world, s, band, carried);
+        FactionWar.Disperse(world, band);
         s.Alert = Alert.None;
         return result;
     }
@@ -337,7 +370,7 @@ public sealed record SetRaidsCommand(int SettlementId, bool Enabled) : Commands.
         var s = world.FindSettlement(SettlementId);
         if (s == null) return Commands.CommandResult.Fail("Unknown settlement");
         s.Rules.Raids = Enabled;
-        if (!Enabled) world.War.Warbands.RemoveAll(w => w.TargetId == s.Id);
+        if (!Enabled) world.War.Warbands.RemoveAll(w => w.TargetId == s.Id && w.OwnerSettlementId == 0); // bandits only
         return Commands.CommandResult.Success();
     }
 }
