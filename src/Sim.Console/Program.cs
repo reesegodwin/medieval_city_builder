@@ -90,6 +90,14 @@ if (world.Diplomacy.Factions.Count > 1)
             Console.WriteLine($"  {f.Name}{(f.IsNpc ? $" ({f.Personality})" : " (you)")}: {town.Name} at ({town.CenterX},{town.CenterY}), " +
                               $"pop {town.Citizens.Count}, coin {town.Stock.Get("coin")}, soldiers {Sim.Core.War.Armies.Soldiers(town)}, " +
                               $"homes {town.Buildings.Count(b => b.Def.Home != null)}, walls {town.Walls.Count}");
+    var book = world.Diplomacy;
+    string Name(int id) => book.Find(id)?.Name ?? "?";
+    foreach (var t in book.Treaties)
+        Console.WriteLine($"  Treaty: {Name(t.A)} {(t.Kind == Sim.Core.Diplomacy.TreatyKind.Vassalage ? "is overlord of" : "-")} " +
+                          $"{Name(t.B)} ({t.Kind}, since day {t.StartDay})");
+    foreach (var r in book.Relations)
+        Console.WriteLine($"  Opinion {Name(r.A)} / {Name(r.B)}: {r.Opinion:0}");
+    Console.WriteLine($"  Diplomatic events: {world.Events.Count(e => e.Kind == Sim.Core.Events.EventKind.Diplomacy)}");
 }
 if (options.ShowMap) Report.PrintMap(world, settlement);
 if (options.ShowCitizens) Report.PrintCitizens(settlement);

@@ -122,9 +122,13 @@ public static class TradeGovernor
         foreach (var offer in offers.Where(o => o.SettlementId != s.Id).ToList())
         {
             if (!offer.Give.Keys.All(Short) || !s.Stock.Has(offer.Want)) continue;
+            // A trade-pact partner gets friendlier prices.
+            double bonus = world.FindSettlement(offer.SettlementId) is { } seller &&
+                           Diplomacy.Statecraft.Has(world, Diplomacy.TreatyKind.TradePact, seller.FactionId, s.FactionId)
+                ? 1 + world.Data.Factions.Diplomacy.PactPriceBonus : 1;
             bool fair = Trading.IsOnlyCoin(offer.Want)
-                ? offer.Want[Inventory.Coin] <= Trading.FairBuyPrice(world, offer.Give)
-                : offer.Want.Keys.All(Surplus) && Trading.Value(world, offer.Want) <= Trading.FairBuyPrice(world, offer.Give);
+                ? offer.Want[Inventory.Coin] <= Trading.FairBuyPrice(world, offer.Give) * bonus
+                : offer.Want.Keys.All(Surplus) && Trading.Value(world, offer.Want) <= Trading.FairBuyPrice(world, offer.Give) * bonus;
             if (fair && world.Execute(new AcceptOfferCommand(s.Id, offer.Id)).Ok) break;
         }
 

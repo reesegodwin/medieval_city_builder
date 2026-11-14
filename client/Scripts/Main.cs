@@ -54,6 +54,7 @@ public partial class Main : Node3D
     private TradePanel _trade = null!;
     private LedgerPanel _ledger = null!;
     private ArmyPanel _army = null!;
+    private DiplomacyPanel _diplomacy = null!;
     private SoundManager _sound = null!;
     private MeshInstance3D _marker = null!;
 
@@ -282,6 +283,11 @@ public partial class Main : Node3D
         _army.Initialize(_session);
         _hud.AddChild(_army);
         _hud.ArmyRequested += ToggleArmy;
+
+        _diplomacy = new DiplomacyPanel { Name = "Diplomacy" };
+        _diplomacy.Initialize(_session);
+        _hud.AddChild(_diplomacy);
+        _hud.DiplomacyRequested += ToggleDiplomacy;
         _hud.SaveRequested += SaveGame;
         _hud.LoadRequested += LoadGame;
         _hud.SoundToggled += _sound.ToggleMute;
@@ -301,6 +307,7 @@ public partial class Main : Node3D
         _screenshotPath = SimSession.UserArg("--screenshot");
         if (SimSession.UserArg("--rules") != null) _rules.Toggle();
         if (SimSession.UserArg("--army") != null) _army.Toggle();
+        if (SimSession.UserArg("--diplomacy") != null) _diplomacy.Toggle();
         if (SimSession.UserArg("--ledger") is { } ledgerTab)
         {
             _ledger.Toggle();
@@ -461,7 +468,8 @@ public partial class Main : Node3D
             if (_rules.Visible) _rules.Refresh();
             _trade.Refresh();
             _army.Refresh();
-            _hud.FeedVisible = !_rules.Visible && !_trade.Visible && !_ledger.Visible && !_army.Visible;
+            _diplomacy.Refresh();
+            _hud.FeedVisible = !_rules.Visible && !_trade.Visible && !_ledger.Visible && !_army.Visible && !_diplomacy.Visible;
         }
 
         if (_flashTimer > 0)
@@ -592,6 +600,10 @@ public partial class Main : Node3D
                 ToggleArmy();
                 break;
 
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.N }:
+                ToggleDiplomacy();
+                break;
+
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.J }:
                 ToggleTrade();
                 break;
@@ -634,12 +646,14 @@ public partial class Main : Node3D
         if (_trade != panel && _trade.Visible) _trade.Toggle();
         if (_ledger != panel && _ledger.Visible) _ledger.Toggle();
         if (_army != panel && _army.Visible) _army.Toggle();
+        if (_diplomacy != panel && _diplomacy.Visible) _diplomacy.Toggle();
         toggle();
     }
 
     private void ToggleTrade() => ShowOnly(_trade, _trade.Toggle);
     private void ToggleLedger() => ShowOnly(_ledger, _ledger.Toggle);
     private void ToggleArmy() => ShowOnly(_army, _army.Toggle);
+    private void ToggleDiplomacy() => ShowOnly(_diplomacy, _diplomacy.Toggle);
 
     private bool AnyToolActive => _placement.Active != null || _roadTool.Active || _wallTool.Active || _demolishTool.Active || _territoryTool.Active;
 

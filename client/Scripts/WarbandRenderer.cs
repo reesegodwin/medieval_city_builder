@@ -55,7 +55,7 @@ public partial class WarbandRenderer : Node3D
 
         foreach (var band in world.War.Warbands)
         {
-            if (!ArmyPanel.InSight(player, band) || flags >= _banners.InstanceCount) continue;
+            if (!ArmyPanel.InSight(world, player, band) || flags >= _banners.InstanceCount) continue;
             var target = world.FindSettlement(band.TargetId);
             if (target == null) continue;
 

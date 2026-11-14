@@ -22,6 +22,7 @@ public enum EventKind
     Battle,
     Government,
     Crime,
+    Diplomacy,
 }
 
 /// <summary>

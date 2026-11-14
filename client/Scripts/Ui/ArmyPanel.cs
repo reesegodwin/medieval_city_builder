@@ -75,7 +75,7 @@ public partial class ArmyPanel : PanelContainer
             s.Alert, s.Rules.Raids, s.Rules.MusterPercent, s.General?.CitizenId, s.General?.Battles,
             string.Join(",", s.Squads.Select(q => $"{q.Id}:{q.SoldierIds.Count}:{(int)q.Xp}")),
             string.Join(",", war.Units.SelectMany(u => u.Gear.Keys).Distinct().Select(g => s.Stock.Get(g))),
-            string.Join(",", World.War.Warbands.Where(w => InSight(s, w)).Select(w => Raids.Describe(s, w) + (int)Raids.Distance(s, w))),
+            string.Join(",", World.War.Warbands.Where(w => InSight(World, s, w)).Select(w => Raids.Describe(s, w) + (int)Raids.Distance(s, w))),
             World.War.Reports.Count, Armies.SquadCapacity(World, s), Armies.SpareHands(s), SiegeSignature(s),
             s.Stock.Get(Sim.Core.Economy.Inventory.Coin) / 50);
         if (signature == _shown) return;
@@ -83,8 +83,8 @@ public partial class ArmyPanel : PanelContainer
         Build();
     }
 
-    /// <summary>Warbands the town's watch can see (fog of war): within its watch radius.</summary>
-    public static bool InSight(Settlement s, Warband w) => Raids.Distance(s, w) <= Raids.WatchRadius(s);
+    /// <summary>Warbands the town's watch (or an ally's) can see (fog of war).</summary>
+    public static bool InSight(Sim.Core.Simulation.GameWorld world, Settlement s, Warband w) => Raids.Sees(world, s, w);
 
     private void Build()
     {
@@ -97,7 +97,7 @@ public partial class ArmyPanel : PanelContainer
         else
         {
             Section(AlertText(s.Alert), AlertHelp(s.Alert), AlertColor(s.Alert));
-            foreach (var band in World.War.Warbands.Where(w => InSight(s, w)))
+            foreach (var band in World.War.Warbands.Where(w => InSight(World, s, w)))
                 Line($"• {Capitalize(Raids.Describe(s, band))}, {Raids.Distance(s, band):0} tiles out");
         }
 

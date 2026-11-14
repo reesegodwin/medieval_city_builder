@@ -103,6 +103,16 @@ public static class Raids
     /// <summary>Where the band reaches the town: the edge of its land.</summary>
     public static double ArriveRadius(Settlement s) => s.TerritoryExtent + 2;
 
+    /// <summary>Whether a town knows of a band: its own watch sees it, or an ally's does (alliances share the watch).</summary>
+    public static bool Sees(GameWorld world, Settlement s, Warband w)
+    {
+        if (Distance(s, w) <= WatchRadius(s)) return true;
+        foreach (var t in world.Settlements)
+            if (t != s && t.FactionId != 0 && Diplomacy.Statecraft.Allied(world, s.FactionId, t.FactionId) && Distance(t, w) <= WatchRadius(t))
+                return true;
+        return false;
+    }
+
     public static double Distance(Settlement s, Warband w) => Math.Max(Math.Abs(w.X - s.CenterX), Math.Abs(w.Y - s.CenterY));
 
     public static void Daily(GameWorld world)
@@ -113,7 +123,10 @@ public static class Raids
         {
             if (!s.Rules.Raids || s.Citizens.Count < rules.MinPopulation || world.Time.Day < rules.StartDay) continue;
             if (book.Warbands.Any(w => w.TargetId == s.Id)) continue;
-            if (!world.Rng.Chance(rules.ChancePerDay)) continue;
+            // A vassal's overlord keeps bandits away, mostly.
+            double chance = rules.ChancePerDay *
+                (Diplomacy.Statecraft.OverlordOf(world, s.FactionId) != null ? world.Data.Factions.Diplomacy.VassalRaidFactor : 1);
+            if (!world.Rng.Chance(chance)) continue;
             Spawn(world, s, rules);
         }
 

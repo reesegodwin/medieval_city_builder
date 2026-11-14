@@ -42,6 +42,12 @@ public static class Trading
     /// Travel time along a path: each road step costs less on gravel or stone; a cross-country first leg (merchants)
     /// counts its full distance at dirt-road speed.
     /// </summary>
+    /// <summary>Caravans between realms with a trade pact travel faster (escorts, waved through at the border).</summary>
+    public static long PactTravel(GameWorld world, Settlement from, Settlement to, long ticks) =>
+        Diplomacy.Statecraft.Has(world, Diplomacy.TreatyKind.TradePact, from.FactionId, to.FactionId)
+            ? (long)Math.Ceiling(ticks / world.Data.Factions.Diplomacy.PactCaravanSpeed)
+            : ticks;
+
     public static long TravelTicks(GameWorld world, IReadOnlyList<(int X, int Y)> path)
     {
         double tiles = 0;
@@ -90,7 +96,7 @@ public static class Trading
             Cargo = new SortedDictionary<string, int>(cargo.ToDictionary(kv => kv.Key, kv => kv.Value), StringComparer.Ordinal),
             StartX = path[0].X, StartY = path[0].Y, EndX = path[^1].X, EndY = path[^1].Y,
             DepartTick = world.Time.Tick,
-            ArriveTick = world.Time.Tick + TravelTicks(world, path),
+            ArriveTick = world.Time.Tick + PactTravel(world, from, to, TravelTicks(world, path)),
             Path = Flatten(path),
         };
         world.Trade.Caravans.Add(caravan);

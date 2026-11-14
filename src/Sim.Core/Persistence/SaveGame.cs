@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 20; // 20: factions
+    public const int CurrentVersion = 21; // 21: diplomacy (relations, treaties, proposals)
 
     private static readonly JsonSerializerOptions Options = new()
     {

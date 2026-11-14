@@ -44,6 +44,7 @@ public partial class Hud : CanvasLayer
     public event Action? TradeRequested;
     public event Action? LedgerRequested;
     public event Action? ArmyRequested;
+    public event Action? DiplomacyRequested;
     public event Action? SaveRequested;
     public event Action? LoadRequested;
     public event Action? SoundToggled;
@@ -118,6 +119,7 @@ public partial class Hud : CanvasLayer
                      ("Trade", "Offers, trade routes and caravans (J). Needs a Trading Post.", () => TradeRequested?.Invoke()),
                      ("Ledger", "The town's books: people and complaints, goods made and used, coin in and out, jobs (L)", () => LedgerRequested?.Invoke()),
                      ("Army", "Squads, the general, raids and the muster (K)", () => ArmyRequested?.Invoke()),
+                     ("Realms", "Other realms: treaties, proposals, gifts and demands (N)", () => DiplomacyRequested?.Invoke()),
                      ("Save", "Quick-save (F5)", () => SaveRequested?.Invoke()),
                      ("Load", "Load the quick-save (F9)", () => LoadRequested?.Invoke()),
                      ("Sound", "Sound on/off (M)", () => SoundToggled?.Invoke()),
@@ -258,7 +260,7 @@ public partial class Hud : CanvasLayer
         // --- Controls help (top-right, under the bar) ---
         var help = new Label
         {
-            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   V: walls   G: gate   B: tower   X: demolish   T: territory   P: rules   J: trade   L: ledger   K: army\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
+            Text = "WASD/edge/middle-drag: pan   Wheel: zoom   Q/E: rotate   R: roads   V: walls   G: gate   B: tower   X: demolish   T: territory   P: rules   J: trade   L: ledger   K: army   N: realms\nLeft-click: select/place   Right-click/Esc: cancel   Space: pause   1-4: speed   F5/F9: save/load",
             HorizontalAlignment = HorizontalAlignment.Right,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
@@ -357,7 +359,7 @@ public partial class Hud : CanvasLayer
             string.Join("   ", world.Data.Needs.Select(n => $"{n.Name} {ServiceSystem.Coverage(town, n.Id):P0}"));
 
         // Alert banner: the nearest warband in sight, as well as the watch can tell.
-        var band = world.War.Warbands.Where(w => ArmyPanel.InSight(town, w)).OrderBy(w => Raids.Distance(town, w)).FirstOrDefault();
+        var band = world.War.Warbands.Where(w => ArmyPanel.InSight(world, town, w)).OrderBy(w => Raids.Distance(town, w)).FirstOrDefault();
         _alert.Visible = town.Alert != Alert.None && band != null;
         if (_alert.Visible && Siege.BandAt(world, town) is { } siege)
         {

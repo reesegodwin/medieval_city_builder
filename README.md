@@ -15,6 +15,7 @@ What works today:
 - **Jobs.** People are assigned by settlement rules (job priorities). The rules give priority to food during shortages, to producers of scarce goods, and to builders.
 - **Production chains** defined in JSON: farm → grain, then mill & bakery → bread; vegetable garden → vegetables; fishing hut (by water) → fish; sheep pasture → wool and mutton; smokehouse: mutton or fish (+ firewood) → smoked meat; brewery: grain → ale; woodcutter → wood; firewood hut → firewood; quarry → stone. They respect stock reserves and stock limits (like Dwarf Fortress work orders), and workers are freed once stores are full.
 - **Walls and gates:** draw a palisade, stone wall or large stone wall like a road; walls stop everyone except at gates, homes inside a closed ring feel safe, and towns ring themselves as they grow. Stone walls have a wall-walk behind battlements, reached by stairs and gatehouses, ready for defenders; towers and gatehouses add strong points.
+- **Diplomacy (N):** other realms like or dislike you; propose trade pacts, non-aggression, alliances or vassalage, send gifts or make demands. Computer-run realms answer by their temperament and strength, and make their own deals with each other.
 - **Neighbours:** new worlds start with computer-run realms nearby (choose 0–6 on the start menu), each with its own town, colours and temperament; more are founded as the years go by. The ledger lists every town of the land.
 - **Sieges:** big bandit warbands dig in before walled towns and build battering rams, catapults and trebuchets, battering the weakest stretch of wall until it breaks and they storm in. Engines are built out of bowshot; once rolled up within range, archers and towers on the walls shoot them to pieces (trebuchets out-range them). Sally out to burn their engines, pay them to leave, or hold out until they give up. Battered walls are repaired afterwards.
 - **Health and the watch:** herbalists speed recovery, bathhouses keep sickness down, and guardhouses keep thieves away from the homes around them. Poor or unhappy people out of the watch's reach steal from the richest homes.
@@ -98,6 +99,7 @@ dotnet test
 | V | Walls: palisade, then stone wall, then large stone wall (press again to cycle); click start and end |
 | G | Gate: click a wall to put a gate in it; press again for a gatehouse (fortify a gate) |
 | B | Tower: click a wall to raise a tower on it |
+| N | Diplomacy: other realms, their opinion of you, treaties, proposals, gifts and demands |
 | K | Army: alert level and warbands in sight, the general, squads (recruit, disband), gear, raid and muster rules, recent battles |
 | L | Town ledger: people and complaints, goods made and used per day (and what will run out, with 30-day charts), coin in and out, jobs |
 | Right-click / Esc | Cancel the current tool or close the inspector |
