@@ -14,6 +14,7 @@ public partial class StartMenu : CanvasLayer
 
     private LineEdit _name = null!;
     private OptionButton _speed = null!;
+    private SpinBox _neighbours = null!;
     private OptionButton _speedPolicy = null!;
     private OptionButton _whenEmpty = null!;
     private LineEdit _seed = null!;
@@ -71,6 +72,11 @@ public partial class StartMenu : CanvasLayer
         _whenEmpty.AddItem("Pause");
         _whenEmpty.AddItem("Catch up (up to 7 days) when someone returns");
         _whenEmpty.AddItem("Keep running (only while hosted)");
+        _neighbours = (SpinBox)Row("Neighbours (new worlds)", new SpinBox
+            {
+                MinValue = 0, MaxValue = 6, Value = Sim.Core.Data.GameData.LoadDefault().Factions.StartTowns,
+            },
+            "Computer-run realms that start nearby, each with its own town and temperament. More are founded as the years go by.");
         _seed = (LineEdit)Row("Seed (new worlds)", new LineEdit { PlaceholderText = "random" }, "The same seed always makes the same map.");
         _port = (LineEdit)Row("Port", new LineEdit { Text = Protocol.DefaultPort.ToString() },
             "The port friends connect to when you host (they may need it forwarded on your router).");
@@ -105,9 +111,14 @@ public partial class StartMenu : CanvasLayer
         SecondsPerGameDay = SecondsPerDay,
         SpeedPolicy = _speedPolicy.Selected switch { 1 => SpeedPolicy.Unanimous, 2 => SpeedPolicy.Fixed, _ => SpeedPolicy.Host },
         WhenEmpty = _whenEmpty.Selected switch { 1 => EmptyWorldPolicy.CatchUp, 2 => EmptyWorldPolicy.Run, _ => EmptyWorldPolicy.Pause },
+        NpcTowns = (int)_neighbours.Value,
     };
 
-    private void NewLocal() => Start(() => SimSession.NewLocal(Seed, SecondsPerDay));
+    private void NewLocal()
+    {
+        int neighbours = (int)_neighbours.Value;
+        Start(() => SimSession.NewLocal(Seed, SecondsPerDay, neighbours));
+    }
 
     private void ContinueLocal() => Start(() => new SimSession(SimSession.LoadSaved()));
 

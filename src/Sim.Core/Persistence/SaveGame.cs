@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 19; // 19: sieges (warband engines)
+    public const int CurrentVersion = 20; // 20: factions
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -63,6 +63,7 @@ public static class SaveGame
         LastActiveUtc = world.LastActiveUtc,
         Trade = world.Trade,
         War = world.War,
+        Diplomacy = world.Diplomacy,
         Settlements = world.Settlements.Select(s => CaptureSettlement(world, s)).ToList(),
         Events = world.Events.Select(e => new EventSave(e.Time.Tick, e.Kind, e.SettlementId, e.Message)).ToList(),
     };
@@ -78,6 +79,7 @@ public static class SaveGame
         Id = s.Id,
         Name = s.Name,
         OwnerId = s.OwnerId,
+        FactionId = s.FactionId,
         CenterX = s.CenterX,
         CenterY = s.CenterY,
         Stock = s.Stock.Items.ToDictionary(kv => kv.Key, kv => kv.Value),
@@ -208,6 +210,7 @@ public static class SaveGame
         // Version 5 and older had no trade.
         world.Trade = file.Trade ?? new Trade.TradeBook();
         world.War = file.War ?? new War.WarBook(); // version 16 and older had no raids
+        world.Diplomacy = file.Diplomacy ?? new Diplomacy.DiplomacyBook(); // version 19 and older: factions are given next day
 
         foreach (var save in file.Settlements) world.Settlements.Add(RestoreSettlement(world, save));
         foreach (var e in file.Events)
@@ -217,7 +220,7 @@ public static class SaveGame
 
     private static Settlement RestoreSettlement(GameWorld world, SettlementSave save)
     {
-        var s = new Settlement(save.Id, save.Name, save.CenterX, save.CenterY) { OwnerId = save.OwnerId };
+        var s = new Settlement(save.Id, save.Name, save.CenterX, save.CenterY) { OwnerId = save.OwnerId, FactionId = save.FactionId };
         foreach (var (resource, amount) in save.Stock) s.Stock.Add(resource, amount);
 
         CopyInto(save.Rules.JobPriority, s.Rules.JobPriority);
@@ -388,6 +391,7 @@ public static class SaveGame
         public DateTimeOffset? LastActiveUtc { get; set; }
         public Trade.TradeBook? Trade { get; set; }
         public War.WarBook? War { get; set; }
+        public Diplomacy.DiplomacyBook? Diplomacy { get; set; }
         public List<SettlementSave> Settlements { get; set; } = new();
         public List<EventSave> Events { get; set; } = new();
     }
@@ -399,6 +403,7 @@ public static class SaveGame
         public int Id { get; set; }
         public string Name { get; set; } = "";
         public string? OwnerId { get; set; }
+        public int FactionId { get; set; }
         public int CenterX { get; set; }
         public int CenterY { get; set; }
         public Dictionary<string, int> Stock { get; set; } = new();

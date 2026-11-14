@@ -18,12 +18,14 @@ using Sim.Core.World;
 //   --realtime [x]     run at real speed (1 game day = 1 real hour), optionally sped up x times
 //   --no-disasters     switch off fires, sickness and poor harvests
 //   --government ID    how the town is run (households.json), e.g. common_weal
+//   --npc N            start the world with N computer-run neighbour towns (more are founded over time)
 
 var options = Options.Parse(args);
 var world = new GameWorld(options.Seed);
 var settlement = SettlementFounder.Found(world);
 settlement.Rules.Disasters = !options.NoDisasters;
 if (options.Government != null) world.Execute(new Sim.Core.Economy.SetGovernmentCommand(settlement.Id, options.Government));
+world.Settings.NpcTowns = options.NpcTowns;
 var sim = new Simulator(world);
 
 Console.WriteLine($"World seed {options.Seed}. {settlement.Name} founded at ({settlement.CenterX},{settlement.CenterY}) " +
@@ -80,6 +82,15 @@ stopwatch.Stop();
 Console.WriteLine();
 Console.WriteLine($"=== {settlement.Name} after {options.Days} days ({world.Time}) — simulated in {stopwatch.ElapsedMilliseconds} ms ===");
 Report.PrintSummary(world, settlement);
+if (world.Diplomacy.Factions.Count > 1)
+{
+    Console.WriteLine("Realm:");
+    foreach (var f in world.Diplomacy.Factions)
+        foreach (var town in Sim.Core.Diplomacy.Factions.TownsOf(world, f))
+            Console.WriteLine($"  {f.Name}{(f.IsNpc ? $" ({f.Personality})" : " (you)")}: {town.Name} at ({town.CenterX},{town.CenterY}), " +
+                              $"pop {town.Citizens.Count}, coin {town.Stock.Get("coin")}, soldiers {Sim.Core.War.Armies.Soldiers(town)}, " +
+                              $"homes {town.Buildings.Count(b => b.Def.Home != null)}, walls {town.Walls.Count}");
+}
 if (options.ShowMap) Report.PrintMap(world, settlement);
 if (options.ShowCitizens) Report.PrintCitizens(settlement);
 Console.WriteLine($"State hash: {world.ComputeStateHash():X16}");
@@ -88,6 +99,7 @@ internal sealed record Options(ulong Seed, int Days, string ReportMode, bool Sho
     bool NoDisasters)
 {
     public string? Government { get; init; }
+    public int NpcTowns { get; init; }
 
     public static Options Parse(string[] args)
     {
@@ -96,6 +108,7 @@ internal sealed record Options(ulong Seed, int Days, string ReportMode, bool Sho
         string report = "weekly";
         bool map = false, citizens = false, noDisasters = false;
         string? government = null;
+        int npcTowns = 0;
         double? realtime = null;
 
         for (int i = 0; i < args.Length; i++)
@@ -110,6 +123,7 @@ internal sealed record Options(ulong Seed, int Days, string ReportMode, bool Sho
                 case "--citizens": citizens = true; break;
                 case "--no-disasters": noDisasters = true; break;
                 case "--government": government = Next(); break;
+                case "--npc": npcTowns = int.Parse(Next()); break;
                 case "--realtime":
                     realtime = i + 1 < args.Length && double.TryParse(args[i + 1], out double x) ? x : 1;
                     if (i + 1 < args.Length && double.TryParse(args[i + 1], out _)) i++;
@@ -117,7 +131,7 @@ internal sealed record Options(ulong Seed, int Days, string ReportMode, bool Sho
                 default: throw new ArgumentException($"Unknown option {args[i]}");
             }
         }
-        return new Options(seed, days, report, map, citizens, realtime, noDisasters) { Government = government };
+        return new Options(seed, days, report, map, citizens, realtime, noDisasters) { Government = government, NpcTowns = npcTowns };
     }
 }
 

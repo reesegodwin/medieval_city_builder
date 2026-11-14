@@ -34,6 +34,9 @@ public sealed class GameWorld
     /// <summary>Warbands on the map and recent battles.</summary>
     public War.WarBook War { get; set; } = new();
 
+    /// <summary>Factions (player and NPC realms) and their dealings.</summary>
+    public Diplomacy.DiplomacyBook Diplomacy { get; set; } = new();
+
     /// <summary>Speed and offline rules, chosen when the world is created.</summary>
     public WorldSettings Settings { get; set; } = new();
 
@@ -76,7 +79,7 @@ public sealed class GameWorld
         h.Add(Time.Tick).Add(TotalBirths).Add(TotalDeaths).Add(Events.Count).Add(Rng.StateFingerprint);
         foreach (var s in Settlements)
         {
-            h.Add(s.Id).Add(s.Territory.Count).Add(s.TerritoryCap).Add(s.HaulCoverage).Add(s.Roads.Count)
+            h.Add(s.Id).Add(s.FactionId).Add(s.Territory.Count).Add(s.TerritoryCap).Add(s.HaulCoverage).Add(s.Roads.Count)
                 .Add(s.TaxAccrued).Add(s.UpkeepOwed).Add(s.UpkeepUnpaid)
                 .Add(s.Ledger.History.Count).Add(s.Ledger.Today.Flows.Sum(f => f.Value.Values.Sum()))
                 .Add(s.Rules.Disasters).Add(s.PoorHarvestDays).Add(s.HeatingOwed)
@@ -118,6 +121,7 @@ public sealed class GameWorld
                 foreach (var (kind, skill) in c.Skills) h.Add(kind).Add(skill);
             }
         }
+        foreach (var f in Diplomacy.Factions) h.Add(f.Id).Add(f.Name).Add(f.IsNpc).Add(f.Personality).Add(f.PlayerName ?? "");
         foreach (var w in War.Warbands)
         {
             h.Add(w.Id).Add(w.TargetId).Add(w.X).Add(w.Y).Add(w.Raiders).Add(w.Archers)

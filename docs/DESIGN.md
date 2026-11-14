@@ -88,7 +88,7 @@ Each phase ends with something you can play.
 3. **Phase 2, Persistence & multiplayer:** PostgreSQL saves, accounts, several players, interest management, running on a cheap Linux VPS.
 4. **Phase 3, War:** armies from population, the formation battle resolver, generals, fog of war and scouting. *(In progress: military economy, squads, generals, the aggregate resolver, raids and the call to arms are in; see "War (Phase 3a)".)*
 5. **Phase 4, Sieges & walls:** walls and towers, siege engines, multi-day sieges, Discord/email alerts. *(In progress: walls, towers, gatehouses and bandit sieges with rams, catapults and trebuchets are in; see "Sieges".)*
-6. **Phase 5, NPC factions & diplomacy:** utility AI, proposals with expiry, vassals and tribute.
+6. **Phase 5, NPC factions & diplomacy:** utility AI, proposals with expiry, vassals and tribute. *(In progress: factions and NPC towns are in; diplomacy, then war between realms, are next.)*
 7. **Phase 6, Trade & sea:** roads, caravans, ports, ships, blockades.
 8. **Phase 7, Depth:** tech tree, instability and civil war, balance passes, content and art.
 
@@ -591,6 +591,27 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   | 7 | 7 | 0 | 7 | 201 stone, 5 gatehouses, 8 towers |
   | 1234 | 3 | 0 | 3 | 171 stone, 8 gatehouses, 9 towers |
 - **Later:** player-vs-player sieges, fire, mining, starving a town out.
+
+## Factions and NPC realms (Phase 5, part 1: `Diplomacy/Factions.cs`, `factions.json`)
+- **Every town belongs to a faction** (`Settlement.FactionId`; the factions are kept in `GameWorld.Diplomacy`):
+  - a player's realm ("Realm of alice");
+  - a single-player town's own realm;
+  - or a computer-run NPC realm ("House Coldwell", "Clan Hale", "The Free Town of …").
+- **NPC realms** have a colour and a temperament: merchants (trade-minded), cautious, or warlike. Their aggression, trade bias and caution drive diplomacy and war in parts 2 and 3.
+- **Founding:**
+  - A world with `WorldSettings.NpcTowns` above 0 starts with that many NPC towns, founded one a day on the founding ring around the first town.
+  - Another is founded every 360 days, up to 6 (or the starting number, if more were asked for).
+  - NPC towns run on the same governor as any "Auto" town: they build, trade, wall themselves and keep garrisons. Bandits raid and besiege them too.
+- **Defaults:**
+  - New worlds made in the game (start menu "Neighbours", 0–6) or on a dedicated server (`--npc-towns`) start with 3.
+  - The core default is 0, so tests, console runs and old saves are unchanged. The console has `--npc N`.
+- **Multiplayer:** the server's "first player takes over the single-player town" rule skips NPC towns, and gives the realm the player's name.
+- **Client:**
+  - Each town has a banner in its faction's colour with a floating label (town, realm, temperament, people), the same size on screen at any zoom.
+  - NPC territory borders take the faction's colour.
+  - The ledger's overview has a Realm list of every town: realm, temperament, people, soldiers, walls and distance.
+- **Cost:** every NPC town is a full simulation. 720 days with the player and up to 5 NPC towns (about 700 people each) took 274 s, about 0.38 s per game day. That's fine at every world speed; a 7-day catch-up takes about 3 s.
+- **Save** v20; factions and `FactionId` are hashed.
 
 ## Battles: individual units + destructible structures (hybrid LOD simulation)
 

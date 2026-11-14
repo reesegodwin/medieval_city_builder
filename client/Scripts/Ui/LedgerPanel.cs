@@ -199,6 +199,20 @@ public partial class LedgerPanel : PanelContainer
                 sb.AppendLine($"[color=#ff9070]{Forecast.NameOf(World, warning)} runs out in {days:0} days[/color] at the current rate");
         }
         if (!s.Rules.Disasters) sb.AppendLine("Disasters are switched off in the rules.");
+        if (World.Diplomacy.Factions.Count > 1)
+        {
+            sb.AppendLine();
+            sb.AppendLine("[b]Realm[/b]: the towns of the land");
+            foreach (var f in World.Diplomacy.Factions)
+                foreach (var town in Sim.Core.Diplomacy.Factions.TownsOf(World, f))
+                {
+                    string temper = f.IsNpc ? World.Data.Factions.Personality(f.Personality).Name.ToLowerInvariant() : town == s ? "you" : "player";
+                    int distance = Math.Max(Math.Abs(town.CenterX - s.CenterX), Math.Abs(town.CenterY - s.CenterY));
+                    sb.AppendLine($"  [color={f.Colour}]■[/color] {town.Name}, {f.Name} ({temper}): {town.Citizens.Count} people, " +
+                                  $"{Sim.Core.War.Armies.Soldiers(town)} soldiers, {town.Walls.Count} wall tiles" +
+                                  (town == s ? "" : $", {distance} tiles away"));
+                }
+        }
         sb.AppendLine();
         sb.AppendLine("[b]Needs met[/b]");
         foreach (var need in World.Data.Needs)

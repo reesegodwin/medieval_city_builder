@@ -16,6 +16,7 @@ using Sim.Net;
 //   --when-empty <p>       pause | catchup | run (default run)
 //   --catch-up-days <n>    most game days caught up on after time away (default 7)
 //   --max-speed <x>        fastest players may speed the world up to (default 8)
+//   --npc-towns <n>        computer-run neighbour realms to start with (default from factions.json, 3; 0 for none)
 //   --admin <name>         the player who controls speed under the "host" policy
 //   --autosave-minutes <n> (default 5)
 //   --accounts <open|off>  open (default): the first join with a name registers it with that player's password,
@@ -42,6 +43,7 @@ else
     world.Settings.WhenEmpty = Enum.Parse<EmptyWorldPolicy>(options.GetValueOrDefault("when-empty", "run"), ignoreCase: true);
     world.Settings.CatchUpCapDays = double.Parse(options.GetValueOrDefault("catch-up-days", "7"));
     world.Settings.MaxSpeedMultiplier = double.Parse(options.GetValueOrDefault("max-speed", "8"));
+    world.Settings.NpcTowns = int.Parse(options.GetValueOrDefault("npc-towns", world.Data.Factions.StartTowns.ToString()));
     world.LastActiveUtc = DateTimeOffset.UtcNow;
     SaveGame.Save(world, path);
     Console.WriteLine($"Created {path} (seed {seed}).");

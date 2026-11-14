@@ -132,6 +132,9 @@ public sealed class Settlement
 
     /// <summary>The player who controls this settlement (their account name), or null for single-player / NPC towns.</summary>
     public string? OwnerId { get; set; }
+
+    /// <summary>The realm this town belongs to (<see cref="Diplomacy.Faction"/>; 0 until one is given).</summary>
+    public int FactionId { get; set; }
     public int CenterX { get; }
     public int CenterY { get; }
 

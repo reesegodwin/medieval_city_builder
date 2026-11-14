@@ -244,10 +244,15 @@ public sealed class WorldHost
         if (!World.Settlements.Any(s => s.OwnerId == name))
         {
             // A single-player world turned shared: its first player takes over the unowned town.
-            var unowned = World.Settlements.FirstOrDefault(s => s.OwnerId == null);
+            var unowned = World.Settlements.FirstOrDefault(s => s.OwnerId == null && !Sim.Core.Diplomacy.Factions.IsNpc(World, s));
             if (unowned != null && _players.Count == 0 && (HostName == null || HostName == name))
             {
                 unowned.OwnerId = name;
+                if (Sim.Core.Diplomacy.Factions.Of(World, unowned) is { } realm)
+                {
+                    realm.PlayerName = name;
+                    realm.Name = $"Realm of {name}";
+                }
             }
             else
             {
