@@ -21,6 +21,9 @@ public static class LedgerKeys
     /// <summary>Coin paid to besiegers to make them leave.</summary>
     public const string Tribute = "tribute";
 
+    /// <summary>Gifts sent to or received from other realms.</summary>
+    public const string Gifts = "gifts";
+
     /// <summary>Goods brought in by adults without a job (berries, firewood, stones).</summary>
     public const string Gathered = "gathered";
 

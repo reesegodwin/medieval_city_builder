@@ -37,6 +37,8 @@ public sealed class FactionRules
     public List<string> Colours { get; set; } = new() { "#b33a3a" };
     public List<PersonalityDef> Personalities { get; set; } = new() { new() { Id = "cautious", Name = "Cautious" } };
 
+    public DiplomacyRules Diplomacy { get; set; } = new();
+
     public PersonalityDef Personality(string id) => Personalities.FirstOrDefault(p => p.Id == id) ?? Personalities[0];
 }
 
@@ -66,6 +68,12 @@ public sealed class Faction
 public sealed class DiplomacyBook
 {
     public List<Faction> Factions { get; set; } = new();
+
+    /// <summary>Opinions between pairs of factions (A &lt; B, sorted).</summary>
+    public List<Relation> Relations { get; set; } = new();
+
+    public List<Treaty> Treaties { get; set; } = new();
+    public List<Proposal> Proposals { get; set; } = new();
 
     public Faction? Find(int id)
     {
@@ -108,6 +116,7 @@ public static class Factions
         EnsureFactions(world);
         int npc = world.Settlements.Count(s => IsNpc(world, s));
         if (npc < WantedNpcTowns(world) && world.Settlements.Count > 0) FoundNpcTown(world); // one a day at most
+        if (world.Diplomacy.Factions.Count > 1) Statecraft.Daily(world);
     }
 
     /// <summary>Gives every town without a faction its own (a player's realm, or a single-player town's).</summary>
@@ -149,7 +158,11 @@ public static class Factions
     {
         var origin = world.Settlements[0];
         var (dx, dy) = Commands.FoundSettlementCommand.SpotOffset(world.Settlements.Count);
-        var town = SettlementFounder.Found(world, nearX: origin.CenterX + dx * Commands.FoundSettlementCommand.Spacing,
+        // A name no other town has.
+        string name = Citizens.Names.Place(world.Rng);
+        for (int tries = 0; tries < 20 && world.Settlements.Any(s => s.Name == name); tries++) name = Citizens.Names.Place(world.Rng);
+        if (world.Settlements.Any(s => s.Name == name)) name = $"New {name}";
+        var town = SettlementFounder.Found(world, name, nearX: origin.CenterX + dx * Commands.FoundSettlementCommand.Spacing,
             nearY: origin.CenterY + dy * Commands.FoundSettlementCommand.Spacing);
         var faction = NewFaction(world, isNpc: true);
         town.FactionId = faction.Id;

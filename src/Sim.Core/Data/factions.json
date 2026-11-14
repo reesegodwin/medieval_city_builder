@@ -7,6 +7,25 @@
   "colours": [
     "#b33a3a", "#3a6fb3", "#3a9a4c", "#c98a1e", "#7a4bb0", "#2f9a9a", "#b35a8a", "#6b6b2f", "#a0522d", "#4b5563"
   ],
+  "diplomacy": {
+    "proposalDays": 3,
+    "pactCaravanSpeed": 1.25,
+    "pactPriceBonus": 0.2,
+    "vassalShare": 0.15,
+    "vassalRaidFactor": 0.5,
+    "opinionDecay": 0.01,
+    "pactOpinionPerDay": 0.25,
+    "allianceOpinionPerDay": 0.15,
+    "rivalryPerDay": 0.1,
+    "neighbourDistance": 400,
+    "giftOpinionPer100": 8,
+    "maxGiftOpinion": 30,
+    "demandRefusedOpinion": -15,
+    "demandPaidOpinion": -5,
+    "treatyBrokenOpinion": -30,
+    "treatyBrokenWitnessOpinion": -8,
+    "npcActEveryDays": 20
+  },
   "personalities": [
     {"id": "trader", "name": "Merchants", "description": "Prefer trade to war: quick to sign trade pacts, slow to anger.", "aggression": 0.2, "tradeBias": 1.0, "caution": 0.5},
     {"id": "cautious", "name": "Cautious", "description": "Keep to themselves, value non-aggression and alliances, rarely start wars.", "aggression": 0.3, "tradeBias": 0.5, "caution": 1.0},

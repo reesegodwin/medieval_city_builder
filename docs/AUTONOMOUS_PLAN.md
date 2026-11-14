@@ -111,3 +111,4 @@ The plan is also copied to `docs/AUTONOMOUS_PLAN.md` with a progress log, so the
 - [x] 10a. Polish: families pay the coin part of their own home upgrades; the ledger shows households (savings by class, going without, relief, thefts) and family spending; army panel tooltips show the savings gear needs. 720 days: 48/74/66 townhouses, treasuries 2.8k/8.2k/2.1k.
 - [x] Sieges (requested after the run): bandit warbands of 20+ besiege walled towns, build rams/catapults/trebuchets, breach and assault; sally, tribute, give-up after 30 days; mild pressure; wall repairs; AI responses; client camp, engines, wall damage, siege panel.
 - [x] Phase 5, PR 1: factions and NPC realms (founded at start and yearly, governed like Auto towns), banners, Realm list, start-menu Neighbours, server --npc-towns.
+- [x] Phase 5, PR 2: diplomacy: opinions, proposals (trade pact, non-aggression, alliance, vassalage, demands), gifts, treaty effects, NPC answers and moves, diplomacy panel (N).

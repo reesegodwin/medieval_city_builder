@@ -122,6 +122,13 @@ public sealed class GameWorld
             }
         }
         foreach (var f in Diplomacy.Factions) h.Add(f.Id).Add(f.Name).Add(f.IsNpc).Add(f.Personality).Add(f.PlayerName ?? "");
+        foreach (var r in Diplomacy.Relations) h.Add(r.A).Add(r.B).Add(r.Opinion);
+        foreach (var t in Diplomacy.Treaties) h.Add(t.Id).Add((int)t.Kind).Add(t.A).Add(t.B).Add(t.StartDay).Add(t.Owed);
+        foreach (var p in Diplomacy.Proposals)
+        {
+            h.Add(p.Id).Add((int)p.Kind).Add(p.FromFaction).Add(p.ToFaction).Add(p.ExpiresTick);
+            foreach (var (r, n) in p.Goods) h.Add(r).Add(n);
+        }
         foreach (var w in War.Warbands)
         {
             h.Add(w.Id).Add(w.TargetId).Add(w.X).Add(w.Y).Add(w.Raiders).Add(w.Archers)

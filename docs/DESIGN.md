@@ -88,7 +88,7 @@ Each phase ends with something you can play.
 3. **Phase 2, Persistence & multiplayer:** PostgreSQL saves, accounts, several players, interest management, running on a cheap Linux VPS.
 4. **Phase 3, War:** armies from population, the formation battle resolver, generals, fog of war and scouting. *(In progress: military economy, squads, generals, the aggregate resolver, raids and the call to arms are in; see "War (Phase 3a)".)*
 5. **Phase 4, Sieges & walls:** walls and towers, siege engines, multi-day sieges, Discord/email alerts. *(In progress: walls, towers, gatehouses and bandit sieges with rams, catapults and trebuchets are in; see "Sieges".)*
-6. **Phase 5, NPC factions & diplomacy:** utility AI, proposals with expiry, vassals and tribute. *(In progress: factions and NPC towns are in; diplomacy, then war between realms, are next.)*
+6. **Phase 5, NPC factions & diplomacy:** utility AI, proposals with expiry, vassals and tribute. *(In progress: factions, NPC towns and diplomacy are in; war between realms is next.)*
 7. **Phase 6, Trade & sea:** roads, caravans, ports, ships, blockades.
 8. **Phase 7, Depth:** tech tree, instability and civil war, balance passes, content and art.
 
@@ -612,6 +612,34 @@ One mechanism covers barter, coin and routes. Tuning is in `trade.json`; fair va
   - The ledger's overview has a Realm list of every town: realm, temperament, people, soldiers, walls and distance.
 - **Cost:** every NPC town is a full simulation. 720 days with the player and up to 5 NPC towns (about 700 people each) took 274 s, about 0.38 s per game day. That's fine at every world speed; a 7-day catch-up takes about 3 s.
 - **Save** v20; factions and `FactionId` are hashed.
+
+## Diplomacy (Phase 5, part 2: `Diplomacy/Diplomacy.cs`, factions.json "diplomacy")
+- **Opinion:** each pair of realms holds one opinion of each other, from −100 to 100.
+  - Each day it drifts back towards neutral (1%), and gains from a trade pact (+0.25) or an alliance (+0.15).
+  - Neighbours within 400 tiles sour on each other in proportion to how warlike they are, and the cautious sour on a neighbour more than twice their strength.
+  - Gifts raise it (8 per 100 coin's worth, at most 30). Refused demands (−15), paid demands (−5) and broken treaties (−30, and −8 with every witness) lower it.
+- **Proposals** last 3 days; an unanswered demand counts as refused.
+
+  | Proposal | What accepting it does |
+  |---|---|
+  | **Trade pact** | Caravans between the two travel 25% faster. A governed town accepts a partner's offers at up to 20% over the fair price. |
+  | **Non-aggression** | No war between them (enforced from part 3). |
+  | **Alliance** | No war, and shared watch: `Raids.Sees` counts an ally's watch radius, so allies see each other's warbands. Help in war comes in part 3. |
+  | **Vassalage** (offered by the weak, or demanded by the strong) | The vassal pays its overlord 15% of its daily coin income (taxes and family spending, accumulated). In return bandits raid it half as often. |
+  | **Demand** | Coin or goods, or else. |
+
+- **Gifts** go at once (envoys, not caravans).
+- **Breaking a treaty** (`EndTreatyCommand`) ends it now and costs opinion all round.
+- **Commands** (`ProposeCommand`, `AnswerProposalCommand`, `EndTreatyCommand`, `SendGiftCommand`) act for the issuing town's realm, so the server's ownership checks cover them, and players can deal with each other the same way.
+- **NPC realms** answer proposals each day by opinion, relative strength and temperament.
+  - Merchants sign trade pacts readily, the cautious seek non-aggression and alliances (or vassalage when very weak), and the warlike demand tribute or vassalage from the weak.
+  - Every 20 days or so each realm makes a move of its own, or sends a gift to the realm it likes best.
+- **Client:** a diplomacy panel on **N** (and a "Realms" button):
+  - incoming proposals with Accept and Refuse, and time left;
+  - your pending proposals;
+  - each realm with its temperament, its opinion of you, its strength next to yours, shared treaties (with Break), and buttons to propose, give or demand.
+- **720 days (seed 42, 3 NPC realms):** the NPC realms signed 9 treaties among themselves: trade pacts, two alliances and non-aggression pacts. One warlike house is wary of its warlike neighbour. Nobody starved. 295 s for the run.
+- **Save** v21; relations, treaties (with owed tribute) and proposals are hashed.
 
 ## Battles: individual units + destructible structures (hybrid LOD simulation)
 
