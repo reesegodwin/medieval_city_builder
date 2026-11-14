@@ -23,7 +23,7 @@ public static class CommandCodec
         typeof(Economy.SetGovernmentCommand), typeof(Systems.SetCrimeCommand),
         typeof(War.SallyCommand), typeof(War.PayTributeCommand),
         typeof(Diplomacy.ProposeCommand), typeof(Diplomacy.AnswerProposalCommand), typeof(Diplomacy.EndTreatyCommand),
-        typeof(Diplomacy.SendGiftCommand),
+        typeof(Diplomacy.SendGiftCommand), typeof(War.DeclareWarCommand), typeof(War.MarchCommand), typeof(War.RecallArmyCommand),
         typeof(Trade.PostOfferCommand), typeof(Trade.CancelOfferCommand), typeof(Trade.AcceptOfferCommand),
         typeof(Trade.ProposeRouteCommand), typeof(Trade.AcceptRouteCommand), typeof(Trade.EndRouteCommand),
     };

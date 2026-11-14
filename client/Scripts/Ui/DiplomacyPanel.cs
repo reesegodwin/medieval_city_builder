@@ -78,6 +78,7 @@ public partial class DiplomacyPanel : PanelContainer
             string.Join(",", book.Relations.Select(r => $"{r.A}-{r.B}:{(int)r.Opinion}")),
             string.Join(",", book.Treaties.Select(t => t.Id)),
             string.Join(",", book.Proposals.Select(p => p.Id)),
+            string.Join(",", book.Wars.Select(w => $"{w.Id}:{World.Time.Tick >= w.StartsTick}")),
             Town.Stock.Get(Sim.Core.Economy.Inventory.Coin) >= DemandCoin);
         if (signature == _shown) return;
         _shown = signature;
@@ -151,9 +152,18 @@ public partial class DiplomacyPanel : PanelContainer
                  $"{(ratio >= 1.5 ? "much stronger than you" : ratio >= 1.1 ? "stronger than you" : ratio > 0.9 ? "about as strong as you" : ratio > 0.6 ? "weaker than you" : "much weaker than you")}");
             if (f.IsNpc) Line(World.Data.Factions.Personality(f.Personality).Description, new Color(0.8f, 0.8f, 0.8f));
 
+            if (Sim.Core.War.FactionWar.WarBetween(World, me, f.Id) is { } war)
+            {
+                double left = (war.StartsTick - World.Time.Tick) / (double)TimeScale.TicksPerDay;
+                Line(left > 0
+                        ? $"⚔ War declared on day {war.DeclaredDay}: the fighting may begin in {left:0.#} days"
+                        : $"⚔ At war since day {war.DeclaredDay}" + (war.Attacker == me ? " (you declared it)" : ""),
+                    new Color(1f, 0.45f, 0.4f));
+            }
             foreach (var t in book.Treaties.Where(t => (t.A == me && t.B == f.Id) || (t.B == me && t.A == f.Id)))
             {
-                string what = t.Kind == TreatyKind.Vassalage ? (t.A == me ? "They are your vassal" : "You are their vassal") : $"A {Statecraft.Describe(t.Kind)}";
+                string what = (t.Kind == TreatyKind.Vassalage ? (t.A == me ? "They are your vassal" : "You are their vassal") : $"A {Statecraft.Describe(t.Kind)}") +
+                              (t.EndsDay > 0 ? $" (until day {t.EndsDay})" : "");
                 var row = new HBoxContainer();
                 row.AddChild(new Label { Text = $"• {what}, since day {t.StartDay}", SizeFlagsHorizontal = SizeFlags.ExpandFill });
                 int id = t.Id;
@@ -176,6 +186,11 @@ public partial class DiplomacyPanel : PanelContainer
             Offer("Demand vassalage", ProposalKind.DemandVassalage, "Demand that they pay you a share of their income. The weak may agree; the proud won't forget.");
             Offer($"Demand {DemandCoin} coin", ProposalKind.Demand, "Demand coin, or else. Refusals sour relations.",
                 new Dictionary<string, int> { [Sim.Core.Economy.Inventory.Coin] = DemandCoin });
+            Offer("Offer peace", ProposalKind.Peace, "End the war. Peace brings a non-aggression pact for a while.");
+            if (Sim.Core.War.FactionWar.CheckWar(World, me, target) == null)
+                actions.AddChild(MakeButton("Declare war", () => Do(new Sim.Core.War.DeclareWarCommand(Town.Id, target),
+                    "War declared. March your squads from the army panel (K) once the warning period is over."),
+                    "Their opinion of you will plummet. After a warning period your squads may march on their towns."));
             if (Town.Stock.Get(Sim.Core.Economy.Inventory.Coin) >= GiftCoin)
                 actions.AddChild(MakeButton($"Gift {GiftCoin} coin", () => Do(new SendGiftCommand(Town.Id, target,
                     new Dictionary<string, int> { [Sim.Core.Economy.Inventory.Coin] = GiftCoin }), "Gift sent"), "Envoys carry it at once; it warms relations."));

@@ -17,7 +17,7 @@ namespace Sim.Core.Persistence;
 public static class SaveGame
 {
     /// <summary>Bump when the format changes, and add a migration in <see cref="Migrate"/>.</summary>
-    public const int CurrentVersion = 21; // 21: diplomacy (relations, treaties, proposals)
+    public const int CurrentVersion = 22; // 22: wars and armies
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -154,7 +154,7 @@ public static class SaveGame
         WallPlans = s.WallPlans.Select(p => new WallPlan { X = p.X, Y = p.Y, Tier = p.Tier, Piece = p.Piece, Progress = p.Progress }).ToList(),
         WallVersion = s.WallVersion,
         WallRing = s.WallRing.Select(r => new[] { r.X, r.Y, r.Gate ? 1 : 0 }).ToList(),
-        Squads = s.Squads.Select(q => new War.Squad { Id = q.Id, UnitId = q.UnitId, SoldierIds = q.SoldierIds.ToList(), Xp = q.Xp, Levy = q.Levy }).ToList(),
+        Squads = s.Squads.Select(q => new War.Squad { Id = q.Id, UnitId = q.UnitId, SoldierIds = q.SoldierIds.ToList(), Xp = q.Xp, Levy = q.Levy, ArmyId = q.ArmyId }).ToList(),
         Alert = s.Alert,
         QuietDays = s.QuietDays,
         General = s.General == null ? null : new War.General

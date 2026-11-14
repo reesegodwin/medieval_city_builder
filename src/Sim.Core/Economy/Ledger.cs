@@ -24,6 +24,9 @@ public static class LedgerKeys
     /// <summary>Gifts sent to or received from other realms.</summary>
     public const string Gifts = "gifts";
 
+    /// <summary>Spoils an army brought home.</summary>
+    public const string Loot = "loot";
+
     /// <summary>Goods brought in by adults without a job (berries, firewood, stones).</summary>
     public const string Gathered = "gathered";
 

@@ -73,6 +73,9 @@ public enum ProposalKind : byte
 
     /// <summary>The proposer demands goods or coin "or else".</summary>
     Demand,
+
+    /// <summary>An end to the war between them.</summary>
+    Peace,
 }
 
 /// <summary>What two factions think of each other (one number for both; A &lt; B).</summary>
@@ -95,6 +98,9 @@ public sealed class Treaty
 
     /// <summary>Vassalage: tribute owed but not yet paid (less than a coin).</summary>
     public double Owed { get; set; }
+
+    /// <summary>Day it lapses (0: lasts until broken), e.g. the non-aggression that follows a peace.</summary>
+    public long EndsDay { get; set; }
 }
 
 public sealed class Proposal
@@ -189,6 +195,7 @@ public static class Statecraft
         ProposalKind.Alliance => "an alliance",
         ProposalKind.OfferVassalage => "to become their vassal",
         ProposalKind.DemandVassalage => "that you become their vassal",
+        ProposalKind.Peace => "peace",
         _ => "tribute",
     };
 
@@ -232,6 +239,9 @@ public static class Statecraft
             ProposalKind.OfferVassalage or ProposalKind.DemandVassalage when OverlordOf(world, kind == ProposalKind.OfferVassalage ? from : to) != null
                 => "Already someone's vassal",
             ProposalKind.OfferVassalage or ProposalKind.DemandVassalage when Has(world, TreatyKind.Vassalage, from, to) => "Already bound by vassalage",
+            ProposalKind.Peace when War.FactionWar.WarBetween(world, from, to) == null => "You are not at war",
+            ProposalKind.TradePact or ProposalKind.NonAggression or ProposalKind.Alliance or ProposalKind.OfferVassalage or ProposalKind.DemandVassalage
+                when War.FactionWar.WarBetween(world, from, to) != null => "You are at war: make peace first",
             ProposalKind.Demand when goods == null || goods.Count == 0 || goods.Any(kv => kv.Value <= 0 || !world.Data.Resources.ContainsKey(kv.Key))
                 => "Say what you demand",
             _ => null,
@@ -261,6 +271,13 @@ public static class Statecraft
                 ChangeOpinion(world, from.Id, to.Id, rules.DemandRefusedOpinion);
                 LogBoth(world, fromSeat, toSeat, $"{to.Name} refused {from.Name}'s demand");
             }
+            return;
+        }
+
+        if (p.Kind == ProposalKind.Peace)
+        {
+            if (accept && War.FactionWar.WarBetween(world, from.Id, to.Id) is { } war) War.FactionWar.MakePeace(world, war, "agreed");
+            else if (!accept) LogBoth(world, fromSeat, toSeat, $"{to.Name} refused {from.Name}'s offer of peace");
             return;
         }
 
@@ -361,11 +378,11 @@ public static class Statecraft
             r.Opinion = Math.Clamp(r.Opinion + delta, -100, 100);
         }
 
-        // Vassals pay their share of yesterday's income; treaties with vanished realms lapse.
+        // Vassals pay their share of yesterday's income; treaties with vanished realms, or past their end, lapse.
         foreach (var t in book.Treaties.ToList())
         {
             var (a, b) = (Capital(world, t.A), Capital(world, t.B));
-            if (a == null || b == null)
+            if (a == null || b == null || t.EndsDay > 0 && world.Time.Day >= t.EndsDay)
             {
                 book.Treaties.Remove(t);
                 continue;
@@ -410,6 +427,7 @@ public static class NpcDiplomacy
             case ProposalKind.Alliance: return opinion > 40 - temper.Caution * 10;
             case ProposalKind.OfferVassalage: return opinion > -30;
             case ProposalKind.DemandVassalage: return ratio >= 2.5 && (temper.Caution >= 0.7 || opinion > 20);
+            case ProposalKind.Peace: return War.NpcWar.WouldMakePeace(world, me, p.FromFaction);
             case ProposalKind.Demand:
             {
                 var seat = Statecraft.Capital(world, me.Id);

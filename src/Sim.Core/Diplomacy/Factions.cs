@@ -38,6 +38,7 @@ public sealed class FactionRules
     public List<PersonalityDef> Personalities { get; set; } = new() { new() { Id = "cautious", Name = "Cautious" } };
 
     public DiplomacyRules Diplomacy { get; set; } = new();
+    public War.FactionWarRules War { get; set; } = new();
 
     public PersonalityDef Personality(string id) => Personalities.FirstOrDefault(p => p.Id == id) ?? Personalities[0];
 }
@@ -74,6 +75,7 @@ public sealed class DiplomacyBook
 
     public List<Treaty> Treaties { get; set; } = new();
     public List<Proposal> Proposals { get; set; } = new();
+    public List<War.WarState> Wars { get; set; } = new();
 
     public Faction? Find(int id)
     {
@@ -116,7 +118,11 @@ public static class Factions
         EnsureFactions(world);
         int npc = world.Settlements.Count(s => IsNpc(world, s));
         if (npc < WantedNpcTowns(world) && world.Settlements.Count > 0) FoundNpcTown(world); // one a day at most
-        if (world.Diplomacy.Factions.Count > 1) Statecraft.Daily(world);
+        if (world.Diplomacy.Factions.Count > 1)
+        {
+            Statecraft.Daily(world);
+            War.FactionWar.Daily(world);
+        }
     }
 
     /// <summary>Gives every town without a faction its own (a player's realm, or a single-player town's).</summary>
@@ -145,7 +151,11 @@ public static class Factions
         if (isNpc)
         {
             string word = rules.HouseWords[world.Rng.Next(rules.HouseWords.Count)];
-            f.Name = name ?? $"{word} {Citizens.Names.FamilyName(world.Rng)}";
+            // A family no other realm bears.
+            string family = Citizens.Names.FamilyName(world.Rng);
+            for (int tries = 0; tries < 20 && world.Diplomacy.Factions.Any(o => o.Name.EndsWith(" " + family)); tries++)
+                family = Citizens.Names.FamilyName(world.Rng);
+            f.Name = name ?? $"{word} {family}";
             f.Personality = rules.Personalities[world.Rng.Next(rules.Personalities.Count)].Id;
         }
         else f.Name = name ?? "Realm";

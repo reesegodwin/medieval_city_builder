@@ -53,6 +53,9 @@ public sealed class WorldSettings
     /// </summary>
     public int NpcTowns { get; set; }
 
+    /// <summary>Least real minutes between a declaration of war and the fighting, whatever the world's speed.</summary>
+    public double MinWarWarningMinutes { get; set; } = 60;
+
     public WorldSettings Clone() => (WorldSettings)MemberwiseClone();
 }
 

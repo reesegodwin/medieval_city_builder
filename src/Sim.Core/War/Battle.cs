@@ -69,6 +69,9 @@ public sealed class BattleResult
 
     /// <summary>Townsfolk who fell (citizen ids), in the order they fell.</summary>
     public List<int> Fallen { get; } = new();
+
+    /// <summary>Attacking soldiers who fell (citizen ids), when the attackers are a town's army.</summary>
+    public List<int> AttackersFallen { get; } = new();
 }
 
 /// <summary>
@@ -139,7 +142,7 @@ public static class BattleResolver
             double toAttackers = dPower * rules.Lethality / Defence(attackers, false) * (0.85 + 0.3 * world.Rng.NextDouble());
 
             int aBefore = Count(attackers), dBefore = Count(defenders);
-            result.AttackerLosses += TakeLosses(world, attackers, toAttackers, null);
+            result.AttackerLosses += TakeLosses(world, attackers, toAttackers, result.AttackersFallen);
             result.DefenderLosses += TakeLosses(world, defenders, toDefenders, result.Fallen);
             int aAfter = Count(attackers), dAfter = Count(defenders);
 

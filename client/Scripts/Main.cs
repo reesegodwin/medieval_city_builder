@@ -329,6 +329,7 @@ public partial class Main : Node3D
         if (SimSession.UserArg("--demo-walls") != null) DemoWalls();
         if (SimSession.UserArg("--demo-raid") != null && _session.Mode == SessionMode.Local) DemoRaid();
         if (SimSession.UserArg("--demo-siege") != null && _session.Mode == SessionMode.Local) DemoSiege();
+        if (SimSession.UserArg("--demo-war") != null && _session.Mode == SessionMode.Local) DemoWar();
         if (int.TryParse(SimSession.UserArg("--look-at-town"), out int townIndex) && townIndex < _session.World.Settlements.Count)
         {
             var other = _session.World.Settlements[townIndex];
@@ -760,6 +761,34 @@ public partial class Main : Node3D
             wall.Hp = Math.Max(1, wall.Hp * (pos == target ? 2 : 5) / 10);
         town.Alert = Alert.CallToArms; // for the banner (the real alert follows at the next day)
         if (SimSession.UserArg("--look-at") == null) _camera.LookAtTile(target.X, target.Y + 7);
+    }
+
+    /// <summary>
+    /// Screenshots (needs --npc): the first neighbour declares war and its army, in its colours, is already close to
+    /// your town; the war shows on the HUD and in the diplomacy panel.
+    /// </summary>
+    private void DemoWar()
+    {
+        var world = _session.World;
+        var town = _session.PlayerTown;
+        if (world.Settlements.Count < 2) return;
+        var enemy = world.Settlements[1];
+        foreach (var f in world.Diplomacy.Factions) f.FoundedDay = -1000;
+        var war = FactionWar.Declare(world, enemy.FactionId, town.FactionId);
+        war.StartsTick = world.Time.Tick;
+        enemy.Stock.Add("weapons", 20);
+        enemy.Stock.Add("bows", 10);
+        foreach (var c in enemy.Citizens) c.Coin = Math.Max(c.Coin, 20); // so the gear can be taken up
+        while (FactionWar.HomeSquads(enemy).Count < 3)
+        {
+            string unit = FactionWar.HomeSquads(enemy).Count == 1 ? "archers" : "spearmen";
+            if (Armies.Raise(world, enemy, unit, 10, levy: false).Squad == null && Armies.Raise(world, enemy, "militia", 10, levy: false).Squad == null) break;
+        }
+        var army = FactionWar.Raise(world, enemy, town, FactionWar.HomeSquads(enemy));
+        double r = Raids.MusterRadius(town) - 2;
+        army.X = town.CenterX;
+        army.Y = town.CenterY - r;
+        if (SimSession.UserArg("--look-at") == null) _camera.LookAtTile((int)army.X, (int)army.Y + 4);
     }
 
     private void DemoWalls()
